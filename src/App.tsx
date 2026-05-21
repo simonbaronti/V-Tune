@@ -7,6 +7,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { Stopwatch } from './components/Stopwatch';
 import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { ReferenceBar } from './components/ReferenceBar';
+import { QuickPitchBar } from './components/QuickPitchBar';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
 
@@ -95,6 +96,7 @@ function App() {
             <StrobeDisplay />
           </div>
           {showSpectrum && <SpectrumAnalyzer />}
+          <QuickPitchBar />
         </div>
 
         {/* Mobile backdrop */}

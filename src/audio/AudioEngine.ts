@@ -78,25 +78,57 @@ export async function startAudio(deviceId?: string): Promise<void> {
   }
 }
 
+// One-shot auto-detect: require this many consecutive frames of the same
+// detected MIDI note before locking in.
+const PITCH_LOCK_VOTES = 4;
+let pitchVoteMidi = -1;
+let pitchVoteCount = 0;
+
 function startPitchDetection() {
+  // Guard against double-starts (subscriber + startAudio could both fire)
+  if (pitchAnimFrame !== null) return;
+
+  pitchVoteMidi = -1;
+  pitchVoteCount = 0;
+
   const detect = () => {
-    if (!analyserNode || !pitchBuffer || !yinDetector) return;
+    if (!analyserNode || !pitchBuffer || !yinDetector) {
+      pitchAnimFrame = null;
+      return;
+    }
 
     const store = useTunerStore.getState();
-    if (!store.isRunning || !store.autoDetect) return;
+    if (!store.isRunning || !store.autoDetect) {
+      pitchAnimFrame = null;
+      return;
+    }
 
     analyserNode.getFloatTimeDomainData(pitchBuffer as Float32Array<ArrayBuffer>);
-
     const pitch = yinDetector(pitchBuffer);
+
     if (pitch && pitch > 20 && pitch < 10000) {
       const note = frequencyToNote(pitch, store.referenceFreq);
       if (note.midi >= 24 && note.midi <= 108) {
-        const prevNote = store.currentNote;
-        if (!prevNote || prevNote.midi !== note.midi) {
-          store.setCurrentNote(note);
-          updateWorkletTargets();
+        if (note.midi === pitchVoteMidi) {
+          pitchVoteCount++;
+          if (pitchVoteCount >= PITCH_LOCK_VOTES) {
+            // Confident lock — set the note, push to worklet, turn AUTO off
+            store.setCurrentNote(note);
+            updateWorkletTargets();
+            store.setAutoDetect(false);
+            pitchVoteMidi = -1;
+            pitchVoteCount = 0;
+            pitchAnimFrame = null;
+            return;
+          }
+        } else {
+          pitchVoteMidi = note.midi;
+          pitchVoteCount = 1;
         }
       }
+    } else {
+      pitchVoteMidi = -1;
+      pitchVoteCount = 0;
     }
 
     pitchAnimFrame = requestAnimationFrame(detect);
@@ -104,6 +136,14 @@ function startPitchDetection() {
 
   pitchAnimFrame = requestAnimationFrame(detect);
 }
+
+// Listen for AUTO being toggled on after startup — start detection whenever
+// (autoDetect ↑ AND isRunning) regardless of the order they happen in.
+useTunerStore.subscribe((state, prevState) => {
+  if (state.autoDetect && !prevState.autoDetect && state.isRunning) {
+    startPitchDetection();
+  }
+});
 
 export function updateWorkletTargets() {
   if (!workletNode) return;
