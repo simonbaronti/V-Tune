@@ -307,22 +307,19 @@ export function StrobeDisplay() {
       ctx.rect(0, y + 2, w, bandHeight - 4);
       ctx.clip();
 
-      // Tinted band background — dark red when out / no signal, lifts to a
-      // brighter green panel when within tolerance so "in tune" is unmistakable
-      const bgL = isInTune ? 22 : isSelected ? 13 : 10;
-      ctx.fillStyle = `hsl(${color.h}, ${color.s}%, ${bgL}%)`;
+      // Solid black band background — the LinoTune look. Colour comes from
+      // the sliding red/green bars below, not from a tinted background.
+      ctx.fillStyle = isSelected ? 'rgba(14, 14, 22, 0.98)' : 'rgba(8, 8, 14, 0.98)';
       ctx.fillRect(0, y + 2, w, bandHeight - 4);
 
       if (displayedAmp > 0.01) {
+        // Alternating colored / black rectangles. Each "cycle" is barWidth
+        // wide and split 50/50 between a coloured bar and a black gap.
+        const barAlpha = Math.min(1, displayedAmp * strobeIntensity);
+        ctx.fillStyle = `hsla(${color.h}, ${color.s}%, ${color.l}%, ${barAlpha})`;
+        const bw = barWidth * 0.5;
         for (let j = -2; j < barCount + 2; j++) {
           const x = j * barWidth + ((newPhase * barWidth) / (2 * Math.PI)) % barWidth;
-          const sin = Math.sin((j * Math.PI) / 1 + newPhase);
-          const brightness = (sin + 1) / 2;
-          const alpha = displayedAmp * brightness * strobeIntensity;
-
-          ctx.fillStyle = `hsla(0, 0%, 92%, ${alpha})`;
-
-          const bw = barWidth * 0.8;
           ctx.fillRect(x - bw / 2, y + 4, bw, bandHeight - 8);
         }
 
