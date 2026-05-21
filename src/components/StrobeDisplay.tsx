@@ -312,10 +312,13 @@ export function StrobeDisplay() {
       ctx.textBaseline = 'middle';
       ctx.fillText(`${getDisplayName(band.noteName, noteNaming)}${band.octave}`, 10, y + bandHeight / 2 - labelSize * 0.15);
 
-      // Frequency below label
+      // Frequency below label — slightly smaller on narrow viewports, with
+      // 8px of breathing room between it and the note label above
+      const isNarrow = w < 500;
+      const hzFontSize = isNarrow ? 16 : 20;
       ctx.fillStyle = 'rgba(180, 180, 200, 0.45)';
-      ctx.font = `20px "JetBrains Mono", monospace`;
-      ctx.fillText(`${band.frequency.toFixed(1)} Hz`, 10, y + bandHeight / 2 + labelSize * 0.35);
+      ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
+      ctx.fillText(`${band.frequency.toFixed(1)} Hz`, 10, y + bandHeight / 2 + labelSize * 0.35 + 8);
 
       // Cents deviation on right — show during live signal, or during
       // decay only if we WERE in tune (so a wrong, red reading doesn't
