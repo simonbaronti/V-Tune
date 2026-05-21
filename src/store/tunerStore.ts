@@ -1,0 +1,320 @@
+import { create } from 'zustand';
+import { noteToFrequency, NOTE_NAMES, type NoteInfo, type NoteNaming } from '../utils/notes';
+
+export interface BandConfig {
+  id: string;
+  noteName: string;
+  octave: number;
+  frequency: number;
+}
+
+export interface StrobeBand extends BandConfig {
+  magnitude: number;
+  phase: number;
+  phaseDelta: number;
+  centsDelta: number;
+  accumulatedPhase: number;
+}
+
+export interface PeakData {
+  freq: number;
+  magnitude: number;
+  db: number;
+}
+
+interface TunerState {
+  isRunning: boolean;
+  referenceFreq: number;
+  currentNote: NoteInfo | null;
+  centsOffset: number;
+  baseFrequency: number;
+  bandConfigs: BandConfig[];
+  bands: StrobeBand[];
+  selectedBandId: string | null;
+  rmsLevel: number;
+  peaks: PeakData[];
+  tolerance: number;
+  autoDetect: boolean;
+  inputDeviceId: string;
+  availableDevices: MediaDeviceInfo[];
+  showBandEditor: boolean;
+  noteNaming: NoteNaming;
+  displaySmoothing: number;
+  strobeSpeed: number;
+  showSpectrum: boolean;
+  readoutSmoothing: number;
+  micGain: number;
+  inTuneHysteresis: number;
+  strobeIntensity: number;
+  theme: 'dark' | 'light';
+
+  setRunning: (running: boolean) => void;
+  setReferenceFreq: (freq: number) => void;
+  setCurrentNote: (note: NoteInfo) => void;
+  setCentsOffset: (cents: number) => void;
+  updateBands: (bandData: { targetFreq: number; magnitude: number; phase: number; phaseDelta: number; centsDelta: number }[]) => void;
+  setRmsLevel: (level: number) => void;
+  setPeaks: (peaks: PeakData[]) => void;
+  setTolerance: (cents: number) => void;
+  setAutoDetect: (auto: boolean) => void;
+  setInputDevice: (deviceId: string) => void;
+  setAvailableDevices: (devices: MediaDeviceInfo[]) => void;
+  setSelectedBand: (id: string | null) => void;
+  setShowBandEditor: (show: boolean) => void;
+  setNoteNaming: (naming: NoteNaming) => void;
+  setDisplaySmoothing: (value: number) => void;
+  setStrobeSpeed: (speed: number) => void;
+  setShowSpectrum: (show: boolean) => void;
+  setReadoutSmoothing: (value: number) => void;
+  setMicGain: (value: number) => void;
+  setInTuneHysteresis: (value: number) => void;
+  setStrobeIntensity: (value: number) => void;
+  setTheme: (theme: 'dark' | 'light') => void;
+  addBandByNote: (noteName: string, octave: number) => void;
+  removeBand: (id: string) => void;
+  updateBandNote: (id: string, noteName: string, octave: number) => void;
+  reorderBands: (fromIndex: number, toIndex: number) => void;
+  syncBandsToCurrentNote: () => void;
+  getTargetFrequencies: () => number[];
+}
+
+let bandCounter = 0;
+function makeBandId(): string {
+  return `band-${++bandCounter}`;
+}
+
+function configsToBands(configs: BandConfig[]): StrobeBand[] {
+  return configs.map((c) => ({
+    ...c,
+    magnitude: 0,
+    phase: 0,
+    phaseDelta: 0,
+    centsDelta: 0,
+    accumulatedPhase: 0,
+  }));
+}
+
+function rebuildFrequencies(configs: BandConfig[], referenceFreq: number): BandConfig[] {
+  return configs.map((c) => ({
+    ...c,
+    frequency: noteToFrequency(c.noteName, c.octave, referenceFreq),
+  }));
+}
+
+function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[] {
+  const configs: BandConfig[] = [];
+  // Fundamental
+  configs.push({
+    id: makeBandId(),
+    noteName: note.name,
+    octave: note.octave,
+    frequency: noteToFrequency(note.name, note.octave, referenceFreq),
+  });
+  // Octave above
+  configs.push({
+    id: makeBandId(),
+    noteName: note.name,
+    octave: note.octave + 1,
+    frequency: noteToFrequency(note.name, note.octave + 1, referenceFreq),
+  });
+  // Octave + 5th (compound 5th)
+  const fifthIndex = (NOTE_NAMES.indexOf(note.name) + 7) % 12;
+  const fifthName = NOTE_NAMES[fifthIndex];
+  const fifthOctave = note.octave + 1 + (NOTE_NAMES.indexOf(note.name) + 7 >= 12 ? 1 : 0);
+  configs.push({
+    id: makeBandId(),
+    noteName: fifthName,
+    octave: fifthOctave,
+    frequency: noteToFrequency(fifthName, fifthOctave, referenceFreq),
+  });
+  return configs.sort((a, b) => b.frequency - a.frequency);
+}
+
+const INITIAL_NOTE: NoteInfo = {
+  name: 'A',
+  flatName: 'A',
+  octave: 4,
+  midi: 69,
+  frequency: 440,
+  centsOff: 0,
+};
+
+const INITIAL_BANDS = defaultBandsForNote(INITIAL_NOTE, 440);
+
+export const useTunerStore = create<TunerState>((set, get) => ({
+  isRunning: false,
+  referenceFreq: 440,
+  currentNote: null,
+  centsOffset: 0,
+  baseFrequency: 440,
+  bandConfigs: INITIAL_BANDS,
+  bands: configsToBands(INITIAL_BANDS),
+  selectedBandId: null,
+  rmsLevel: 0,
+  peaks: [],
+  tolerance: 5,
+  autoDetect: false,
+  inputDeviceId: 'default',
+  availableDevices: [],
+  showBandEditor: false,
+  noteNaming: 'sharp',
+  displaySmoothing: 0.93,
+  strobeSpeed: 1,
+  showSpectrum: false,
+  readoutSmoothing: 0.95,
+  micGain: 1.0,
+  inTuneHysteresis: 1.0,
+  strobeIntensity: 0.9,
+  theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
+
+  setRunning: (running) => set({ isRunning: running }),
+
+  setReferenceFreq: (freq) => {
+    const state = get();
+    const updated = rebuildFrequencies(state.bandConfigs, freq);
+    set({
+      referenceFreq: freq,
+      baseFrequency: state.currentNote
+        ? noteToFrequency(state.currentNote.name, state.currentNote.octave, freq)
+        : freq,
+      bandConfigs: updated,
+      bands: configsToBands(updated),
+    });
+  },
+
+  setCurrentNote: (note) => {
+    const state = get();
+    const newBase = note.frequency * Math.pow(2, state.centsOffset / 1200);
+    const newBands = defaultBandsForNote(note, state.referenceFreq);
+    set({
+      currentNote: note,
+      baseFrequency: newBase,
+      bandConfigs: newBands,
+      bands: configsToBands(newBands),
+    });
+  },
+
+  setCentsOffset: (cents) => {
+    const state = get();
+    const note = state.currentNote;
+    if (note) {
+      const newBase = note.frequency * Math.pow(2, cents / 1200);
+      set({ centsOffset: cents, baseFrequency: newBase });
+    } else {
+      set({ centsOffset: cents });
+    }
+  },
+
+  updateBands: (bandData) => {
+    set((state) => {
+      const updated = state.bands.map((band) => {
+        const data = bandData.find((d) => Math.abs(d.targetFreq - band.frequency) < 0.5);
+        if (!data) return band;
+        return {
+          ...band,
+          magnitude: data.magnitude,
+          phase: data.phase,
+          phaseDelta: data.phaseDelta,
+          centsDelta: data.centsDelta,
+          accumulatedPhase: band.accumulatedPhase + data.phaseDelta,
+        };
+      });
+      return { bands: updated };
+    });
+  },
+
+  setRmsLevel: (level) => set({ rmsLevel: level }),
+  setPeaks: (peaks) => set({ peaks }),
+  setTolerance: (cents) => set({ tolerance: cents }),
+  setAutoDetect: (auto) => set({ autoDetect: auto }),
+  setInputDevice: (deviceId) => set({ inputDeviceId: deviceId }),
+  setAvailableDevices: (devices) => set({ availableDevices: devices }),
+  setSelectedBand: (id) => set((s) => ({ selectedBandId: s.selectedBandId === id ? null : id })),
+  setShowBandEditor: (show) => set({ showBandEditor: show }),
+  setNoteNaming: (naming) => set({ noteNaming: naming }),
+  setDisplaySmoothing: (value) => set({ displaySmoothing: value }),
+  setStrobeSpeed: (speed) => set({ strobeSpeed: speed }),
+  setShowSpectrum: (show) => set({ showSpectrum: show }),
+  setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
+  setMicGain: (value) => set({ micGain: value }),
+  setInTuneHysteresis: (value) => set({ inTuneHysteresis: value }),
+  setStrobeIntensity: (value) => set({ strobeIntensity: value }),
+  setTheme: (theme) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-theme', theme);
+    set({ theme });
+  },
+
+  addBandByNote: (noteName, octave) => {
+    const state = get();
+    const exists = state.bandConfigs.some(
+      (c) => c.noteName === noteName && c.octave === octave,
+    );
+    if (exists) return;
+
+    const config: BandConfig = {
+      id: makeBandId(),
+      noteName,
+      octave,
+      frequency: noteToFrequency(noteName, octave, state.referenceFreq),
+    };
+    const newConfigs = [...state.bandConfigs, config].sort((a, b) => b.frequency - a.frequency);
+    set({
+      bandConfigs: newConfigs,
+      bands: configsToBands(newConfigs),
+    });
+  },
+
+  removeBand: (id) => {
+    const state = get();
+    if (state.bandConfigs.length <= 1) return;
+    const newConfigs = state.bandConfigs.filter((c) => c.id !== id);
+    set({
+      bandConfigs: newConfigs,
+      bands: configsToBands(newConfigs),
+      selectedBandId: state.selectedBandId === id ? null : state.selectedBandId,
+    });
+  },
+
+  updateBandNote: (id, noteName, octave) => {
+    const state = get();
+    const newConfigs = state.bandConfigs.map((c) => {
+      if (c.id !== id) return c;
+      return {
+        ...c,
+        noteName,
+        octave,
+        frequency: noteToFrequency(noteName, octave, state.referenceFreq),
+      };
+    }).sort((a, b) => b.frequency - a.frequency);
+    set({
+      bandConfigs: newConfigs,
+      bands: configsToBands(newConfigs),
+    });
+  },
+
+  reorderBands: (fromIndex, toIndex) => {
+    const state = get();
+    const configs = [...state.bandConfigs];
+    const [moved] = configs.splice(fromIndex, 1);
+    configs.splice(toIndex, 0, moved);
+    set({
+      bandConfigs: configs,
+      bands: configsToBands(configs),
+    });
+  },
+
+  syncBandsToCurrentNote: () => {
+    const state = get();
+    if (!state.currentNote) return;
+    const newBands = defaultBandsForNote(state.currentNote, state.referenceFreq);
+    set({
+      bandConfigs: newBands,
+      bands: configsToBands(newBands),
+      selectedBandId: null,
+    });
+  },
+
+  getTargetFrequencies: () => {
+    return get().bandConfigs.map((c) => c.frequency);
+  },
+}));
