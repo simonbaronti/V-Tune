@@ -39,6 +39,36 @@
   color-scheme: light;
 }
 
+/* High-contrast accessibility mode — boosts text contrast and border
+ * visibility to comfortably meet WCAG AA 4.5:1 on every label. */
+:root.high-contrast {
+  --text-primary: #ffffff;
+  --text-secondary: #e6e6f0;
+  --text-dim: #c4c4d2;
+  --border: #6e6e80;
+}
+
+:root.light.high-contrast {
+  --text-primary: #000000;
+  --text-secondary: #1a1a24;
+  --text-dim: #45455a;
+  --border: #707080;
+}
+
+/* Larger text mode — bumps the html font-size, which scales all rem-based
+ * text proportionally (Tailwind text-sm/base/lg etc. are rem-based). */
+:root.large-text {
+  font-size: 19px; /* base is 16px, so ~+19% */
+}
+
+/* Strong visible focus outline on every interactive element — only when
+ * focus comes from keyboard (not from mouse-click). */
+:focus-visible {
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;

@@ -111,7 +111,14 @@ export function BandEditor() {
                 color: isSelected ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                 border: `1px solid ${isSelected ? 'var(--accent-cyan)' : 'var(--border)'}`,
               }}
+              title={config.isFoundation ? 'Foundation band (locked)' : 'Custom band'}
             >
+              {config.isFoundation && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.6 }}>
+                  <rect x="5" y="11" width="14" height="10" rx="1.5"/>
+                  <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                </svg>
+              )}
               <span className="font-medium">{getDisplayName(config.noteName, noteNaming)}{config.octave}</span>
               <span className="opacity-50 text-xs">{config.frequency.toFixed(1)}</span>
             </button>
@@ -132,43 +139,56 @@ export function BandEditor() {
 
       {/* Edit selected band */}
       {selectedConfig && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>EDIT</span>
-
-          <select
-            value={selectedConfig.noteName}
-            onChange={(e) => handleEditNote(e.target.value)}
-            className="rounded px-2 py-1 text-sm"
-            style={selectStyle}
+        selectedConfig.isFoundation ? (
+          <div
+            className="flex items-center gap-2 text-sm"
+            style={{ color: 'var(--text-dim)' }}
           >
-            {NOTE_NAMES.map((n) => (
-              <option key={n} value={n}>{getDisplayName(n, noteNaming)}</option>
-            ))}
-          </select>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="10" rx="1.5"/>
+              <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+            </svg>
+            Foundation band — locked to the played note
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>EDIT</span>
 
-          <select
-            value={selectedConfig.octave}
-            onChange={(e) => handleEditOctave(parseInt(e.target.value))}
-            className="rounded px-2 py-1 text-sm"
-            style={selectStyle}
-          >
-            {OCTAVE_RANGE.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+            <select
+              value={selectedConfig.noteName}
+              onChange={(e) => handleEditNote(e.target.value)}
+              className="rounded px-2 py-1 text-sm"
+              style={selectStyle}
+            >
+              {NOTE_NAMES.map((n) => (
+                <option key={n} value={n}>{getDisplayName(n, noteNaming)}</option>
+              ))}
+            </select>
 
-          <span className="text-sm opacity-60" style={{ color: 'var(--text-secondary)' }}>
-            {selectedConfig.frequency.toFixed(2)} Hz
-          </span>
+            <select
+              value={selectedConfig.octave}
+              onChange={(e) => handleEditOctave(parseInt(e.target.value))}
+              className="rounded px-2 py-1 text-sm"
+              style={selectStyle}
+            >
+              {OCTAVE_RANGE.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
 
-          <button
-            onClick={handleRemove}
-            className="px-2.5 py-1 rounded text-sm ml-2"
-            style={{ background: 'rgba(255, 59, 59, 0.15)', color: 'var(--accent-red)', border: '1px solid rgba(255, 59, 59, 0.3)' }}
-          >
-            DELETE
-          </button>
-        </div>
+            <span className="text-sm opacity-60" style={{ color: 'var(--text-secondary)' }}>
+              {selectedConfig.frequency.toFixed(2)} Hz
+            </span>
+
+            <button
+              onClick={handleRemove}
+              className="px-2.5 py-1 rounded text-sm ml-2"
+              style={{ background: 'rgba(255, 59, 59, 0.15)', color: 'var(--accent-red)', border: '1px solid rgba(255, 59, 59, 0.3)' }}
+            >
+              DELETE
+            </button>
+          </div>
+        )
       )}
 
       {/* Add new band */}

@@ -15,12 +15,36 @@ function App() {
   useKeyboardShortcuts();
   const showSpectrum = useTunerStore((s) => s.showSpectrum);
   const theme = useTunerStore((s) => s.theme);
+  const highContrast = useTunerStore((s) => s.highContrast);
+  const largeText = useTunerStore((s) => s.largeText);
   const [panelOpen, setPanelOpen] = useState(false);
   const [tuningOpen, setTuningOpen] = useState(true);
+  const [a11yOpen, setA11yOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('high-contrast', highContrast);
+  }, [highContrast]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('large-text', largeText);
+  }, [largeText]);
+
+  // Close the a11y popover when clicking outside
+  useEffect(() => {
+    if (!a11yOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-a11y-popover]')) {
+        setA11yOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [a11yOpen]);
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
@@ -41,6 +65,67 @@ function App() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Accessibility popover */}
+          <div className="relative" data-a11y-popover>
+            <button
+              onClick={() => setA11yOpen(!a11yOpen)}
+              className="w-9 h-9 rounded flex items-center justify-center transition-colors"
+              style={{
+                background: a11yOpen ? 'var(--accent-cyan)' : 'var(--bg-tertiary)',
+                color: a11yOpen ? '#000' : 'var(--text-secondary)',
+                border: `1px solid ${a11yOpen ? 'var(--accent-cyan)' : 'var(--border)'}`,
+              }}
+              aria-label="Accessibility options"
+              title="Accessibility options"
+              aria-expanded={a11yOpen}
+              aria-haspopup="dialog"
+            >
+              {/* Universal accessibility figure */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="4" r="2" />
+                <path d="M5 8h14" />
+                <path d="M9 8v5l-1.5 8" />
+                <path d="M15 8v5l1.5 8" />
+                <path d="M9 13h6" />
+              </svg>
+            </button>
+            {a11yOpen && (
+              <div
+                role="dialog"
+                aria-label="Accessibility options"
+                className="absolute right-0 top-full mt-2 rounded-lg shadow-xl p-3 flex flex-col gap-2 w-64 z-50"
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}
+              >
+                <div className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
+                  Accessibility
+                </div>
+                <label className="flex items-center justify-between gap-3 py-1 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <span>High contrast</span>
+                  <input
+                    type="checkbox"
+                    checked={highContrast}
+                    onChange={(e) => useTunerStore.getState().setHighContrast(e.target.checked)}
+                    className="w-5 h-5 cursor-pointer"
+                    style={{ accentColor: 'var(--accent-cyan)' }}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 py-1 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <span>Larger text</span>
+                  <input
+                    type="checkbox"
+                    checked={largeText}
+                    onChange={(e) => useTunerStore.getState().setLargeText(e.target.checked)}
+                    className="w-5 h-5 cursor-pointer"
+                    style={{ accentColor: 'var(--accent-cyan)' }}
+                  />
+                </label>
+                <div className="text-xs pt-1" style={{ color: 'var(--text-dim)' }}>
+                  Settings persist across sessions.
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => useTunerStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="w-9 h-9 rounded flex items-center justify-center transition-colors"

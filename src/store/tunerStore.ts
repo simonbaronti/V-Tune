@@ -6,6 +6,9 @@ export interface BandConfig {
   noteName: string;
   octave: number;
   frequency: number;
+  /** Foundation bands (fundamental + octave + 12th) are auto-managed —
+   * they can't be edited, removed, or reordered. */
+  isFoundation: boolean;
 }
 
 export interface StrobeBand extends BandConfig {
@@ -47,6 +50,8 @@ interface TunerState {
   inTuneHysteresis: number;
   strobeIntensity: number;
   theme: 'dark' | 'light';
+  highContrast: boolean;
+  largeText: boolean;
 
   setRunning: (running: boolean) => void;
   setReferenceFreq: (freq: number) => void;
@@ -70,6 +75,8 @@ interface TunerState {
   setInTuneHysteresis: (value: number) => void;
   setStrobeIntensity: (value: number) => void;
   setTheme: (theme: 'dark' | 'light') => void;
+  setHighContrast: (on: boolean) => void;
+  setLargeText: (on: boolean) => void;
   addBandByNote: (noteName: string, octave: number) => void;
   removeBand: (id: string) => void;
   updateBandNote: (id: string, noteName: string, octave: number) => void;
@@ -109,6 +116,7 @@ function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[
     noteName: note.name,
     octave: note.octave,
     frequency: noteToFrequency(note.name, note.octave, referenceFreq),
+    isFoundation: true,
   });
   // Octave above
   configs.push({
@@ -116,6 +124,7 @@ function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[
     noteName: note.name,
     octave: note.octave + 1,
     frequency: noteToFrequency(note.name, note.octave + 1, referenceFreq),
+    isFoundation: true,
   });
   // Octave + 5th (compound 5th)
   const fifthIndex = (NOTE_NAMES.indexOf(note.name) + 7) % 12;
@@ -126,8 +135,17 @@ function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[
     noteName: fifthName,
     octave: fifthOctave,
     frequency: noteToFrequency(fifthName, fifthOctave, referenceFreq),
+    isFoundation: true,
   });
   return configs.sort((a, b) => b.frequency - a.frequency);
+}
+
+/** Re-sorts a band list so additional bands stack on top (sorted by freq
+ * desc) and foundation bands stay locked at the bottom in their order. */
+function partitionAndSort(configs: BandConfig[]): BandConfig[] {
+  const additional = configs.filter((c) => !c.isFoundation).sort((a, b) => b.frequency - a.frequency);
+  const foundation = configs.filter((c) => c.isFoundation).sort((a, b) => b.frequency - a.frequency);
+  return [...additional, ...foundation];
 }
 
 const INITIAL_NOTE: NoteInfo = {
@@ -166,6 +184,8 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   inTuneHysteresis: 1.0,
   strobeIntensity: 0.9,
   theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
+  highContrast: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-high-contrast') === '1'),
+  largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
 
   setRunning: (running) => set({ isRunning: running }),
 
@@ -243,6 +263,14 @@ export const useTunerStore = create<TunerState>((set, get) => ({
     if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-theme', theme);
     set({ theme });
   },
+  setHighContrast: (on) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-high-contrast', on ? '1' : '0');
+    set({ highContrast: on });
+  },
+  setLargeText: (on) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-large-text', on ? '1' : '0');
+    set({ largeText: on });
+  },
 
   addBandByNote: (noteName, octave) => {
     const state = get();
@@ -256,8 +284,9 @@ export const useTunerStore = create<TunerState>((set, get) => ({
       noteName,
       octave,
       frequency: noteToFrequency(noteName, octave, state.referenceFreq),
+      isFoundation: false,
     };
-    const newConfigs = [...state.bandConfigs, config].sort((a, b) => b.frequency - a.frequency);
+    const newConfigs = partitionAndSort([...state.bandConfigs, config]);
     set({
       bandConfigs: newConfigs,
       bands: configsToBands(newConfigs),
@@ -266,7 +295,8 @@ export const useTunerStore = create<TunerState>((set, get) => ({
 
   removeBand: (id) => {
     const state = get();
-    if (state.bandConfigs.length <= 1) return;
+    const band = state.bandConfigs.find((c) => c.id === id);
+    if (!band || band.isFoundation) return; // Foundation bands are locked
     const newConfigs = state.bandConfigs.filter((c) => c.id !== id);
     set({
       bandConfigs: newConfigs,
@@ -277,7 +307,9 @@ export const useTunerStore = create<TunerState>((set, get) => ({
 
   updateBandNote: (id, noteName, octave) => {
     const state = get();
-    const newConfigs = state.bandConfigs.map((c) => {
+    const target = state.bandConfigs.find((c) => c.id === id);
+    if (!target || target.isFoundation) return; // Foundation bands are locked
+    const updated = state.bandConfigs.map((c) => {
       if (c.id !== id) return c;
       return {
         ...c,
@@ -285,7 +317,8 @@ export const useTunerStore = create<TunerState>((set, get) => ({
         octave,
         frequency: noteToFrequency(noteName, octave, state.referenceFreq),
       };
-    }).sort((a, b) => b.frequency - a.frequency);
+    });
+    const newConfigs = partitionAndSort(updated);
     set({
       bandConfigs: newConfigs,
       bands: configsToBands(newConfigs),
@@ -294,6 +327,10 @@ export const useTunerStore = create<TunerState>((set, get) => ({
 
   reorderBands: (fromIndex, toIndex) => {
     const state = get();
+    const fromBand = state.bandConfigs[fromIndex];
+    const toBand = state.bandConfigs[toIndex];
+    // Either band missing, or either is a foundation → no-op
+    if (!fromBand || !toBand || fromBand.isFoundation || toBand.isFoundation) return;
     const configs = [...state.bandConfigs];
     const [moved] = configs.splice(fromIndex, 1);
     configs.splice(toIndex, 0, moved);

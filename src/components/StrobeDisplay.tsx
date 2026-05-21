@@ -35,14 +35,25 @@ export function StrobeDisplay() {
   // the time that peak was set.
   const peakAmpRef = useRef<Map<string, number>>(new Map());
   const peakTimeRef = useRef<Map<string, number>>(new Map());
-  const dragRef = useRef<{ fromIndex: number; currentY: number; active: boolean }>({
+  // Long-press drag-to-reorder. Only non-foundation bands can drag.
+  const LONG_PRESS_MS = 350;
+  const dragRef = useRef<{ fromIndex: number; currentY: number; active: boolean; canDrag: boolean }>({
     fromIndex: -1,
     currentY: 0,
     active: false,
+    canDrag: false,
   });
   const dragStartYRef = useRef(0);
+  const longPressTimerRef = useRef<number | null>(null);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -50,44 +61,77 @@ export function StrobeDisplay() {
     const state = useTunerStore.getState();
     const idx = getBandIndexAtY(y, rect.height, state.bands.length);
     if (idx === -1) return;
-    dragRef.current = { fromIndex: idx, currentY: y, active: false };
+    const band = state.bands[idx];
+    const canDrag = !band.isFoundation;
+    dragRef.current = { fromIndex: idx, currentY: y, active: false, canDrag };
     dragStartYRef.current = y;
+
+    if (canDrag) {
+      // Capture so we keep receiving moves even if pointer leaves the canvas
+      canvas.setPointerCapture(e.pointerId);
+      cancelLongPress();
+      longPressTimerRef.current = window.setTimeout(() => {
+        // Promote to active drag after the hold delay
+        if (dragRef.current.fromIndex === idx) {
+          dragRef.current.active = true;
+          // Tiny haptic on supported devices
+          if (navigator.vibrate) navigator.vibrate(10);
+        }
+        longPressTimerRef.current = null;
+      }, LONG_PRESS_MS);
+    }
   }, []);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragRef.current.fromIndex === -1) return;
     const canvas = canvasRef.current;
-    if (!canvas || dragRef.current.fromIndex === -1) return;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    if (!dragRef.current.active && Math.abs(y - dragStartYRef.current) > 8) {
-      dragRef.current.active = true;
+    // If the user moves too far before long-press fires, cancel it
+    // (treat as a swipe/scroll rather than a hold).
+    if (!dragRef.current.active && Math.abs(y - dragStartYRef.current) > 12) {
+      cancelLongPress();
+      dragRef.current.fromIndex = -1;
+      return;
     }
     dragRef.current.currentY = y;
   }, []);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    cancelLongPress();
     const canvas = canvasRef.current;
-    if (!canvas) { dragRef.current = { fromIndex: -1, currentY: 0, active: false }; return; }
+    if (!canvas) {
+      dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
+      return;
+    }
+    try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const state = useTunerStore.getState();
 
     if (dragRef.current.active) {
       const toIndex = getBandIndexAtY(y, rect.height, state.bands.length);
-      if (toIndex !== -1 && toIndex !== dragRef.current.fromIndex) {
+      const fromBand = state.bands[dragRef.current.fromIndex];
+      const toBand = toIndex !== -1 ? state.bands[toIndex] : null;
+      // Both must be non-foundation to swap
+      if (toBand && fromBand && !fromBand.isFoundation && !toBand.isFoundation
+          && toIndex !== dragRef.current.fromIndex) {
         state.reorderBands(dragRef.current.fromIndex, toIndex);
       }
-    } else {
+    } else if (dragRef.current.fromIndex !== -1) {
+      // Quick tap → select the band (still allowed for foundation bands)
       const idx = getBandIndexAtY(y, rect.height, state.bands.length);
       if (idx !== -1) {
         state.setSelectedBand(state.bands[idx].id);
       }
     }
-    dragRef.current = { fromIndex: -1, currentY: 0, active: false };
+    dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
   }, []);
 
-  const handleMouseLeave = useCallback(() => {
-    dragRef.current = { fromIndex: -1, currentY: 0, active: false };
+  const handlePointerCancel = useCallback(() => {
+    cancelLongPress();
+    dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
   }, []);
 
   const draw = useCallback(() => {
@@ -339,10 +383,12 @@ export function StrobeDisplay() {
         ctx.fillText(`${hzOff >= 0 ? '+' : ''}${hzOff.toFixed(1)} Hz`, w - 10, y + bandHeight / 2 + centsSize * 0.55);
       }
 
-      // Separator
+      // Separator — chunky at the foundation boundary, thin between bands
       if (i < numBands - 1) {
-        ctx.strokeStyle = '#1e1e2a';
-        ctx.lineWidth = 1;
+        const next = bands[i + 1];
+        const isBoundary = !band.isFoundation && next.isFoundation;
+        ctx.strokeStyle = isBoundary ? 'rgba(6, 182, 212, 0.55)' : '#1e1e2a';
+        ctx.lineWidth = isBoundary ? 4 : 1;
         ctx.beginPath();
         ctx.moveTo(0, y + bandHeight);
         ctx.lineTo(w, y + bandHeight);
@@ -350,24 +396,43 @@ export function StrobeDisplay() {
       }
     }
 
-    // Drag indicator
+    // Drag-active overlay — "lifts" the dragged band visually and shows the
+    // drop position with a glowing insert line. Only fires for non-foundation
+    // bands (foundation bands never reach the active state).
     if (dragRef.current.active && dragRef.current.fromIndex !== -1) {
-      const toIdx = getBandIndexAtY(dragRef.current.currentY, h, numBands);
-      if (toIdx !== -1 && toIdx !== dragRef.current.fromIndex) {
-        const insertY = toIdx > dragRef.current.fromIndex
-          ? startY + (toIdx + 1) * bandHeight
-          : startY + toIdx * bandHeight;
+      const dragY = startY + dragRef.current.fromIndex * bandHeight;
+      const fromBand = bands[dragRef.current.fromIndex];
+      const candidateIdx = getBandIndexAtY(dragRef.current.currentY, h, numBands);
+      const candidateBand = candidateIdx !== -1 ? bands[candidateIdx] : null;
+      const validDrop =
+        candidateBand !== null &&
+        !candidateBand.isFoundation &&
+        candidateIdx !== dragRef.current.fromIndex;
+
+      if (validDrop) {
+        const insertY = candidateIdx > dragRef.current.fromIndex
+          ? startY + (candidateIdx + 1) * bandHeight
+          : startY + candidateIdx * bandHeight;
+        // Soft glow
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 8;
         ctx.strokeStyle = '#06b6d4';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(0, insertY);
         ctx.lineTo(w, insertY);
         ctx.stroke();
+        ctx.shadowBlur = 0;
       }
-      // Dim the dragged band
-      const dragY = startY + dragRef.current.fromIndex * bandHeight;
-      ctx.fillStyle = 'rgba(6, 182, 212, 0.08)';
-      ctx.fillRect(0, dragY + 2, w, bandHeight - 4);
+
+      // Highlight the band being dragged
+      if (fromBand && !fromBand.isFoundation) {
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.14)';
+        ctx.fillRect(0, dragY + 2, w, bandHeight - 4);
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(2, dragY + 3, w - 4, bandHeight - 6);
+      }
     }
 
     animFrameRef.current = requestAnimationFrame(draw);
@@ -384,11 +449,14 @@ export function StrobeDisplay() {
     <canvas
       ref={canvasRef}
       className="w-full h-full"
-      style={{ cursor: dragRef.current.active ? 'grabbing' : 'pointer' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      style={{
+        cursor: dragRef.current.active ? 'grabbing' : 'pointer',
+        touchAction: 'none',
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     />
   );
 }
