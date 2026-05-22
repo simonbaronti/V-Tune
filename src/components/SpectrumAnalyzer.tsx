@@ -1,10 +1,15 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useTunerStore } from '../store/tunerStore';
-import { getAnalyserNode, getAudioContext } from '../audio/AudioEngine';
+import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 
 const MIN_FREQ = 20;
 const MAX_FREQ = 16000;
+// Zoom limits expressed as a log10 frequency span.
+// Full range ≈ 2.9; the small min lets you zoom right in on a single peak
+// (~0.008 ≈ a ±1% window, e.g. ~±10 Hz around 1 kHz).
+const MAX_LOG_SPAN = Math.log10(MAX_FREQ) - Math.log10(MIN_FREQ);
+const MIN_LOG_SPAN = 0.008;
 const DB_FLOOR = -100;
 const DB_CEIL = -10;
 
@@ -46,6 +51,8 @@ export function SpectrumAnalyzer() {
   const peakHoldRef = useRef<Float32Array | null>(null);
 
   const bands = useTunerStore((s) => s.bands);
+  const fftSize = useTunerStore((s) => s.fftSize);
+  const fftSmoothing = useTunerStore((s) => s.fftSmoothing);
 
   const [viewRange, setViewRange] = useState<[number, number]>([MIN_FREQ, MAX_FREQ]);
   const [threshold, setThreshold] = useState(-60);
@@ -164,9 +171,12 @@ export function SpectrumAnalyzer() {
       const smooth = smoothDataRef.current!;
       const peaks = peakHoldRef.current!;
       // AnalyserNode already applies temporal smoothing via
-      // smoothingTimeConstant, so use its output directly
+      // smoothingTimeConstant, so use its output directly. The threshold
+      // line acts as a noise gate — anything below it is flattened to the
+      // floor so only peaks above the line survive.
       for (let i = 0; i < binCount; i++) {
-        const val = isFinite(raw[i]) ? raw[i] : DB_FLOOR;
+        let val = isFinite(raw[i]) ? raw[i] : DB_FLOOR;
+        if (val < currentThreshold) val = DB_FLOOR;
         smooth[i] = val;
         if (smooth[i] > peaks[i]) {
           peaks[i] = smooth[i];
@@ -333,6 +343,14 @@ export function SpectrumAnalyzer() {
     };
   }, [draw]);
 
+  useEffect(() => {
+    setAnalyserFftSize(fftSize);
+  }, [fftSize]);
+
+  useEffect(() => {
+    setAnalyserSmoothing(fftSmoothing);
+  }, [fftSmoothing]);
+
   const findNearestMarker = useCallback((x: number, w: number): Marker | null => {
     const [minF, maxF] = viewRange;
     let closest: Marker | null = null;
@@ -474,7 +492,7 @@ export function SpectrumAnalyzer() {
     const logSpan = logMax - logMin;
 
     const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
-    const newSpan = Math.max(0.3, Math.min(Math.log10(MAX_FREQ) - Math.log10(MIN_FREQ), logSpan * zoomFactor));
+    const newSpan = Math.max(MIN_LOG_SPAN, Math.min(MAX_LOG_SPAN, logSpan * zoomFactor));
 
     const ratio = (logCenter - logMin) / logSpan;
     let newLogMin = logCenter - ratio * newSpan;
@@ -485,6 +503,55 @@ export function SpectrumAnalyzer() {
 
     setViewRange([Math.pow(10, newLogMin), Math.pow(10, newLogMax)]);
   }, [viewRange]);
+
+  // ── Pinch-to-zoom (mobile) ──────────────────────────────────────────
+  const pinchRef = useRef<{ startDist: number; startRange: [number, number]; centerFreq: number } | null>(null);
+
+  const touchDistance = (touches: React.TouchList) =>
+    Math.hypot(
+      touches[0].clientX - touches[1].clientX,
+      touches[0].clientY - touches[1].clientY,
+    );
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length !== 2) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+    const [minF, maxF] = viewRange;
+    pinchRef.current = {
+      startDist: touchDistance(e.touches),
+      startRange: [minF, maxF],
+      centerFreq: xToFreq(midX, rect.width, minF, maxF),
+    };
+  }, [viewRange]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length !== 2 || !pinchRef.current) return;
+    e.preventDefault();
+    const dist = touchDistance(e.touches);
+    if (dist <= 0) return;
+    // Fingers apart (dist grows) → ratio < 1 → span shrinks → zoom in
+    const ratioChange = pinchRef.current.startDist / dist;
+    const [sMin, sMax] = pinchRef.current.startRange;
+    const logMin = Math.log10(sMin);
+    const logMax = Math.log10(sMax);
+    const logSpan = logMax - logMin;
+    const logCenter = Math.log10(pinchRef.current.centerFreq);
+    const newSpan = Math.max(MIN_LOG_SPAN, Math.min(MAX_LOG_SPAN, logSpan * ratioChange));
+    const centerRatio = (logCenter - logMin) / logSpan;
+    let newLogMin = logCenter - centerRatio * newSpan;
+    let newLogMax = logCenter + (1 - centerRatio) * newSpan;
+    newLogMin = Math.max(Math.log10(MIN_FREQ), newLogMin);
+    newLogMax = Math.min(Math.log10(MAX_FREQ), newLogMax);
+    setViewRange([Math.pow(10, newLogMin), Math.pow(10, newLogMax)]);
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length < 2) pinchRef.current = null;
+  }, []);
 
   const handleDoubleClick = useCallback(() => {
     setViewRange([MIN_FREQ, MAX_FREQ]);
@@ -523,10 +590,42 @@ export function SpectrumAnalyzer() {
           </button>
         </div>
       </div>
+      <div
+        className="flex items-center gap-3 px-2 py-1"
+        style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
+      >
+        <label className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>
+          FFT
+          <select
+            value={fftSize}
+            onChange={(e) => useTunerStore.getState().setFftSize(parseInt(e.target.value))}
+            className="rounded px-1 py-0.5 text-[9px]"
+            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+          >
+            {[1024, 2048, 4096, 8192, 16384].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5 text-[9px] flex-1" style={{ color: 'var(--text-dim)' }}>
+          SMOOTH
+          <input
+            type="range"
+            min="0"
+            max="0.99"
+            step="0.01"
+            value={fftSmoothing}
+            onChange={(e) => useTunerStore.getState().setFftSmoothing(parseFloat(e.target.value))}
+            className="flex-1 h-1"
+            style={{ accentColor: 'var(--accent-blue)' }}
+          />
+          <span style={{ color: 'var(--text-secondary)' }}>{Math.round(fftSmoothing * 100)}%</span>
+        </label>
+      </div>
       <canvas
         ref={canvasRef}
         className="w-full"
-        style={{ height: '200px', cursor: getCursor() }}
+        style={{ height: '200px', cursor: getCursor(), touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -534,6 +633,10 @@ export function SpectrumAnalyzer() {
         onWheel={handleWheel}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       />
     </div>
   );

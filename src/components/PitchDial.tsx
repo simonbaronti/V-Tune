@@ -1,8 +1,15 @@
 import { useState, useCallback, useRef } from 'react';
 import { useTunerStore } from '../store/tunerStore';
-import { noteToFrequency, NOTE_NAMES, getDisplayName } from '../utils/notes';
+import { noteToFrequency, NOTE_NAMES, getDisplayName, type NoteNaming } from '../utils/notes';
 import { updateWorkletTargets } from '../audio/AudioEngine';
 import { playTone, stopTone, getActiveFreq } from '../audio/PitchPipe';
+
+const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
+  { value: 'sharp', label: '♯' },
+  { value: 'flat', label: '♭' },
+  { value: 'solfege', label: 'Do' },
+  { value: 'german', label: 'DE' },
+];
 
 // Piano layout — 7 natural notes (white keys) and 5 sharps (black keys)
 const NATURALS = [0, 2, 4, 5, 7, 9, 11]; // C  D  E  F  G  A  B
@@ -150,8 +157,24 @@ export function PitchDial() {
       className="flex flex-col gap-2 px-3 py-3 shrink-0"
       style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}
     >
-      {/* Top row — Octave + Mode + Root */}
-      <div className="flex items-center gap-2">
+      {/* Piano-style note grid */}
+      <div
+        className="grid gap-1"
+        style={{
+          gridTemplateColumns: 'repeat(14, minmax(0, 1fr))',
+          gridTemplateRows: 'auto auto',
+        }}
+      >
+        {SHARPS.map(({ idx, col }) => (
+          <NoteButton key={idx} idx={idx} isSharp gridCol={col} />
+        ))}
+        {NATURALS.map((idx, i) => (
+          <NoteButton key={idx} idx={idx} isSharp={false} gridCol={i * 2 + 1} />
+        ))}
+      </div>
+
+      {/* Octave control + note-naming selector */}
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1.5">
           <span className="text-sm" style={{ color: 'var(--text-dim)' }}>OCT</span>
           <button
@@ -180,22 +203,23 @@ export function PitchDial() {
             }}
           >+</button>
         </div>
-      </div>
 
-      {/* Piano-style note grid */}
-      <div
-        className="grid gap-1"
-        style={{
-          gridTemplateColumns: 'repeat(14, minmax(0, 1fr))',
-          gridTemplateRows: 'auto auto',
-        }}
-      >
-        {SHARPS.map(({ idx, col }) => (
-          <NoteButton key={idx} idx={idx} isSharp gridCol={col} />
-        ))}
-        {NATURALS.map((idx, i) => (
-          <NoteButton key={idx} idx={idx} isSharp={false} gridCol={i * 2 + 1} />
-        ))}
+        <div className="flex items-center gap-1">
+          {NAMING_LABELS.map((n) => (
+            <button
+              key={n.value}
+              onClick={() => useTunerStore.getState().setNoteNaming(n.value)}
+              className="px-2.5 py-1 rounded text-sm transition-colors"
+              style={{
+                background: noteNaming === n.value ? 'rgba(6, 182, 212, 0.2)' : 'transparent',
+                color: noteNaming === n.value ? 'var(--accent-cyan)' : 'var(--text-dim)',
+                border: noteNaming === n.value ? '1px solid var(--accent-cyan)' : '1px solid var(--border)',
+              }}
+            >
+              {n.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Active pitch pipe indicator */}

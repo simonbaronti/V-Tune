@@ -1,28 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useTunerStore } from '../store/tunerStore';
-import { enumerateDevices, setMicGain, startAudio, stopAudio } from '../audio/AudioEngine';
-import type { NoteNaming } from '../utils/notes';
-
-const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
-  { value: 'sharp', label: '♯' },
-  { value: 'flat', label: '♭' },
-  { value: 'solfege', label: 'Do' },
-  { value: 'german', label: 'DE' },
-];
+import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
 
 export function SettingsPanel() {
-  const [open, setOpen] = useState(false);
+  const open = useTunerStore((s) => s.openAccordion === 'settings');
 
   const isRunning = useTunerStore((s) => s.isRunning);
   const availableDevices = useTunerStore((s) => s.availableDevices);
   const inputDeviceId = useTunerStore((s) => s.inputDeviceId);
-  const noteNaming = useTunerStore((s) => s.noteNaming);
   const displaySmoothing = useTunerStore((s) => s.displaySmoothing);
   const strobeSpeed = useTunerStore((s) => s.strobeSpeed);
   const readoutSmoothing = useTunerStore((s) => s.readoutSmoothing);
-  const micGain = useTunerStore((s) => s.micGain);
-  const inTuneHysteresis = useTunerStore((s) => s.inTuneHysteresis);
+  const micGainDb = useTunerStore((s) => s.micGainDb);
   const strobeIntensity = useTunerStore((s) => s.strobeIntensity);
+  const strobeSoftness = useTunerStore((s) => s.strobeSoftness);
+  const highContrast = useTunerStore((s) => s.highContrast);
+  const largeText = useTunerStore((s) => s.largeText);
 
   useEffect(() => {
     enumerateDevices();
@@ -44,7 +37,7 @@ export function SettingsPanel() {
       style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
     >
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => useTunerStore.getState().toggleAccordion('settings')}
         className="w-full flex items-center justify-between px-4 py-3 transition-colors"
         style={{ background: 'transparent', color: 'var(--text-secondary)' }}
         aria-expanded={open}
@@ -91,41 +84,23 @@ export function SettingsPanel() {
           </label>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm mr-1" style={{ color: 'var(--text-dim)' }}>NOTES</span>
-            {NAMING_LABELS.map((n) => (
-              <button
-                key={n.value}
-                onClick={() => useTunerStore.getState().setNoteNaming(n.value)}
-                className="px-2.5 py-1 rounded text-sm transition-all"
-                style={{
-                  background: noteNaming === n.value ? 'rgba(6, 182, 212, 0.2)' : 'transparent',
-                  color: noteNaming === n.value ? 'var(--accent-cyan)' : 'var(--text-dim)',
-                  border: noteNaming === n.value ? '1px solid var(--accent-cyan)' : '1px solid transparent',
-                }}
-              >
-                {n.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>MIC</span>
+            <span className="text-sm" style={{ color: 'var(--text-dim)' }} title="Input gain in decibels — 0 dB is unmodified, positive lifts a quiet mic">MIC</span>
             <input
               type="range"
-              min="0.1"
-              max="5"
-              step="0.05"
-              value={micGain}
+              min="-12"
+              max="30"
+              step="1"
+              value={micGainDb}
               onChange={(e) => {
                 const v = parseFloat(e.target.value);
-                useTunerStore.getState().setMicGain(v);
-                setMicGain(v);
+                useTunerStore.getState().setMicGainDb(v);
+                setMicGainDb(v);
               }}
               className="flex-1 h-1"
               style={{ accentColor: 'var(--accent-blue)' }}
             />
-            <span className="text-sm w-12 text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-              {micGain.toFixed(2)}×
+            <span className="text-sm w-14 text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+              {micGainDb > 0 ? '+' : ''}{micGainDb} dB
             </span>
           </div>
 
@@ -147,8 +122,25 @@ export function SettingsPanel() {
           </div>
 
           <div className="flex items-center gap-2">
+            <span className="text-sm" style={{ color: 'var(--text-dim)' }} title="Softness of the red/green bar edges — 0 is razor-sharp, 100% is a feathered glow">BLUR</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={strobeSoftness}
+              onChange={(e) => useTunerStore.getState().setStrobeSoftness(parseFloat(e.target.value))}
+              className="flex-1 h-1"
+              style={{ accentColor: 'var(--accent-blue)' }}
+            />
+            <span className="text-sm w-10 text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+              {Math.round(strobeSoftness * 100)}%
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <span className="text-sm mr-1" style={{ color: 'var(--text-dim)' }}>SPEED</span>
-            {[1, 2, 5, 10].map((s) => (
+            {[1, 2, 3, 5, 10].map((s) => (
               <button
                 key={s}
                 onClick={() => useTunerStore.getState().setStrobeSpeed(s)}
@@ -164,55 +156,75 @@ export function SettingsPanel() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>SMOOTH</span>
-            <input
-              type="range"
-              min="0"
-              max="0.95"
-              step="0.05"
-              value={displaySmoothing}
-              onChange={(e) => useTunerStore.getState().setDisplaySmoothing(parseFloat(e.target.value))}
-              className="flex-1 h-1"
-              style={{ accentColor: 'var(--accent-blue)' }}
-            />
-            <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
-              {Math.round(displaySmoothing * 100)}%
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>SMOOTH</span>
+              <input
+                type="range"
+                min="0"
+                max="0.95"
+                step="0.05"
+                value={displaySmoothing}
+                onChange={(e) => useTunerStore.getState().setDisplaySmoothing(parseFloat(e.target.value))}
+                className="flex-1 h-1"
+                style={{ accentColor: 'var(--accent-blue)' }}
+              />
+              <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
+                {Math.round(displaySmoothing * 100)}%
+              </span>
+            </div>
+            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
+              How calm the moving bars &amp; colour are. Higher = smoother but slightly slower to react.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>READOUT</span>
-            <input
-              type="range"
-              min="0"
-              max="0.99"
-              step="0.01"
-              value={readoutSmoothing}
-              onChange={(e) => useTunerStore.getState().setReadoutSmoothing(parseFloat(e.target.value))}
-              className="flex-1 h-1"
-              style={{ accentColor: 'var(--accent-blue)' }}
-            />
-            <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
-              {Math.round(readoutSmoothing * 100)}%
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>READOUT</span>
+              <input
+                type="range"
+                min="0"
+                max="0.99"
+                step="0.01"
+                value={readoutSmoothing}
+                onChange={(e) => useTunerStore.getState().setReadoutSmoothing(parseFloat(e.target.value))}
+                className="flex-1 h-1"
+                style={{ accentColor: 'var(--accent-blue)' }}
+              />
+              <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
+                {Math.round(readoutSmoothing * 100)}%
+              </span>
+            </div>
+            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
+              How steady the cents number is. Higher = the number holds still; lower = it updates in real time.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }} title="Extra cents past TOL the reading can drift before flipping red — kills boundary flicker">HYST</span>
-            <input
-              type="range"
-              min="0"
-              max="5"
-              step="0.1"
-              value={inTuneHysteresis}
-              onChange={(e) => useTunerStore.getState().setInTuneHysteresis(parseFloat(e.target.value))}
-              className="flex-1 h-1"
-              style={{ accentColor: 'var(--accent-blue)' }}
-            />
-            <span className="text-sm w-10 text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-              {inTuneHysteresis.toFixed(1)}¢
+          {/* Accessibility options */}
+          <div className="flex flex-col gap-2 pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+            <span className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+              ACCESSIBILITY OPTIONS
             </span>
+            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+              <span>High contrast</span>
+              <input
+                type="checkbox"
+                checked={highContrast}
+                onChange={(e) => useTunerStore.getState().setHighContrast(e.target.checked)}
+                className="w-5 h-5 cursor-pointer"
+                style={{ accentColor: 'var(--accent-cyan)' }}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+              <span>Larger text</span>
+              <input
+                type="checkbox"
+                checked={largeText}
+                onChange={(e) => useTunerStore.getState().setLargeText(e.target.checked)}
+                className="w-5 h-5 cursor-pointer"
+                style={{ accentColor: 'var(--accent-cyan)' }}
+              />
+            </label>
           </div>
         </div>
       )}

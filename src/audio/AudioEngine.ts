@@ -35,7 +35,7 @@ export async function startAudio(deviceId?: string): Promise<void> {
 
     sourceNode = audioContext.createMediaStreamSource(stream);
     gainNode = audioContext.createGain();
-    gainNode.gain.value = store.micGain;
+    gainNode.gain.value = dbToGain(store.micGainDb);
     workletNode = new AudioWorkletNode(audioContext, 'tuner-processor');
 
     workletNode.port.postMessage({ type: 'setSampleRate', sampleRate });
@@ -57,8 +57,8 @@ export async function startAudio(deviceId?: string): Promise<void> {
     };
 
     analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 16384;
-    analyserNode.smoothingTimeConstant = 0.99;
+    analyserNode.fftSize = store.fftSize;
+    analyserNode.smoothingTimeConstant = store.fftSmoothing;
     pitchBuffer = new Float32Array(ANALYSIS_BUFFER_SIZE);
 
     sourceNode.connect(gainNode);
@@ -199,8 +199,21 @@ export function getAnalyserNode(): AnalyserNode | null {
   return analyserNode;
 }
 
-export function setMicGain(value: number): void {
-  if (gainNode) gainNode.gain.value = value;
+export function setAnalyserFftSize(size: number): void {
+  if (analyserNode) analyserNode.fftSize = size;
+}
+
+export function setAnalyserSmoothing(value: number): void {
+  if (analyserNode) analyserNode.smoothingTimeConstant = value;
+}
+
+// Convert decibels to a linear amplitude multiplier (0 dB = unity gain)
+function dbToGain(db: number): number {
+  return Math.pow(10, db / 20);
+}
+
+export function setMicGainDb(db: number): void {
+  if (gainNode) gainNode.gain.value = dbToGain(db);
 }
 
 export function getAudioContext(): AudioContext | null {

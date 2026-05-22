@@ -15,7 +15,7 @@ export function BandEditor() {
   const bandConfigs = useTunerStore((s) => s.bandConfigs);
   const selectedBandId = useTunerStore((s) => s.selectedBandId);
   const currentNote = useTunerStore((s) => s.currentNote);
-  const showBandEditor = useTunerStore((s) => s.showBandEditor);
+  const showBandEditor = useTunerStore((s) => s.openAccordion === 'bands');
   const noteNaming = useTunerStore((s) => s.noteNaming);
 
   const [addNote, setAddNote] = useState('A');
@@ -60,7 +60,7 @@ export function BandEditor() {
     >
       {/* Accordion header */}
       <button
-        onClick={() => useTunerStore.getState().setShowBandEditor(!showBandEditor)}
+        onClick={() => useTunerStore.getState().toggleAccordion('bands')}
         className="w-full flex items-center justify-between px-4 py-3 transition-colors"
         style={{ background: 'transparent', color: 'var(--text-secondary)' }}
         aria-expanded={showBandEditor}
@@ -97,6 +97,39 @@ export function BandEditor() {
         className="flex flex-col gap-2 px-4 pt-1 pb-3 overflow-y-auto"
         style={{ borderTop: '1px solid var(--border)', maxHeight: '260px' }}
       >
+      {/* Add new band */}
+      <div className="flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+        <select
+          value={addNote}
+          onChange={(e) => setAddNote(e.target.value)}
+          className="rounded px-2 py-1 text-sm"
+          style={selectStyle}
+        >
+          {NOTE_NAMES.map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+
+        <select
+          value={addOctave}
+          onChange={(e) => setAddOctave(parseInt(e.target.value))}
+          className="rounded px-2 py-1 text-sm"
+          style={selectStyle}
+        >
+          {OCTAVE_RANGE.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={handleAdd}
+          className="px-3 py-1.5 rounded text-sm font-medium"
+          style={{ background: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)' }}
+        >
+          + ADD
+        </button>
+      </div>
+
       {/* Band chips */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {bandConfigs.map((config) => {
@@ -190,39 +223,6 @@ export function BandEditor() {
           </div>
         )
       )}
-
-      {/* Add new band */}
-      <div className="flex items-center gap-2 flex-wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-        <select
-          value={addNote}
-          onChange={(e) => setAddNote(e.target.value)}
-          className="rounded px-2 py-1 text-sm"
-          style={selectStyle}
-        >
-          {NOTE_NAMES.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-
-        <select
-          value={addOctave}
-          onChange={(e) => setAddOctave(parseInt(e.target.value))}
-          className="rounded px-2 py-1 text-sm"
-          style={selectStyle}
-        >
-          {OCTAVE_RANGE.map((o) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-
-        <button
-          onClick={handleAdd}
-          className="px-3 py-1.5 rounded text-sm font-medium"
-          style={{ background: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)' }}
-        >
-          + ADD
-        </button>
-      </div>
       </div>
       )}
     </div>

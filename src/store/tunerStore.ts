@@ -40,15 +40,18 @@ interface TunerState {
   autoDetect: boolean;
   inputDeviceId: string;
   availableDevices: MediaDeviceInfo[];
-  showBandEditor: boolean;
+  openAccordion: 'tuning' | 'bands' | 'settings' | 'stopwatch' | null;
   noteNaming: NoteNaming;
   displaySmoothing: number;
   strobeSpeed: number;
   showSpectrum: boolean;
   readoutSmoothing: number;
-  micGain: number;
+  micGainDb: number;
   inTuneHysteresis: number;
   strobeIntensity: number;
+  strobeSoftness: number;
+  fftSize: number;
+  fftSmoothing: number;
   theme: 'dark' | 'light';
   highContrast: boolean;
   largeText: boolean;
@@ -65,15 +68,18 @@ interface TunerState {
   setInputDevice: (deviceId: string) => void;
   setAvailableDevices: (devices: MediaDeviceInfo[]) => void;
   setSelectedBand: (id: string | null) => void;
-  setShowBandEditor: (show: boolean) => void;
+  toggleAccordion: (id: 'tuning' | 'bands' | 'settings' | 'stopwatch') => void;
   setNoteNaming: (naming: NoteNaming) => void;
   setDisplaySmoothing: (value: number) => void;
   setStrobeSpeed: (speed: number) => void;
   setShowSpectrum: (show: boolean) => void;
   setReadoutSmoothing: (value: number) => void;
-  setMicGain: (value: number) => void;
+  setMicGainDb: (value: number) => void;
   setInTuneHysteresis: (value: number) => void;
   setStrobeIntensity: (value: number) => void;
+  setStrobeSoftness: (value: number) => void;
+  setFftSize: (size: number) => void;
+  setFftSmoothing: (value: number) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   setHighContrast: (on: boolean) => void;
   setLargeText: (on: boolean) => void;
@@ -174,15 +180,18 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   autoDetect: false,
   inputDeviceId: 'default',
   availableDevices: [],
-  showBandEditor: false,
+  openAccordion: null,
   noteNaming: 'sharp',
   displaySmoothing: 0.93,
   strobeSpeed: 1,
   showSpectrum: false,
   readoutSmoothing: 0.95,
-  micGain: 1.0,
+  micGainDb: 0,
   inTuneHysteresis: 1.0,
   strobeIntensity: 0.9,
+  strobeSoftness: 0.35,
+  fftSize: 16384,
+  fftSmoothing: 0.99,
   theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
   highContrast: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-high-contrast') === '1'),
   largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
@@ -250,15 +259,18 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   setInputDevice: (deviceId) => set({ inputDeviceId: deviceId }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedBand: (id) => set((s) => ({ selectedBandId: s.selectedBandId === id ? null : id })),
-  setShowBandEditor: (show) => set({ showBandEditor: show }),
+  toggleAccordion: (id) => set((s) => ({ openAccordion: s.openAccordion === id ? null : id })),
   setNoteNaming: (naming) => set({ noteNaming: naming }),
   setDisplaySmoothing: (value) => set({ displaySmoothing: value }),
   setStrobeSpeed: (speed) => set({ strobeSpeed: speed }),
   setShowSpectrum: (show) => set({ showSpectrum: show }),
   setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
-  setMicGain: (value) => set({ micGain: value }),
+  setMicGainDb: (value) => set({ micGainDb: value }),
   setInTuneHysteresis: (value) => set({ inTuneHysteresis: value }),
   setStrobeIntensity: (value) => set({ strobeIntensity: value }),
+  setStrobeSoftness: (value) => set({ strobeSoftness: value }),
+  setFftSize: (size) => set({ fftSize: size }),
+  setFftSmoothing: (value) => set({ fftSmoothing: value }),
   setTheme: (theme) => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-theme', theme);
     set({ theme });

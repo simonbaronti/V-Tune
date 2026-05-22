@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { StrobeDisplay } from './components/StrobeDisplay';
 import { ControlBar } from './components/ControlBar';
 import { PitchDial } from './components/PitchDial';
@@ -17,9 +17,32 @@ function App() {
   const theme = useTunerStore((s) => s.theme);
   const highContrast = useTunerStore((s) => s.highContrast);
   const largeText = useTunerStore((s) => s.largeText);
+  const tuningOpen = useTunerStore((s) => s.openAccordion === 'tuning');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [tuningOpen, setTuningOpen] = useState(true);
-  const [a11yOpen, setA11yOpen] = useState(false);
+
+  // Swipe-to-close: a rightward swipe (the way the drawer exits) closes it.
+  const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  const onDrawerTouchStart = (e: React.TouchEvent) => {
+    const t = e.target as HTMLElement;
+    // Don't hijack swipes that start on a control (sliders drag horizontally)
+    if (t.closest('input, select, button')) {
+      swipeRef.current = null;
+      return;
+    }
+    swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onDrawerTouchMove = (e: React.TouchEvent) => {
+    if (!swipeRef.current) return;
+    const dx = e.touches[0].clientX - swipeRef.current.x;
+    const dy = e.touches[0].clientY - swipeRef.current.y;
+    if (dx > 70 && Math.abs(dx) > Math.abs(dy)) {
+      setPanelOpen(false);
+      swipeRef.current = null;
+    }
+  };
+  const onDrawerTouchEnd = () => {
+    swipeRef.current = null;
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
@@ -32,19 +55,6 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('large-text', largeText);
   }, [largeText]);
-
-  // Close the a11y popover when clicking outside
-  useEffect(() => {
-    if (!a11yOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-a11y-popover]')) {
-        setA11yOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [a11yOpen]);
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
@@ -65,67 +75,6 @@ function App() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Accessibility popover */}
-          <div className="relative" data-a11y-popover>
-            <button
-              onClick={() => setA11yOpen(!a11yOpen)}
-              className="w-9 h-9 rounded flex items-center justify-center transition-colors"
-              style={{
-                background: a11yOpen ? 'var(--accent-cyan)' : 'var(--bg-tertiary)',
-                color: a11yOpen ? '#000' : 'var(--text-secondary)',
-                border: `1px solid ${a11yOpen ? 'var(--accent-cyan)' : 'var(--border)'}`,
-              }}
-              aria-label="Accessibility options"
-              title="Accessibility options"
-              aria-expanded={a11yOpen}
-              aria-haspopup="dialog"
-            >
-              {/* Universal accessibility figure */}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="4" r="2" />
-                <path d="M5 8h14" />
-                <path d="M9 8v5l-1.5 8" />
-                <path d="M15 8v5l1.5 8" />
-                <path d="M9 13h6" />
-              </svg>
-            </button>
-            {a11yOpen && (
-              <div
-                role="dialog"
-                aria-label="Accessibility options"
-                className="absolute right-0 top-full mt-2 rounded-lg shadow-xl p-3 flex flex-col gap-2 w-64 z-50"
-                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}
-              >
-                <div className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                  Accessibility
-                </div>
-                <label className="flex items-center justify-between gap-3 py-1 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <span>High contrast</span>
-                  <input
-                    type="checkbox"
-                    checked={highContrast}
-                    onChange={(e) => useTunerStore.getState().setHighContrast(e.target.checked)}
-                    className="w-5 h-5 cursor-pointer"
-                    style={{ accentColor: 'var(--accent-cyan)' }}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 py-1 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <span>Larger text</span>
-                  <input
-                    type="checkbox"
-                    checked={largeText}
-                    onChange={(e) => useTunerStore.getState().setLargeText(e.target.checked)}
-                    className="w-5 h-5 cursor-pointer"
-                    style={{ accentColor: 'var(--accent-cyan)' }}
-                  />
-                </label>
-                <div className="text-xs pt-1" style={{ color: 'var(--text-dim)' }}>
-                  Settings persist across sessions.
-                </div>
-              </div>
-            )}
-          </div>
-
           <button
             onClick={() => useTunerStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="w-9 h-9 rounded flex items-center justify-center transition-colors"
@@ -152,7 +101,7 @@ function App() {
           </button>
           <button
             onClick={() => setPanelOpen(!panelOpen)}
-            className="lg:hidden w-9 h-9 rounded flex items-center justify-center"
+            className="w-9 h-9 rounded flex items-center justify-center"
             style={{
               background: 'var(--bg-tertiary)',
               color: 'var(--accent-cyan)',
@@ -184,24 +133,31 @@ function App() {
           <QuickPitchBar />
         </div>
 
-        {/* Mobile backdrop */}
+        {/* Backdrop — click to close (all viewports) */}
         {panelOpen && (
           <div
-            className="lg:hidden absolute inset-0 z-40"
+            className="absolute inset-0 z-40"
             style={{ background: 'rgba(0, 0, 0, 0.6)' }}
             onClick={() => setPanelOpen(false)}
           />
         )}
 
-        {/* Settings drawer / sidebar */}
+        {/* Off-canvas slide-out menu */}
         <div
           className={`flex flex-col transition-transform duration-200
             absolute inset-y-0 right-0 z-50 w-[88%] max-w-[420px]
-            lg:static lg:z-auto lg:w-[420px] lg:max-w-none lg:translate-x-0
             ${panelOpen ? 'translate-x-0' : 'translate-x-full'}`}
           style={{ background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)' }}
+          onTouchStart={onDrawerTouchStart}
+          onTouchMove={onDrawerTouchMove}
+          onTouchEnd={onDrawerTouchEnd}
         >
-          {/* Scrollable region — everything except the fixed footer */}
+          {/* Pinned top — Let's Go / Stop */}
+          <div className="shrink-0">
+            <ControlBar />
+          </div>
+
+          {/* Scrollable region — accordions */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {/* Tuning / Scale accordion */}
             <div
@@ -209,7 +165,7 @@ function App() {
               style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}
             >
               <button
-                onClick={() => setTuningOpen(!tuningOpen)}
+                onClick={() => useTunerStore.getState().toggleAccordion('tuning')}
                 className="w-full flex items-center justify-between px-4 py-3 transition-colors"
                 style={{ background: 'transparent', color: 'var(--text-secondary)' }}
                 aria-expanded={tuningOpen}
@@ -244,11 +200,14 @@ function App() {
             </div>
             <BandEditor />
             <SettingsPanel />
+          </div>
 
-            {/* Spectrum Analyser toggle */}
+          {/* Pinned footer — stopwatch + spectrum analyser toggle */}
+          <div className="shrink-0">
+            <Stopwatch />
             <button
               onClick={() => useTunerStore.getState().setShowSpectrum(!showSpectrum)}
-              className="shrink-0 w-full flex items-center justify-between px-4 py-3 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 transition-colors"
               style={{
                 background: 'var(--bg-panel)',
                 color: 'var(--text-secondary)',
@@ -286,12 +245,6 @@ function App() {
                 />
               </span>
             </button>
-          </div>
-
-          {/* Pinned footer — stopwatch + Let's Go button */}
-          <div className="shrink-0">
-            <Stopwatch />
-            <ControlBar />
           </div>
         </div>
       </div>

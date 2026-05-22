@@ -98,7 +98,7 @@ export function useKeyboardShortcuts() {
 
       // B: toggle band editor
       if (e.key === 'b') {
-        store.setShowBandEditor(!store.showBandEditor);
+        store.toggleAccordion('bands');
         return;
       }
 

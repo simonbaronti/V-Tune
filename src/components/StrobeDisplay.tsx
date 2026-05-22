@@ -153,7 +153,7 @@ export function StrobeDisplay() {
     ctx.clearRect(0, 0, w, h);
 
     const state = useTunerStore.getState();
-    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity } = state;
+    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness } = state;
     const bands = state.bands;
     const numBands = bands.length;
 
@@ -315,13 +315,25 @@ export function StrobeDisplay() {
       if (displayedAmp > 0.01) {
         // Alternating colored / black rectangles. Each "cycle" is barWidth
         // wide and split 50/50 between a coloured bar and a black gap.
+        // Edges feathered via canvas blur filter that fades down to ~5%
+        // as the note approaches the tolerance threshold — sharp bars
+        // when in tune, soft bars when way off.
         const barAlpha = Math.min(1, displayedAmp * strobeIntensity);
         ctx.fillStyle = `hsla(${color.h}, ${color.s}%, ${color.l}%, ${barAlpha})`;
         const bw = barWidth * 0.5;
+
+        const FADE_RANGE = 50; // cents past tolerance over which blur reaches max
+        const minSoftness = Math.min(0.05, strobeSoftness);
+        const fadeT = Math.max(0, Math.min(1, (Math.abs(smoothedCents) - tolerance) / FADE_RANGE));
+        const effectiveSoftness = minSoftness + (strobeSoftness - minSoftness) * fadeT;
+        const blurPx = effectiveSoftness * Math.min(10, barWidth * 0.25);
+
+        if (blurPx > 0.1) ctx.filter = `blur(${blurPx.toFixed(2)}px)`;
         for (let j = -2; j < barCount + 2; j++) {
           const x = j * barWidth + ((newPhase * barWidth) / (2 * Math.PI)) % barWidth;
           ctx.fillRect(x - bw / 2, y + 4, bw, bandHeight - 8);
         }
+        if (blurPx > 0.1) ctx.filter = 'none';
 
         if (isInTune) {
           const grad = ctx.createLinearGradient(0, y, 0, y + bandHeight);

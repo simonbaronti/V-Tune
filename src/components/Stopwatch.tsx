@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTunerStore } from '../store/tunerStore';
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -13,7 +14,7 @@ function formatElapsed(ms: number): string {
 }
 
 export function Stopwatch() {
-  const [open, setOpen] = useState(false);
+  const open = useTunerStore((s) => s.openAccordion === 'stopwatch');
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -59,7 +60,7 @@ export function Stopwatch() {
       style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
     >
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => useTunerStore.getState().toggleAccordion('stopwatch')}
         className="w-full flex items-center justify-between px-4 py-3 transition-colors"
         style={{ background: 'transparent', color: 'var(--text-secondary)' }}
         aria-expanded={open}
