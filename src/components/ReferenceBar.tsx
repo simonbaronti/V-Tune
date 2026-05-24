@@ -1,6 +1,16 @@
 import { useTunerStore } from '../store/tunerStore';
 import { updateWorkletTargets } from '../audio/AudioEngine';
 
+/**
+ * Top row of the TUNING / SCALE accordion: three equal-width columns,
+ * each with a label above its control(s).
+ *   ┌─────────┬─────────┬─────────┐
+ *   │  AUTO   │   A4=   │   TOL   │
+ *   │ [toggle]│ [- v +] │ [- v +] │
+ *   └─────────┴─────────┴─────────┘
+ * Same internal padding as the old full-width AUTO so the visual weight
+ * doesn't change.
+ */
 export function ReferenceBar() {
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
   const tolerance = useTunerStore((s) => s.tolerance);
@@ -15,7 +25,7 @@ export function ReferenceBar() {
   const stepperBtn = (label: string, onClick: () => void) => (
     <button
       onClick={onClick}
-      className="w-8 h-8 rounded text-base flex items-center justify-center transition-colors"
+      className="w-8 h-8 rounded text-base flex items-center justify-center transition-colors shrink-0"
       style={{
         background: 'var(--bg-tertiary)',
         color: 'var(--text-secondary)',
@@ -28,43 +38,61 @@ export function ReferenceBar() {
 
   return (
     <div
-      className="flex flex-col gap-3 px-3 py-3 shrink-0"
+      className="grid grid-cols-3 gap-2 px-3 py-3 shrink-0"
       style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
     >
-      {/* Row 1: full-width AUTO toggle */}
-      <button
-        onClick={() => useTunerStore.getState().setAutoDetect(!autoDetect)}
-        className="w-full rounded text-base font-medium transition-colors"
-        style={{
-          padding: '26px 12px',
-          background: autoDetect ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)',
-          color: autoDetect ? '#3b82f6' : 'var(--text-secondary)',
-          border: `1px solid ${autoDetect ? '#3b82f6' : 'var(--border)'}`,
-        }}
-      >
-        AUTO
-      </button>
+      {/* AUTO column — single button labelled "AUTO". items-end so the
+          button bottom-aligns with the stepper rows in the other two
+          columns despite having no header label of its own. */}
+      <div className="flex flex-col justify-end min-w-0">
+        <button
+          onClick={() => useTunerStore.getState().setAutoDetect(!autoDetect)}
+          className="w-full rounded text-sm font-medium transition-colors"
+          style={{
+            padding: '12px 6px',
+            background: autoDetect ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)',
+            color: autoDetect ? '#3b82f6' : 'var(--text-secondary)',
+            border: `1px solid ${autoDetect ? '#3b82f6' : 'var(--border)'}`,
+          }}
+          aria-pressed={autoDetect}
+        >
+          AUTO
+        </button>
+      </div>
 
-      {/* Row 2: A₄ + TOL steppers */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>A₄</span>
+      {/* A4 column — title above, value flanked by − / + below */}
+      <div className="flex flex-col gap-1 min-w-0">
+        <span
+          className="text-xs text-center tracking-wide"
+          style={{ color: 'var(--text-dim)' }}
+        >
+          A4
+        </span>
+        <div className="flex items-center justify-between gap-1">
           {stepperBtn('−', () => handleRefChange(-1))}
           <span
-            className="text-base text-center font-medium tabular-nums"
-            style={{ color: 'var(--text-primary)', minWidth: '4.5rem' }}
+            className="flex-1 text-center text-sm font-medium tabular-nums min-w-0"
+            style={{ color: 'var(--text-primary)' }}
           >
-            {referenceFreq.toFixed(1)} Hz
+            {referenceFreq.toFixed(1)}
           </span>
           {stepperBtn('+', () => handleRefChange(1))}
         </div>
+      </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>TOL</span>
+      {/* TOL column — title above, value flanked by − / + below */}
+      <div className="flex flex-col gap-1 min-w-0">
+        <span
+          className="text-xs text-center tracking-wide"
+          style={{ color: 'var(--text-dim)' }}
+        >
+          TOL
+        </span>
+        <div className="flex items-center justify-between gap-1">
           {stepperBtn('−', () => useTunerStore.getState().setTolerance(Math.max(0.5, tolerance - 0.5)))}
           <span
-            className="text-base text-center font-medium tabular-nums"
-            style={{ color: 'var(--text-primary)', minWidth: '3.2rem' }}
+            className="flex-1 text-center text-sm font-medium tabular-nums min-w-0"
+            style={{ color: 'var(--text-primary)' }}
           >
             {tolerance.toFixed(1)}¢
           </span>

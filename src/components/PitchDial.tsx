@@ -3,6 +3,12 @@ import { useTunerStore } from '../store/tunerStore';
 import { noteToFrequency, NOTE_NAMES, getDisplayName, type NoteNaming } from '../utils/notes';
 import { updateWorkletTargets } from '../audio/AudioEngine';
 import { playTone, stopTone, getActiveFreq } from '../audio/PitchPipe';
+import {
+  HANDPAN_SCALES,
+  CHROMATIC_ID,
+  findScale,
+  type ScaleNote,
+} from '../data/scales';
 
 const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
   { value: 'sharp', label: '♯' },
@@ -28,15 +34,20 @@ export function PitchDial() {
   const autoDetect = useTunerStore((s) => s.autoDetect);
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
   const noteNaming = useTunerStore((s) => s.noteNaming);
+  const selectedScaleId = useTunerStore((s) => s.selectedScaleId);
   const [pipeFreq, setPipeFreq] = useState<number | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
 
+  const activeScale = findScale(selectedScaleId);
+  const isScaleMode = activeScale !== null;
+
   const currentOctave = currentNote?.octave ?? 4;
   const currentNoteIdx = currentNote ? NOTE_NAMES.indexOf(currentNote.name) : -1;
 
-  const setNoteFromIndex = useCallback((noteIdx: number, octave: number) => {
-    const noteName = NOTE_NAMES[noteIdx];
+  const setNote = useCallback((noteName: string, octave: number) => {
+    const noteIdx = NOTE_NAMES.indexOf(noteName);
+    if (noteIdx === -1) return;
     const freq = noteToFrequency(noteName, octave, referenceFreq);
     useTunerStore.getState().setCurrentNote({
       name: noteName,
@@ -49,11 +60,8 @@ export function PitchDial() {
     updateWorkletTargets();
   }, [referenceFreq]);
 
-  // Chromatic — every note is always selectable
-  const isNoteEnabled = (_noteIdx: number) => true;
-
-  const togglePipe = (noteIdx: number) => {
-    const freq = noteToFrequency(NOTE_NAMES[noteIdx], currentOctave, referenceFreq);
+  const togglePipe = (noteName: string, octave: number) => {
+    const freq = noteToFrequency(noteName, octave, referenceFreq);
     if (getActiveFreq() === freq) {
       stopTone();
       setPipeFreq(null);
@@ -63,11 +71,11 @@ export function PitchDial() {
     }
   };
 
-  const handlePointerDown = (noteIdx: number) => {
+  const handlePointerDown = (noteName: string, octave: number) => {
     longPressFired.current = false;
     longPressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
-      togglePipe(noteIdx);
+      togglePipe(noteName, octave);
     }, LONG_PRESS_MS);
   };
 
@@ -78,27 +86,39 @@ export function PitchDial() {
     }
   };
 
-  const handlePointerUp = (noteIdx: number) => {
+  const handlePointerUp = (noteName: string, octave: number) => {
     clearLongPress();
     if (longPressFired.current) return;
     if (autoDetect) return;
-    if (!isNoteEnabled(noteIdx)) return;
-    setNoteFromIndex(noteIdx, currentOctave);
+    setNote(noteName, octave);
   };
 
   const handleOctaveChange = (delta: number) => {
     if (!currentNote || autoDetect) return;
     const newOctave = Math.max(0, Math.min(9, currentNote.octave + delta));
-    setNoteFromIndex(NOTE_NAMES.indexOf(currentNote.name), newOctave);
+    setNote(currentNote.name, newOctave);
   };
 
+  const handleScaleChange = (id: string) => {
+    useTunerStore.getState().setSelectedScale(id);
+    // When switching INTO a scale, auto-select its ding so the bands
+    // immediately reflect the scale's fundamental and the user can start
+    // tuning straight away. The ding isn't necessarily the lowest note —
+    // extended scales place "bottom notes" below it.
+    const next = findScale(id);
+    if (next && next.notes.length > 0) {
+      const ding = next.notes[next.dingIndex] ?? next.notes[0];
+      setNote(ding.name, ding.octave);
+    }
+  };
+
+  // ── Piano-keyboard button (chromatic mode) ────────────────────────────
   const NoteButton = ({ idx, isSharp, gridCol }: { idx: number; isSharp: boolean; gridCol: number }) => {
-    const enabled = isNoteEnabled(idx);
+    const noteName = NOTE_NAMES[idx];
     const isActive = idx === currentNoteIdx;
     const isPiping =
       pipeFreq !== null &&
-      getActiveFreq() === noteToFrequency(NOTE_NAMES[idx], currentOctave, referenceFreq);
-    const dimmed = !enabled && !autoDetect;
+      getActiveFreq() === noteToFrequency(noteName, currentOctave, referenceFreq);
 
     const background = isActive
       ? 'var(--accent-blue)'
@@ -124,13 +144,13 @@ export function PitchDial() {
 
     return (
       <button
-        onPointerDown={() => handlePointerDown(idx)}
-        onPointerUp={() => handlePointerUp(idx)}
+        onPointerDown={() => handlePointerDown(noteName, currentOctave)}
+        onPointerUp={() => handlePointerUp(noteName, currentOctave)}
         onPointerLeave={clearLongPress}
         onPointerCancel={clearLongPress}
         onContextMenu={(e) => {
           e.preventDefault();
-          togglePipe(idx);
+          togglePipe(noteName, currentOctave);
         }}
         className="rounded-md font-medium text-sm transition-colors select-none touch-none"
         style={{
@@ -141,85 +161,189 @@ export function PitchDial() {
           background,
           color,
           border: `1px solid ${borderColor}`,
-          opacity: dimmed ? 0.3 : 1,
-          cursor: enabled || autoDetect ? 'pointer' : 'default',
+          cursor: 'pointer',
           boxShadow: isActive ? '0 1px 0 rgba(255,255,255,0.08) inset' : undefined,
         }}
-        title={`${NOTE_NAMES[idx]} — long-press for pitch pipe`}
+        title={`${noteName} — long-press for pitch pipe`}
       >
-        {getDisplayName(NOTE_NAMES[idx], noteNaming)}
+        {getDisplayName(noteName, noteNaming)}
+      </button>
+    );
+  };
+
+  // ── Single scale-note button (scale mode) ─────────────────────────────
+  const ScaleNoteButton = ({ note, isDing }: { note: ScaleNote; isDing: boolean }) => {
+    const isActive =
+      currentNote !== null &&
+      currentNote.name === note.name &&
+      currentNote.octave === note.octave;
+    const noteFreq = noteToFrequency(note.name, note.octave, referenceFreq);
+    const isPiping = pipeFreq !== null && getActiveFreq() === noteFreq;
+
+    const background = isActive
+      ? 'var(--accent-blue)'
+      : isPiping
+        ? 'rgba(255, 200, 0, 0.18)'
+        : isDing
+          ? 'rgba(168, 85, 247, 0.15)' // highlight the ding
+          : 'var(--bg-tertiary)';
+    const color = isActive
+      ? '#fff'
+      : isPiping
+        ? 'var(--accent-yellow)'
+        : isDing
+          ? '#a855f7'
+          : 'var(--text-primary)';
+    const borderColor = isActive
+      ? 'var(--accent-blue)'
+      : isPiping
+        ? 'var(--accent-yellow)'
+        : isDing
+          ? '#a855f7'
+          : 'var(--border)';
+
+    return (
+      <button
+        onPointerDown={() => handlePointerDown(note.name, note.octave)}
+        onPointerUp={() => handlePointerUp(note.name, note.octave)}
+        onPointerLeave={clearLongPress}
+        onPointerCancel={clearLongPress}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          togglePipe(note.name, note.octave);
+        }}
+        className="rounded-md font-medium text-sm transition-colors select-none touch-none px-2 py-2 min-w-0"
+        style={{
+          background,
+          color,
+          border: `1px solid ${borderColor}`,
+          cursor: 'pointer',
+        }}
+        title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''} — long-press for pitch pipe`}
+      >
+        <span className="font-bold">{getDisplayName(note.name, activeScale?.naming ?? noteNaming)}</span>
+        <span className="opacity-70 text-xs ml-0.5">{note.octave}</span>
       </button>
     );
   };
 
   return (
     <div
+      data-tour="pitch-dial"
       className="flex flex-col gap-2 px-3 py-3 shrink-0"
       style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}
     >
-      {/* Piano-style note grid */}
-      <div
-        className="grid gap-1"
-        style={{
-          gridTemplateColumns: 'repeat(14, minmax(0, 1fr))',
-          gridTemplateRows: 'auto auto',
-        }}
-      >
-        {SHARPS.map(({ idx, col }) => (
-          <NoteButton key={idx} idx={idx} isSharp gridCol={col} />
-        ))}
-        {NATURALS.map((idx, i) => (
-          <NoteButton key={idx} idx={idx} isSharp={false} gridCol={i * 2 + 1} />
-        ))}
+      {/* Scale picker — sits above the note grid */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm shrink-0" style={{ color: 'var(--text-dim)' }}>SCALE</span>
+        <select
+          value={selectedScaleId}
+          onChange={(e) => handleScaleChange(e.target.value)}
+          className="flex-1 min-w-0 rounded px-2 py-1.5 text-sm"
+          style={{
+            background: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <option value={CHROMATIC_ID}>Chromatic</option>
+          {HANDPAN_SCALES.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Octave control + note-naming selector */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>OCT</span>
-          <button
-            onClick={() => handleOctaveChange(-1)}
-            disabled={autoDetect}
-            className="w-8 h-8 rounded flex items-center justify-center text-base transition-colors"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              opacity: autoDetect ? 0.3 : 1,
-            }}
-          >−</button>
-          <span className="text-base w-6 text-center font-bold" style={{ color: 'var(--text-primary)' }}>
-            {currentOctave}
-          </span>
-          <button
-            onClick={() => handleOctaveChange(1)}
-            disabled={autoDetect}
-            className="w-8 h-8 rounded flex items-center justify-center text-base transition-colors"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              opacity: autoDetect ? 0.3 : 1,
-            }}
-          >+</button>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {NAMING_LABELS.map((n) => (
-            <button
-              key={n.value}
-              onClick={() => useTunerStore.getState().setNoteNaming(n.value)}
-              className="px-2.5 py-1 rounded text-sm transition-colors"
-              style={{
-                background: noteNaming === n.value ? 'rgba(6, 182, 212, 0.2)' : 'transparent',
-                color: noteNaming === n.value ? 'var(--accent-cyan)' : 'var(--text-dim)',
-                border: noteNaming === n.value ? '1px solid var(--accent-cyan)' : '1px solid var(--border)',
-              }}
-            >
-              {n.label}
-            </button>
+      {/* Note picker — piano keyboard for chromatic, scale-note grid otherwise */}
+      {isScaleMode ? (
+        <div
+          className="grid gap-1"
+          style={{
+            // 4 buttons per row on narrow, more on wide. minmax(56px,1fr)
+            // gives a comfortable touch target while staying responsive.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(56px, 1fr))',
+          }}
+        >
+          {activeScale!.notes.map((n, i) => (
+            <ScaleNoteButton
+              key={`${n.name}${n.octave}`}
+              note={n}
+              isDing={i === activeScale!.dingIndex}
+            />
           ))}
         </div>
+      ) : (
+        <div
+          className="grid gap-1"
+          style={{
+            gridTemplateColumns: 'repeat(14, minmax(0, 1fr))',
+            gridTemplateRows: 'auto auto',
+          }}
+        >
+          {SHARPS.map(({ idx, col }) => (
+            <NoteButton key={idx} idx={idx} isSharp gridCol={col} />
+          ))}
+          {NATURALS.map((idx, i) => (
+            <NoteButton key={idx} idx={idx} isSharp={false} gridCol={i * 2 + 1} />
+          ))}
+        </div>
+      )}
+
+      {/* Octave + note-naming row. Octave control only makes sense in
+          chromatic mode (scale notes have a fixed octave each); naming is
+          always relevant. */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {!isScaleMode && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>OCT</span>
+            <button
+              onClick={() => handleOctaveChange(-1)}
+              disabled={autoDetect}
+              className="w-8 h-8 rounded flex items-center justify-center text-base transition-colors"
+              style={{
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                opacity: autoDetect ? 0.3 : 1,
+              }}
+            >−</button>
+            <span className="text-base w-6 text-center font-bold" style={{ color: 'var(--text-primary)' }}>
+              {currentOctave}
+            </span>
+            <button
+              onClick={() => handleOctaveChange(1)}
+              disabled={autoDetect}
+              className="w-8 h-8 rounded flex items-center justify-center text-base transition-colors"
+              style={{
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                opacity: autoDetect ? 0.3 : 1,
+              }}
+            >+</button>
+          </div>
+        )}
+
+        {/* Naming selector only applies to the chromatic keyboard — when
+            a scale is active its `naming` override drives the labels and
+            the global preference is irrelevant. */}
+        {!isScaleMode && (
+          <div className="flex items-center gap-1">
+            {NAMING_LABELS.map((n) => (
+              <button
+                key={n.value}
+                onClick={() => useTunerStore.getState().setNoteNaming(n.value)}
+                className="px-2.5 py-1 rounded text-sm transition-colors"
+                style={{
+                  background: noteNaming === n.value ? 'rgba(6, 182, 212, 0.2)' : 'transparent',
+                  color: noteNaming === n.value ? 'var(--accent-cyan)' : 'var(--text-dim)',
+                  border: noteNaming === n.value ? '1px solid var(--accent-cyan)' : '1px solid var(--border)',
+                }}
+              >
+                {n.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Active pitch pipe indicator */}

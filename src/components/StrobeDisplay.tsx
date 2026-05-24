@@ -151,6 +151,12 @@ export function StrobeDisplay() {
     const w = rect.width;
     const h = rect.height;
     ctx.clearRect(0, 0, w, h);
+    // Fill the whole canvas with the same dark colour the bands use, so
+    // the 2 px inset around each band slot doesn't reveal the parent's
+    // background as a stray line above the top note (or below the bottom
+    // one) — particularly visible in light mode.
+    ctx.fillStyle = 'rgba(8, 8, 14, 0.98)';
+    ctx.fillRect(0, 0, w, h);
 
     const state = useTunerStore.getState();
     const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness } = state;

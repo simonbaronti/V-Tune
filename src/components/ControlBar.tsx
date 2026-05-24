@@ -17,6 +17,7 @@ export function ControlBar() {
     <div className="flex flex-col shrink-0" style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}>
       <div className="px-3 py-2">
         <button
+          data-tour="lets-go"
           onClick={handleToggle}
           className="w-full flex items-center justify-center gap-2 py-3 rounded text-lg font-semibold tracking-wide transition-all"
           style={{ background: isRunning ? 'var(--accent-red)' : 'var(--accent-green)', color: '#000' }}

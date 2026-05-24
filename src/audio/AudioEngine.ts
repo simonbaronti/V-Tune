@@ -47,6 +47,13 @@ export async function startAudio(deviceId?: string): Promise<void> {
       referenceFreq: store.referenceFreq,
     });
 
+    // Push the current hum-filter setting straight away so it takes effect
+    // from the first hop instead of waiting for the next user toggle.
+    workletNode.port.postMessage({
+      type: 'setHumFilter',
+      hz: store.humFilter === 'off' ? 0 : parseInt(store.humFilter, 10),
+    });
+
     workletNode.port.onmessage = (e) => {
       if (e.data.type === 'analysis') {
         const store = useTunerStore.getState();
@@ -142,6 +149,13 @@ function startPitchDetection() {
 useTunerStore.subscribe((state, prevState) => {
   if (state.autoDetect && !prevState.autoDetect && state.isRunning) {
     startPitchDetection();
+  }
+  // Live-push hum-filter changes to the worklet (no restart needed).
+  if (state.humFilter !== prevState.humFilter && workletNode) {
+    workletNode.port.postMessage({
+      type: 'setHumFilter',
+      hz: state.humFilter === 'off' ? 0 : parseInt(state.humFilter, 10),
+    });
   }
 });
 

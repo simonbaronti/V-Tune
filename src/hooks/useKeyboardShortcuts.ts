@@ -96,12 +96,6 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // B: toggle band editor
-      if (e.key === 'b') {
-        store.toggleAccordion('bands');
-        return;
-      }
-
       // Q: toggle auto detect
       if (e.key === 'q') {
         store.setAutoDetect(!store.autoDetect);

@@ -33,6 +33,12 @@ class TunerProcessor extends AudioWorkletProcessor {
     this.dcX1 = 0;
     this.dcY1 = 0;
 
+    // Mains-hum notch cascade — narrow biquad notches at f0 and harmonics.
+    // 'off' bypasses; otherwise we hold an array of 4 biquads (f0..4·f0).
+    this.humFilterHz = 0; // 0 = off, 50 or 60 when active
+    this.humNotches = [];
+    this.rebuildHumNotches();
+
     this.port.onmessage = (e) => {
       if (e.data.type === 'setTargets') {
         this.targetFrequencies = e.data.frequencies;
@@ -42,8 +48,52 @@ class TunerProcessor extends AudioWorkletProcessor {
       }
       if (e.data.type === 'setSampleRate') {
         this.sampleRate = e.data.sampleRate;
+        this.rebuildHumNotches();
+      }
+      if (e.data.type === 'setHumFilter') {
+        this.humFilterHz = e.data.hz | 0; // 0 / 50 / 60
+        this.rebuildHumNotches();
       }
     };
+  }
+
+  // Build a cascade of narrow notch biquads at f0, 2·f0, 3·f0, 4·f0.
+  // Coefficients from the RBJ Audio EQ Cookbook (notch / band-stop).
+  // Q is high → narrow notch (a few Hz wide) so musical content nearby
+  // is essentially untouched.
+  rebuildHumNotches() {
+    const f0 = this.humFilterHz;
+    const Fs = this.sampleRate;
+    this.humNotches = [];
+    if (!f0 || f0 <= 0) return;
+    const Q = 30;
+    for (let h = 1; h <= 4; h++) {
+      const fc = f0 * h;
+      if (fc >= Fs * 0.45) break; // skip past Nyquist
+      const w0 = (2 * Math.PI * fc) / Fs;
+      const alpha = Math.sin(w0) / (2 * Q);
+      const cosw0 = Math.cos(w0);
+      const b0 = 1, b1 = -2 * cosw0, b2 = 1;
+      const a0 = 1 + alpha, a1 = -2 * cosw0, a2 = 1 - alpha;
+      this.humNotches.push({
+        b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
+        a1: a1 / a0, a2: a2 / a0,
+        x1: 0, x2: 0, y1: 0, y2: 0,
+      });
+    }
+  }
+
+  applyHumNotches(x) {
+    for (let i = 0; i < this.humNotches.length; i++) {
+      const n = this.humNotches[i];
+      const y = n.b0 * x + n.b1 * n.x1 + n.b2 * n.x2 - n.a1 * n.y1 - n.a2 * n.y2;
+      n.x2 = n.x1;
+      n.x1 = x;
+      n.y2 = n.y1;
+      n.y1 = y;
+      x = y;
+    }
+    return x;
   }
 
   goertzel(samples, targetFreq, sampleRate) {
@@ -183,10 +233,14 @@ class TunerProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < channelData.length; i++) {
       // One-pole DC blocker: removes rumble/handling noise that would
       // otherwise bias the lowest band
-      const x = channelData[i];
-      const y = x - this.dcX1 + 0.999 * this.dcY1;
+      let x = channelData[i];
+      const dcY = x - this.dcX1 + 0.999 * this.dcY1;
       this.dcX1 = x;
-      this.dcY1 = y;
+      this.dcY1 = dcY;
+      x = dcY;
+      // Mains-hum notch cascade (no-op when disabled)
+      if (this.humNotches.length > 0) x = this.applyHumNotches(x);
+      const y = x;
       this.buffer[this.writeIndex] = y;
       this.writeIndex = (this.writeIndex + 1) % this.bufferSize;
       this.samplesSinceLastHop++;

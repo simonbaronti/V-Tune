@@ -25,7 +25,19 @@ export interface PeakData {
   db: number;
 }
 
-interface TunerState {
+/** A user-drawn isolation window on the spectrum analyser. */
+export interface IsolationWindow {
+  id: string;
+  minFreq: number;
+  maxFreq: number;
+  /** Loudest peak (Hz) found inside the window on the last frame, or null
+   * when there's nothing above the noise gate inside the bracket. */
+  peakFreq: number | null;
+}
+
+export const MAX_ISOLATIONS = 2;
+
+export interface TunerState {
   isRunning: boolean;
   referenceFreq: number;
   currentNote: NoteInfo | null;
@@ -40,7 +52,7 @@ interface TunerState {
   autoDetect: boolean;
   inputDeviceId: string;
   availableDevices: MediaDeviceInfo[];
-  openAccordion: 'tuning' | 'bands' | 'settings' | 'stopwatch' | null;
+  openAccordion: 'tuning' | 'settings' | 'stopwatch' | null;
   noteNaming: NoteNaming;
   displaySmoothing: number;
   strobeSpeed: number;
@@ -52,6 +64,27 @@ interface TunerState {
   strobeSoftness: number;
   fftSize: number;
   fftSmoothing: number;
+  // Spectrum-analyser isolation windows — up to 2 user-drawn frequency
+  // brackets. Each loudest-peak-in-window drives a live tuning band
+  // rendered under the spectrum. When two exist the band area splits 50/50.
+  isolations: IsolationWindow[];
+  // Mains-hum notch filter — cascaded biquad notches in the worklet at
+  // f, 2f, 3f, 4f. 'off' bypasses; '50' / '60' picks the region's grid Hz.
+  humFilter: 'off' | '50' | '60';
+  // Tauri-only: keep the desktop window above other windows.
+  alwaysOnTop: boolean;
+  // Pre-saved handpan scale that filters the note picker. 'chromatic'
+  // means "show the full piano keyboard"; any other value is the id of
+  // an entry in src/data/scales.ts.
+  selectedScaleId: string;
+  // Onboarding tour — `onboardingDone` is persisted (skipped on first
+  // launch only); `tourActive` is transient and toggled by the tour
+  // overlay itself. `panelOpen` lives here so the tour can drive the
+  // mobile slide-out drawer (open it for accordion steps, close it for
+  // canvas-area steps).
+  onboardingDone: boolean;
+  tourActive: boolean;
+  panelOpen: boolean;
   theme: 'dark' | 'light';
   highContrast: boolean;
   largeText: boolean;
@@ -68,7 +101,7 @@ interface TunerState {
   setInputDevice: (deviceId: string) => void;
   setAvailableDevices: (devices: MediaDeviceInfo[]) => void;
   setSelectedBand: (id: string | null) => void;
-  toggleAccordion: (id: 'tuning' | 'bands' | 'settings' | 'stopwatch') => void;
+  toggleAccordion: (id: 'tuning' | 'settings' | 'stopwatch') => void;
   setNoteNaming: (naming: NoteNaming) => void;
   setDisplaySmoothing: (value: number) => void;
   setStrobeSpeed: (speed: number) => void;
@@ -80,6 +113,18 @@ interface TunerState {
   setStrobeSoftness: (value: number) => void;
   setFftSize: (size: number) => void;
   setFftSmoothing: (value: number) => void;
+  /** Returns the new isolation's id, or null if the cap is already reached. */
+  addIsolation: (minFreq: number, maxFreq: number) => string | null;
+  removeIsolation: (id: string) => void;
+  updateIsolationRange: (id: string, minFreq: number, maxFreq: number) => void;
+  setIsolationPeak: (id: string, freq: number | null) => void;
+  clearIsolations: () => void;
+  setHumFilter: (mode: 'off' | '50' | '60') => void;
+  setAlwaysOnTop: (on: boolean) => void;
+  setSelectedScale: (id: string) => void;
+  setOnboardingDone: (done: boolean) => void;
+  setTourActive: (active: boolean) => void;
+  setPanelOpen: (open: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   setHighContrast: (on: boolean) => void;
   setLargeText: (on: boolean) => void;
@@ -95,6 +140,8 @@ let bandCounter = 0;
 function makeBandId(): string {
   return `band-${++bandCounter}`;
 }
+
+let isolationCounter = 0;
 
 function configsToBands(configs: BandConfig[]): StrobeBand[] {
   return configs.map((c) => ({
@@ -191,7 +238,14 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   strobeIntensity: 0.9,
   strobeSoftness: 0.35,
   fftSize: 16384,
-  fftSmoothing: 0.99,
+  fftSmoothing: 0.80,
+  isolations: [],
+  humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
+  alwaysOnTop: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-always-on-top') === '1'),
+  selectedScaleId: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-scale')) || 'chromatic',
+  onboardingDone: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-onboarding-done') === '1'),
+  tourActive: false,
+  panelOpen: false,
   theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
   highContrast: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-high-contrast') === '1'),
   largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
@@ -271,6 +325,55 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   setStrobeSoftness: (value) => set({ strobeSoftness: value }),
   setFftSize: (size) => set({ fftSize: size }),
   setFftSmoothing: (value) => set({ fftSmoothing: value }),
+  addIsolation: (minFreq, maxFreq) => {
+    const state = get();
+    if (state.isolations.length >= MAX_ISOLATIONS) return null;
+    const lo = Math.min(minFreq, maxFreq);
+    const hi = Math.max(minFreq, maxFreq);
+    const id = `iso-${++isolationCounter}`;
+    set({
+      isolations: [...state.isolations, { id, minFreq: lo, maxFreq: hi, peakFreq: null }],
+    });
+    return id;
+  },
+  removeIsolation: (id) => {
+    set((s) => ({ isolations: s.isolations.filter((iso) => iso.id !== id) }));
+  },
+  updateIsolationRange: (id, minFreq, maxFreq) => {
+    const lo = Math.min(minFreq, maxFreq);
+    const hi = Math.max(minFreq, maxFreq);
+    set((s) => ({
+      isolations: s.isolations.map((iso) =>
+        iso.id === id ? { ...iso, minFreq: lo, maxFreq: hi } : iso,
+      ),
+    }));
+  },
+  setIsolationPeak: (id, freq) => {
+    set((s) => ({
+      isolations: s.isolations.map((iso) =>
+        iso.id === id ? { ...iso, peakFreq: freq } : iso,
+      ),
+    }));
+  },
+  clearIsolations: () => set({ isolations: [] }),
+  setHumFilter: (mode) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-hum', mode);
+    set({ humFilter: mode });
+  },
+  setAlwaysOnTop: (on) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-always-on-top', on ? '1' : '0');
+    set({ alwaysOnTop: on });
+  },
+  setSelectedScale: (id) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-scale', id);
+    set({ selectedScaleId: id });
+  },
+  setOnboardingDone: (done) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-onboarding-done', done ? '1' : '0');
+    set({ onboardingDone: done });
+  },
+  setTourActive: (active) => set({ tourActive: active }),
+  setPanelOpen: (open) => set({ panelOpen: open }),
   setTheme: (theme) => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-theme', theme);
     set({ theme });
