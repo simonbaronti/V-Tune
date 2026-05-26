@@ -388,7 +388,9 @@ export function StrobeDisplay() {
         ctx.textAlign = 'right';
         const centsSize = Math.min(44, Math.max(28, bandHeight * 0.5));
         ctx.font = `bold ${centsSize}px "JetBrains Mono", monospace`;
-        ctx.fillStyle = isInTune ? '#00e878' : '#8888a0';
+        // Keep cents white when in tune so the digits stay legible on top
+        // of the green in-tune bar (green-on-green was unreadable).
+        ctx.fillStyle = isInTune ? '#ffffff' : '#8888a0';
         ctx.fillText(`${sign}${roundedCents}`, w - 10, y + bandHeight / 2 - centsSize * 0.2);
 
         // Hz deviation

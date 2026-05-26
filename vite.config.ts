@@ -4,6 +4,19 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Pin V-Tune's dev server to its own port so it can't collide with other
+  // Vite projects (HypaMaps etc.) running on the default 5173. `strictPort`
+  // makes Vite fail loudly if something else is already using it instead
+  // of silently rolling forward to 5174 — which would leave Tauri's
+  // pre-configured devUrl loading the wrong app.
+  server: {
+    port: 5183,
+    strictPort: true,
+  },
+  preview: {
+    port: 5183,
+    strictPort: true,
+  },
   plugins: [
     react(),
     tailwindcss(),

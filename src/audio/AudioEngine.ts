@@ -14,6 +14,16 @@ let analyserNode: AnalyserNode | null = null;
 let pitchBuffer: Float32Array | null = null;
 let pitchAnimFrame: number | null = null;
 
+// Live "what note is being played" indicator — runs the whole time audio
+// is on, independent of AUTO. Drives the lit-up note on the pitch wheel.
+let liveDetectFrame: number | null = null;
+let liveDetectBuffer: Float32Array | null = null;
+// Hold the last reported MIDI for a short window so brief mic drops don't
+// flicker the highlight off and back on between strikes.
+const LIVE_HOLD_FRAMES = 30; // ~0.5s at 60fps
+let liveLastMidi: number | null = null;
+let liveSilentFrames = 0;
+
 export async function startAudio(deviceId?: string): Promise<void> {
   const store = useTunerStore.getState();
 
@@ -73,10 +83,16 @@ export async function startAudio(deviceId?: string): Promise<void> {
     gainNode.connect(analyserNode);
 
     yinDetector = YIN({ sampleRate });
+    liveDetectBuffer = new Float32Array(ANALYSIS_BUFFER_SIZE);
 
     if (store.autoDetect) {
       startPitchDetection();
     }
+
+    // Always run the live "what note is being played" indicator while
+    // audio is on — it lights up notes on the pitch wheel without
+    // selecting them.
+    startLiveNoteDetection();
 
     store.setRunning(true);
   } catch (err) {
@@ -159,6 +175,67 @@ useTunerStore.subscribe((state, prevState) => {
   }
 });
 
+// Continuous live-pitch indicator (independent of AUTO). Updates the
+// store's `detectedMidi` every ~2 frames so the pitch wheel can light up
+// whichever chromatic note is being struck. Cheap: single YIN call per
+// tick, same buffer reused.
+function startLiveNoteDetection() {
+  if (liveDetectFrame !== null) return;
+  liveLastMidi = null;
+  liveSilentFrames = 0;
+  useTunerStore.getState().setDetectedMidi(null);
+
+  let frameCount = 0;
+  const tick = () => {
+    if (!analyserNode || !liveDetectBuffer || !yinDetector) {
+      liveDetectFrame = null;
+      return;
+    }
+    const store = useTunerStore.getState();
+    if (!store.isRunning) {
+      liveDetectFrame = null;
+      return;
+    }
+
+    // Throttle to every other frame — this is purely visual feedback so
+    // sub-30Hz updates are fine and keep CPU low.
+    frameCount++;
+    if (frameCount % 2 === 0) {
+      analyserNode.getFloatTimeDomainData(liveDetectBuffer as Float32Array<ArrayBuffer>);
+      const pitch = yinDetector(liveDetectBuffer);
+
+      // Gate on the same RMS the worklet reports so we don't latch onto
+      // room hiss between strikes.
+      const rmsOk = store.rmsLevel > 0.01;
+
+      if (rmsOk && pitch && pitch > 20 && pitch < 10000) {
+        const note = frequencyToNote(pitch, store.referenceFreq);
+        if (note.midi >= 24 && note.midi <= 108) {
+          if (note.midi !== liveLastMidi) {
+            liveLastMidi = note.midi;
+            store.setDetectedMidi(note.midi);
+          }
+          liveSilentFrames = 0;
+        } else {
+          liveSilentFrames++;
+        }
+      } else {
+        liveSilentFrames++;
+      }
+
+      // Hold the last detected note for a short window so brief gaps
+      // between strikes don't flicker the indicator off.
+      if (liveSilentFrames > LIVE_HOLD_FRAMES && liveLastMidi !== null) {
+        liveLastMidi = null;
+        store.setDetectedMidi(null);
+      }
+    }
+
+    liveDetectFrame = requestAnimationFrame(tick);
+  };
+  liveDetectFrame = requestAnimationFrame(tick);
+}
+
 export function updateWorkletTargets() {
   if (!workletNode) return;
   const store = useTunerStore.getState();
@@ -175,6 +252,14 @@ export function stopAudio() {
     cancelAnimationFrame(pitchAnimFrame);
     pitchAnimFrame = null;
   }
+
+  if (liveDetectFrame) {
+    cancelAnimationFrame(liveDetectFrame);
+    liveDetectFrame = null;
+  }
+  liveLastMidi = null;
+  liveSilentFrames = 0;
+  useTunerStore.getState().setDetectedMidi(null);
 
   if (workletNode) {
     workletNode.disconnect();

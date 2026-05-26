@@ -50,6 +50,13 @@ export interface TunerState {
   peaks: PeakData[];
   tolerance: number;
   autoDetect: boolean;
+  /** Live pitch indicator — the MIDI number of whichever note the
+   *  microphone is currently picking up while audio is running. Updated
+   *  continuously by the YIN detector in AudioEngine. Used purely for
+   *  visual feedback on the pitch wheel (lit-up note); does NOT change
+   *  `currentNote` (which is the user-selected tuning target). `null`
+   *  when the mic is off or no stable pitch is detected. */
+  detectedMidi: number | null;
   inputDeviceId: string;
   availableDevices: MediaDeviceInfo[];
   openAccordion: 'tuning' | 'settings' | 'stopwatch' | null;
@@ -98,6 +105,7 @@ export interface TunerState {
   setPeaks: (peaks: PeakData[]) => void;
   setTolerance: (cents: number) => void;
   setAutoDetect: (auto: boolean) => void;
+  setDetectedMidi: (midi: number | null) => void;
   setInputDevice: (deviceId: string) => void;
   setAvailableDevices: (devices: MediaDeviceInfo[]) => void;
   setSelectedBand: (id: string | null) => void;
@@ -225,6 +233,7 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   peaks: [],
   tolerance: 5,
   autoDetect: false,
+  detectedMidi: null,
   inputDeviceId: 'default',
   availableDevices: [],
   openAccordion: null,
@@ -242,7 +251,9 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   isolations: [],
   humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
   alwaysOnTop: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-always-on-top') === '1'),
-  selectedScaleId: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-scale')) || 'chromatic',
+  // Always start in chromatic so the full pitch wheel is visible on launch.
+  // The user can switch to any saved scale from the SCALE dropdown.
+  selectedScaleId: 'chromatic',
   onboardingDone: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-onboarding-done') === '1'),
   tourActive: false,
   panelOpen: false,
@@ -310,6 +321,7 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   setPeaks: (peaks) => set({ peaks }),
   setTolerance: (cents) => set({ tolerance: cents }),
   setAutoDetect: (auto) => set({ autoDetect: auto }),
+  setDetectedMidi: (midi) => set({ detectedMidi: midi }),
   setInputDevice: (deviceId) => set({ inputDeviceId: deviceId }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedBand: (id) => set((s) => ({ selectedBandId: s.selectedBandId === id ? null : id })),

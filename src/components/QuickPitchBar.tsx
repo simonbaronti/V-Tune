@@ -1,7 +1,7 @@
 import { useTunerStore } from '../store/tunerStore';
 import { NOTE_NAMES, noteToFrequency, getDisplayName } from '../utils/notes';
 import { updateWorkletTargets, startAudio, stopAudio } from '../audio/AudioEngine';
-import { findScale, type ScaleNote } from '../data/scales';
+import { findScale, HANDPAN_SCALES, CHROMATIC_ID, type ScaleNote } from '../data/scales';
 
 /**
  * Mobile-only quick note picker pinned to the bottom of the strobe area.
@@ -21,6 +21,10 @@ export function QuickPitchBar() {
   const isRunning = useTunerStore((s) => s.isRunning);
   const inputDeviceId = useTunerStore((s) => s.inputDeviceId);
   const selectedScaleId = useTunerStore((s) => s.selectedScaleId);
+  const setSelectedScale = useTunerStore((s) => s.setSelectedScale);
+  // Live mic-detected MIDI note — drives a cyan glow on the matching button.
+  const detectedMidi = useTunerStore((s) => s.detectedMidi);
+  const detectedPitchClass = detectedMidi !== null ? detectedMidi % 12 : -1;
 
   const activeScale = findScale(selectedScaleId);
   const isScaleMode = activeScale !== null;
@@ -66,6 +70,8 @@ export function QuickPitchBar() {
       {names.map((name) => {
         const isActive = name === currentNoteName;
         const isSharp = name.includes('#');
+        const isDetected =
+          !isActive && NOTE_NAMES.indexOf(name) === detectedPitchClass;
         return (
           <button
             key={name}
@@ -83,6 +89,9 @@ export function QuickPitchBar() {
                   ? 'var(--text-secondary)'
                   : 'var(--text-primary)',
               border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border)'}`,
+              boxShadow: isDetected
+                ? '0 0 0 2px #22d3ee, 0 0 12px 2px rgba(34, 211, 238, 0.5)'
+                : undefined,
             }}
           >
             {getDisplayName(name, noteNaming)}
@@ -98,6 +107,8 @@ export function QuickPitchBar() {
       currentNote !== null &&
       currentNote.name === note.name &&
       currentNote.octave === note.octave;
+    const noteMidi = (note.octave + 1) * 12 + NOTE_NAMES.indexOf(note.name);
+    const isDetected = !isActive && detectedMidi !== null && detectedMidi === noteMidi;
 
     const background = isActive
       ? 'var(--accent-blue)'
@@ -119,7 +130,14 @@ export function QuickPitchBar() {
       <button
         onClick={() => selectNote(note.name, note.octave)}
         className="py-2.5 px-1 text-base font-medium rounded transition-colors min-w-0"
-        style={{ background, color, border: `1px solid ${borderColor}` }}
+        style={{
+          background,
+          color,
+          border: `1px solid ${borderColor}`,
+          boxShadow: isDetected
+            ? '0 0 0 2px #22d3ee, 0 0 12px 2px rgba(34, 211, 238, 0.5)'
+            : undefined,
+        }}
         title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''}`}
       >
         <span className="font-bold">{getDisplayName(note.name, scaleNaming)}</span>
@@ -140,6 +158,26 @@ export function QuickPitchBar() {
         paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
       }}
     >
+      {/* Scale picker */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs tracking-wider shrink-0" style={{ color: 'var(--text-dim)' }}>SCALE</span>
+        <select
+          value={selectedScaleId}
+          onChange={(e) => setSelectedScale(e.target.value)}
+          className="flex-1 min-w-0 rounded px-2 py-1.5 text-sm"
+          style={{
+            background: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <option value={CHROMATIC_ID}>Chromatic</option>
+          {HANDPAN_SCALES.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+
       {isScaleMode ? (
         <div
           className="grid gap-1"

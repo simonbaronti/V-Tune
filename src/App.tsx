@@ -91,6 +91,11 @@ function App() {
     // Stopwatch stays open until the user explicitly closes it — running
     // timers shouldn't disappear behind your back.
     if (openAccordion === 'stopwatch') return;
+    // Desktop has plenty of room for an open accordion alongside the
+    // strobe, so the auto-close is just annoying there. Restrict to
+    // mobile/tablet, where the panel covers content and users open it
+    // via the burger anyway — a closed default makes sense.
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
     const TIMEOUT_MS = 10_000;
     let t: ReturnType<typeof setTimeout> | null = null;
     const arm = () => {

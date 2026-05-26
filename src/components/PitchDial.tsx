@@ -35,6 +35,9 @@ export function PitchDial() {
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
   const noteNaming = useTunerStore((s) => s.noteNaming);
   const selectedScaleId = useTunerStore((s) => s.selectedScaleId);
+  // Live mic-detected note (MIDI). Drives a cyan glow ring on whichever
+  // button matches — purely visual, never alters the user's selection.
+  const detectedMidi = useTunerStore((s) => s.detectedMidi);
   const [pipeFreq, setPipeFreq] = useState<number | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
@@ -112,10 +115,17 @@ export function PitchDial() {
     }
   };
 
+  // Pitch class (0–11) currently being picked up by the mic, or -1.
+  // Chromatic mode shows only one octave at a time so we match by pitch
+  // class — the lit-up key tells the player "you struck a D" no matter
+  // which octave the dial happens to be displaying.
+  const detectedPitchClass = detectedMidi !== null ? detectedMidi % 12 : -1;
+
   // ── Piano-keyboard button (chromatic mode) ────────────────────────────
   const NoteButton = ({ idx, isSharp, gridCol }: { idx: number; isSharp: boolean; gridCol: number }) => {
     const noteName = NOTE_NAMES[idx];
     const isActive = idx === currentNoteIdx;
+    const isDetected = idx === detectedPitchClass && !isActive;
     const isPiping =
       pipeFreq !== null &&
       getActiveFreq() === noteToFrequency(noteName, currentOctave, referenceFreq);
@@ -162,7 +172,11 @@ export function PitchDial() {
           color,
           border: `1px solid ${borderColor}`,
           cursor: 'pointer',
-          boxShadow: isActive ? '0 1px 0 rgba(255,255,255,0.08) inset' : undefined,
+          boxShadow: isDetected
+            ? '0 0 0 2px #22d3ee, 0 0 14px 2px rgba(34, 211, 238, 0.55)'
+            : isActive
+              ? '0 1px 0 rgba(255,255,255,0.08) inset'
+              : undefined,
         }}
         title={`${noteName} — long-press for pitch pipe`}
       >
@@ -177,6 +191,8 @@ export function PitchDial() {
       currentNote !== null &&
       currentNote.name === note.name &&
       currentNote.octave === note.octave;
+    const noteMidi = (note.octave + 1) * 12 + NOTE_NAMES.indexOf(note.name);
+    const isDetected = detectedMidi !== null && detectedMidi === noteMidi && !isActive;
     const noteFreq = noteToFrequency(note.name, note.octave, referenceFreq);
     const isPiping = pipeFreq !== null && getActiveFreq() === noteFreq;
 
@@ -218,6 +234,9 @@ export function PitchDial() {
           color,
           border: `1px solid ${borderColor}`,
           cursor: 'pointer',
+          boxShadow: isDetected
+            ? '0 0 0 2px #22d3ee, 0 0 14px 2px rgba(34, 211, 238, 0.55)'
+            : undefined,
         }}
         title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''} — long-press for pitch pipe`}
       >

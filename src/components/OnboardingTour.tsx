@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 
 /**
@@ -59,14 +59,14 @@ const STEPS: TourStep[] = [
     id: 'welcome',
     targets: ['welcome'],
     title: 'Welcome to V-Tune',
-    body: 'A quick guided tour — about a minute. Tap Next to begin.',
+    body: 'A quick guided tour to get familiar with the layout. Tap Next to begin.',
     manualAdvance: true,
   },
   {
     id: 'theme',
     targets: ['theme-toggle'],
     title: 'Light / dark',
-    body: 'Tap the icon to flip between light and dark themes.',
+    body: 'Tap the icon to flip between light and dark mode.',
     advanceWhen: (s, snap) => s.theme !== snap.theme,
   },
   {
@@ -89,7 +89,7 @@ const STEPS: TourStep[] = [
     id: 'pick-d3',
     targets: ['pitch-dial'],
     title: 'Pick D3',
-    body: 'Tap D on the keyboard first, then use the OCT − button to drop to octave 3.',
+    body: 'Tap D on the note layout below, then use the OCT − button to drop to octave 3.',
     advanceWhen: (s, snap) => {
       const isD3 =
         s.currentNote !== null &&
@@ -204,16 +204,27 @@ export function OnboardingTour() {
   const stepSnapshotRef = useRef<TunerState | null>(null);
 
   // Resolve effective step list (skip steps whose skipOnMedia matches).
-  const stepsRef = useRef<TourStep[]>([]);
+  // Done synchronously via useMemo — using a ref + useEffect caused the
+  // tour to fail to render on the first paint after `tourActive` flipped
+  // true (refs don't trigger re-renders), so the tour only became visible
+  // after some other store change caused a re-render — by which point
+  // the user had already opened the panel and step 3 could never advance.
+  const effectiveSteps = useMemo(
+    () =>
+      tourActive
+        ? STEPS.filter(
+            (s) => !s.skipOnMedia || !window.matchMedia(s.skipOnMedia).matches,
+          )
+        : [],
+    [tourActive],
+  );
+
+  // Reset step index whenever the tour (re-)activates so "Show tour again"
+  // starts from step 0 each time.
   useEffect(() => {
-    if (!tourActive) return;
-    stepsRef.current = STEPS.filter(
-      (s) => !s.skipOnMedia || !window.matchMedia(s.skipOnMedia).matches,
-    );
-    setStepIdx(0);
+    if (tourActive) setStepIdx(0);
   }, [tourActive]);
 
-  const effectiveSteps = stepsRef.current;
   const step = effectiveSteps[stepIdx] ?? null;
 
   // ── Tour entry / exit side effects ──────────────────────────────────
@@ -332,13 +343,25 @@ export function OnboardingTour() {
     setStepIdx((i) => {
       const next = i + 1;
       if (next >= effectiveSteps.length) {
-        endTour();
+        completeTour();
         return i;
       }
       return next;
     });
   };
 
+  /** Natural completion — clean up SA / ISO / open accordion so the user
+   *  starts fresh after the tour walks them through those features. */
+  const completeTour = () => {
+    const s = useTunerStore.getState();
+    if (s.showSpectrum) s.setShowSpectrum(false);
+    if (s.isolations.length > 0) s.clearIsolations();
+    if (s.openAccordion !== null) s.toggleAccordion(s.openAccordion);
+    s.setOnboardingDone(true);
+    s.setTourActive(false);
+  };
+
+  /** Skip / dismiss — don't touch the user's layout, just close the tour. */
   const endTour = () => {
     const s = useTunerStore.getState();
     s.setOnboardingDone(true);

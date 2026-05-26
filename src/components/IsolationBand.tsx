@@ -164,7 +164,8 @@ function IsolationBandItem({
         const cs = Math.min(total > 1 ? 28 : 38, Math.max(20, h * (total > 1 ? 0.38 : 0.45)));
         const sign = cents >= 0 ? '+' : '';
         ctx.font = `bold ${cs}px "JetBrains Mono", monospace`;
-        ctx.fillStyle = isInTune ? '#00e878' : '#a0a0b8';
+        // White when in tune so the digits stay legible over the green bar.
+        ctx.fillStyle = isInTune ? '#ffffff' : '#a0a0b8';
         ctx.textAlign = 'right';
         ctx.fillText(`${sign}${Math.round(cents)}`, w - 10, h / 2 - cs * 0.2);
 
