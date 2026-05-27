@@ -291,6 +291,10 @@ export function stopAudio() {
     stream = null;
   }
 
+  // Stopping the mic also stops any pitch-pipe — the user explicitly
+  // halted the session, so leaving a stray reference tone running would
+  // be surprising.
+  useTunerStore.getState().clearPipe();
   useTunerStore.getState().setRunning(false);
 }
 

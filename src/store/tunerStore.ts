@@ -57,6 +57,18 @@ export interface TunerState {
    *  `currentNote` (which is the user-selected tuning target). `null`
    *  when the mic is off or no stable pitch is detected. */
   detectedMidi: number | null;
+
+  /** Per-band pitch pipe (LinoTune-style). At most one band is "piping"
+   *  at a time. Three modes per band:
+   *    null       — off
+   *    'tone'     — continuous sine reference tone
+   *    'beep'     — silent until the band detects a strike, then emits
+   *                 a brief reference beep on each fresh onset
+   *  Cycle order on the ♪ icon: off → tone → beep → off.
+   *  Clicking the icon on a different band moves the pipe to that band
+   *  while preserving the current mode. */
+  pipeBandId: string | null;
+  pipeMode: 'tone' | 'beep' | null;
   inputDeviceId: string;
   availableDevices: MediaDeviceInfo[];
   openAccordion: 'tuning' | 'settings' | 'stopwatch' | null;
@@ -106,6 +118,13 @@ export interface TunerState {
   setTolerance: (cents: number) => void;
   setAutoDetect: (auto: boolean) => void;
   setDetectedMidi: (midi: number | null) => void;
+  /** Cycle the pitch-pipe for the given band id (off → tone → beep → off).
+   *  Clicking a different band id moves the pipe to that band, keeping
+   *  whichever mode was active. */
+  cyclePipeBand: (id: string) => void;
+  /** Force-stop the pipe (no band, no mode). Called from tour completion
+   *  / audio stop so we never leave a stray tone running. */
+  clearPipe: () => void;
   setInputDevice: (deviceId: string) => void;
   setAvailableDevices: (devices: MediaDeviceInfo[]) => void;
   setSelectedBand: (id: string | null) => void;
@@ -234,6 +253,8 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   tolerance: 5,
   autoDetect: false,
   detectedMidi: null,
+  pipeBandId: null,
+  pipeMode: null,
   inputDeviceId: 'default',
   availableDevices: [],
   openAccordion: null,
@@ -322,6 +343,20 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   setTolerance: (cents) => set({ tolerance: cents }),
   setAutoDetect: (auto) => set({ autoDetect: auto }),
   setDetectedMidi: (midi) => set({ detectedMidi: midi }),
+  cyclePipeBand: (id) => set((s) => {
+    // Different band — move the pipe over, keep current mode (or start
+    // on tone if pipe was off).
+    if (s.pipeBandId !== id) {
+      return { pipeBandId: id, pipeMode: s.pipeMode ?? 'tone' };
+    }
+    // Same band — cycle tone → beep → off.
+    if (s.pipeMode === 'tone') return { pipeBandId: id, pipeMode: 'beep' };
+    if (s.pipeMode === 'beep') return { pipeBandId: null, pipeMode: null };
+    // Off → tone (defensive — shouldn't be reached if pipeBandId is set
+    // but pipeMode is null, but cheap to handle).
+    return { pipeBandId: id, pipeMode: 'tone' };
+  }),
+  clearPipe: () => set({ pipeBandId: null, pipeMode: null }),
   setInputDevice: (deviceId) => set({ inputDeviceId: deviceId }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedBand: (id) => set((s) => ({ selectedBandId: s.selectedBandId === id ? null : id })),

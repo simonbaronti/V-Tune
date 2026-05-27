@@ -1,9 +1,15 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { getDisplayName } from '../utils/notes';
+import { playTone, stopTone, playBeep } from '../audio/PitchPipe';
 
 // How long the colour + cents readout stays on screen after signal drops
 const HOLD_MS = 3500;
+
+// Width of the clickable ♪ pitch-pipe icon strip on the left of each band.
+// Clicks inside this region cycle the band's pitch pipe (off → tone → beep);
+// clicks outside it behave as before (select / drag the band).
+const PIPE_ICON_W = 36;
 
 function getBandLayout(canvasHeight: number, numBands: number) {
   const bandHeight = canvasHeight / numBands;
@@ -45,6 +51,10 @@ export function StrobeDisplay() {
   });
   const dragStartYRef = useRef(0);
   const longPressTimerRef = useRef<number | null>(null);
+  // Tracks a pointer-down inside the ♪ icon strip so pointer-up knows to
+  // treat the gesture as an icon tap (cycle pipe mode) rather than a
+  // band-select / drag.
+  const iconPressRef = useRef<{ bandIdx: number; bandId: string } | null>(null);
 
   const cancelLongPress = () => {
     if (longPressTimerRef.current !== null) {
@@ -57,11 +67,22 @@ export function StrobeDisplay() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const state = useTunerStore.getState();
     const idx = getBandIndexAtY(y, rect.height, state.bands.length);
     if (idx === -1) return;
     const band = state.bands[idx];
+
+    // Left-edge ♪ icon: record the press and bail out so the band-drag /
+    // band-select code path is skipped entirely. Pointer-up will cycle
+    // the pipe mode if the pointer is still over the icon.
+    if (x < PIPE_ICON_W) {
+      iconPressRef.current = { bandIdx: idx, bandId: band.id };
+      dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
+      return;
+    }
+
     const canDrag = !band.isFoundation;
     dragRef.current = { fromIndex: idx, currentY: y, active: false, canDrag };
     dragStartYRef.current = y;
@@ -103,12 +124,27 @@ export function StrobeDisplay() {
     const canvas = canvasRef.current;
     if (!canvas) {
       dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
+      iconPressRef.current = null;
       return;
     }
     try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const state = useTunerStore.getState();
+
+    // ♪ icon tap — only fire if the pointer is still over the same band's
+    // icon region. Stops a drag-onto-icon from accidentally toggling pipe.
+    if (iconPressRef.current) {
+      const press = iconPressRef.current;
+      iconPressRef.current = null;
+      const stillInIcon = x < PIPE_ICON_W;
+      const sameBand = getBandIndexAtY(y, rect.height, state.bands.length) === press.bandIdx;
+      if (stillInIcon && sameBand) {
+        state.cyclePipeBand(press.bandId);
+      }
+      return;
+    }
 
     if (dragRef.current.active) {
       const toIndex = getBandIndexAtY(y, rect.height, state.bands.length);
@@ -132,6 +168,7 @@ export function StrobeDisplay() {
   const handlePointerCancel = useCallback(() => {
     cancelLongPress();
     dragRef.current = { fromIndex: -1, currentY: 0, active: false, canDrag: false };
+    iconPressRef.current = null;
   }, []);
 
   const draw = useCallback(() => {
@@ -159,7 +196,7 @@ export function StrobeDisplay() {
     ctx.fillRect(0, 0, w, h);
 
     const state = useTunerStore.getState();
-    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness } = state;
+    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness, pipeBandId, pipeMode } = state;
     const bands = state.bands;
     const numBands = bands.length;
 
@@ -220,7 +257,8 @@ export function StrobeDisplay() {
 
       // Detect signal resuming after a gap > 250ms — treat as a fresh
       // strike and wipe stale state so the previous note's lock can't
-      // bleed in on the new one.
+      // bleed in on the new one. This rising-edge moment is also the
+      // hook for the pitch-pipe beep mode (one beep per strike).
       const prevLastSignal = lastSignalTimeRef.current.get(band.id) ?? -Infinity;
       const isSignalLive = signalPresent && band.magnitude > magThreshold;
       if (isSignalLive && now - prevLastSignal > 250) {
@@ -229,6 +267,10 @@ export function StrobeDisplay() {
         medianBufferRef.current.set(band.id, []);
         inTuneStateRef.current.set(band.id, false);
         inTuneChangeStartRef.current.delete(band.id);
+        // Pitch-pipe beep mode: fire one reference beep per fresh strike.
+        if (pipeBandId === band.id && pipeMode === 'beep') {
+          playBeep(band.frequency);
+        }
       }
 
       const prevSmoothed = smoothedCentsRef.current.get(band.id) ?? centsOff;
@@ -360,7 +402,27 @@ export function StrobeDisplay() {
         ctx.strokeRect(1, y + 2, w - 2, bandHeight - 4);
       }
 
-      // Band note name
+      // ♪ Pitch-pipe icon (left edge) — three states per band:
+      //   off   → very dim glyph
+      //   tone  → solid amber (continuous tone playing)
+      //   beep  → solid cyan  (beep-on-strike armed)
+      const isPipingThis = pipeBandId === band.id;
+      const iconMode: 'off' | 'tone' | 'beep' =
+        isPipingThis && pipeMode ? pipeMode : 'off';
+      const iconColor =
+        iconMode === 'tone'
+          ? '#fbbf24'
+          : iconMode === 'beep'
+            ? '#22d3ee'
+            : 'rgba(255, 255, 255, 0.8)';
+      const iconSize = Math.min(36, Math.max(24, bandHeight * 0.5));
+      ctx.fillStyle = iconColor;
+      ctx.font = `${iconSize}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('♪', PIPE_ICON_W / 2, y + bandHeight / 2);
+
+      // Band note name — shifted right of the icon strip
       const labelColor = holdActive
         ? 'rgba(245, 245, 250, 0.95)'
         : isSelected ? '#06b6d4' : 'rgba(200, 200, 215, 0.55)';
@@ -369,15 +431,15 @@ export function StrobeDisplay() {
       ctx.font = `bold ${labelSize}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${getDisplayName(band.noteName, noteNaming)}${band.octave}`, 10, y + bandHeight / 2 - labelSize * 0.15);
+      ctx.fillText(`${getDisplayName(band.noteName, noteNaming)}${band.octave}`, PIPE_ICON_W + 6, y + bandHeight / 2 - labelSize * 0.15);
 
       // Frequency below label — slightly smaller on narrow viewports, with
       // 8px of breathing room between it and the note label above
       const isNarrow = w < 500;
-      const hzFontSize = isNarrow ? 16 : 20;
-      ctx.fillStyle = 'rgba(180, 180, 200, 0.45)';
+      const hzFontSize = isNarrow ? 13 : 16;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
-      ctx.fillText(`${band.frequency.toFixed(1)} Hz`, 10, y + bandHeight / 2 + labelSize * 0.35 + 8);
+      ctx.fillText(`${band.frequency.toFixed(1)} Hz`, PIPE_ICON_W + 6, y + bandHeight / 2 + labelSize * 0.35 + 8);
 
       // Cents deviation on right — show during live signal, or during
       // decay only if we WERE in tune (so a wrong, red reading doesn't
@@ -461,6 +523,43 @@ export function StrobeDisplay() {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [draw]);
+
+  // ── Pitch-pipe audio driver ─────────────────────────────────────────
+  // Subscribe to (pipeBandId, pipeMode) and the freq of *just* the
+  // targeted band — NOT the whole `bands` array. The bands array is
+  // re-created every audio frame by `updateBands`, so subscribing to it
+  // would re-fire this effect 60×/s and constantly cycle the oscillator
+  // (and worse, hit playTone's same-freq toggle, which silences it).
+  // Beep mode does NOT use playTone — beeps fire from the per-frame
+  // onset detector in the draw loop.
+  const pipeBandId = useTunerStore((s) => s.pipeBandId);
+  const pipeMode = useTunerStore((s) => s.pipeMode);
+  const pipeBandFreq = useTunerStore((s) => {
+    if (!s.pipeBandId) return null;
+    const b = s.bands.find((bb) => bb.id === s.pipeBandId);
+    return b?.frequency ?? null;
+  });
+  useEffect(() => {
+    if (!pipeBandId || !pipeMode) {
+      stopTone();
+      return;
+    }
+    if (pipeBandFreq === null) {
+      // Targeted band no longer exists (e.g. user changed root note).
+      useTunerStore.getState().clearPipe();
+      stopTone();
+      return;
+    }
+    if (pipeMode === 'tone') {
+      playTone(pipeBandFreq);
+    } else {
+      // beep mode → no continuous tone, beeps fire from the draw loop
+      stopTone();
+    }
+    return () => {
+      stopTone();
+    };
+  }, [pipeBandId, pipeMode, pipeBandFreq]);
 
   return (
     <canvas

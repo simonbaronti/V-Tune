@@ -1,8 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { noteToFrequency, NOTE_NAMES, getDisplayName, type NoteNaming } from '../utils/notes';
 import { updateWorkletTargets } from '../audio/AudioEngine';
-import { playTone, stopTone, getActiveFreq } from '../audio/PitchPipe';
 import {
   HANDPAN_SCALES,
   CHROMATIC_ID,
@@ -27,8 +26,6 @@ const SHARPS = [
   { idx: 10, col: 12 },  // A#  between A and B
 ];
 
-const LONG_PRESS_MS = 450;
-
 export function PitchDial() {
   const currentNote = useTunerStore((s) => s.currentNote);
   const autoDetect = useTunerStore((s) => s.autoDetect);
@@ -38,9 +35,6 @@ export function PitchDial() {
   // Live mic-detected note (MIDI). Drives a cyan glow ring on whichever
   // button matches — purely visual, never alters the user's selection.
   const detectedMidi = useTunerStore((s) => s.detectedMidi);
-  const [pipeFreq, setPipeFreq] = useState<number | null>(null);
-  const longPressTimer = useRef<number | null>(null);
-  const longPressFired = useRef(false);
 
   const activeScale = findScale(selectedScaleId);
   const isScaleMode = activeScale !== null;
@@ -63,35 +57,11 @@ export function PitchDial() {
     updateWorkletTargets();
   }, [referenceFreq]);
 
-  const togglePipe = (noteName: string, octave: number) => {
-    const freq = noteToFrequency(noteName, octave, referenceFreq);
-    if (getActiveFreq() === freq) {
-      stopTone();
-      setPipeFreq(null);
-    } else {
-      playTone(freq);
-      setPipeFreq(freq);
-    }
-  };
-
-  const handlePointerDown = (noteName: string, octave: number) => {
-    longPressFired.current = false;
-    longPressTimer.current = window.setTimeout(() => {
-      longPressFired.current = true;
-      togglePipe(noteName, octave);
-    }, LONG_PRESS_MS);
-  };
-
-  const clearLongPress = () => {
-    if (longPressTimer.current !== null) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  const handlePointerUp = (noteName: string, octave: number) => {
-    clearLongPress();
-    if (longPressFired.current) return;
+  // Pitch pipe used to live on the dial via a long-press / right-click on
+  // each note. It now lives per-band on the strobe canvas (♪ icon on the
+  // left of each band → off → tone → beep) so users can hear ALL the
+  // reference frequencies, not just the root. See StrobeDisplay.tsx.
+  const handleNoteClick = (noteName: string, octave: number) => {
     if (autoDetect) return;
     setNote(noteName, octave);
   };
@@ -126,42 +96,24 @@ export function PitchDial() {
     const noteName = NOTE_NAMES[idx];
     const isActive = idx === currentNoteIdx;
     const isDetected = idx === detectedPitchClass && !isActive;
-    const isPiping =
-      pipeFreq !== null &&
-      getActiveFreq() === noteToFrequency(noteName, currentOctave, referenceFreq);
 
     const background = isActive
       ? 'var(--accent-blue)'
-      : isPiping
-        ? 'rgba(255, 200, 0, 0.18)'
-        : isSharp
-          ? '#0a0a12'
-          : 'var(--bg-tertiary)';
+      : isSharp
+        ? '#0a0a12'
+        : 'var(--bg-tertiary)';
 
     const color = isActive
       ? '#fff'
-      : isPiping
-        ? 'var(--accent-yellow)'
-        : isSharp
-          ? 'var(--text-secondary)'
-          : 'var(--text-primary)';
+      : isSharp
+        ? 'var(--text-secondary)'
+        : 'var(--text-primary)';
 
-    const borderColor = isActive
-      ? 'var(--accent-blue)'
-      : isPiping
-        ? 'var(--accent-yellow)'
-        : 'var(--border)';
+    const borderColor = isActive ? 'var(--accent-blue)' : 'var(--border)';
 
     return (
       <button
-        onPointerDown={() => handlePointerDown(noteName, currentOctave)}
-        onPointerUp={() => handlePointerUp(noteName, currentOctave)}
-        onPointerLeave={clearLongPress}
-        onPointerCancel={clearLongPress}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          togglePipe(noteName, currentOctave);
-        }}
+        onClick={() => handleNoteClick(noteName, currentOctave)}
         className="rounded-md font-medium text-sm transition-colors select-none touch-none"
         style={{
           gridColumn: `${gridCol} / span 2`,
@@ -178,7 +130,7 @@ export function PitchDial() {
               ? '0 1px 0 rgba(255,255,255,0.08) inset'
               : undefined,
         }}
-        title={`${noteName} — long-press for pitch pipe`}
+        title={noteName}
       >
         {getDisplayName(noteName, noteNaming)}
       </button>
@@ -193,41 +145,26 @@ export function PitchDial() {
       currentNote.octave === note.octave;
     const noteMidi = (note.octave + 1) * 12 + NOTE_NAMES.indexOf(note.name);
     const isDetected = detectedMidi !== null && detectedMidi === noteMidi && !isActive;
-    const noteFreq = noteToFrequency(note.name, note.octave, referenceFreq);
-    const isPiping = pipeFreq !== null && getActiveFreq() === noteFreq;
 
     const background = isActive
       ? 'var(--accent-blue)'
-      : isPiping
-        ? 'rgba(255, 200, 0, 0.18)'
-        : isDing
-          ? 'rgba(168, 85, 247, 0.15)' // highlight the ding
-          : 'var(--bg-tertiary)';
+      : isDing
+        ? 'rgba(168, 85, 247, 0.15)' // highlight the ding
+        : 'var(--bg-tertiary)';
     const color = isActive
       ? '#fff'
-      : isPiping
-        ? 'var(--accent-yellow)'
-        : isDing
-          ? '#a855f7'
-          : 'var(--text-primary)';
+      : isDing
+        ? '#a855f7'
+        : 'var(--text-primary)';
     const borderColor = isActive
       ? 'var(--accent-blue)'
-      : isPiping
-        ? 'var(--accent-yellow)'
-        : isDing
-          ? '#a855f7'
-          : 'var(--border)';
+      : isDing
+        ? '#a855f7'
+        : 'var(--border)';
 
     return (
       <button
-        onPointerDown={() => handlePointerDown(note.name, note.octave)}
-        onPointerUp={() => handlePointerUp(note.name, note.octave)}
-        onPointerLeave={clearLongPress}
-        onPointerCancel={clearLongPress}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          togglePipe(note.name, note.octave);
-        }}
+        onClick={() => handleNoteClick(note.name, note.octave)}
         className="rounded-md font-medium text-sm transition-colors select-none touch-none px-2 py-2 min-w-0"
         style={{
           background,
@@ -238,7 +175,7 @@ export function PitchDial() {
             ? '0 0 0 2px #22d3ee, 0 0 14px 2px rgba(34, 211, 238, 0.55)'
             : undefined,
         }}
-        title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''} — long-press for pitch pipe`}
+        title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''}`}
       >
         <span className="font-bold">{getDisplayName(note.name, activeScale?.naming ?? noteNaming)}</span>
         <span className="opacity-70 text-xs ml-0.5">{note.octave}</span>
@@ -365,34 +302,6 @@ export function PitchDial() {
         )}
       </div>
 
-      {/* Active pitch pipe indicator */}
-      {pipeFreq !== null && (
-        <div
-          className="flex items-center gap-2 px-2 py-1.5 rounded"
-          style={{
-            background: 'rgba(255, 200, 0, 0.08)',
-            border: '1px solid rgba(255, 200, 0, 0.3)',
-          }}
-        >
-          <span className="text-sm font-bold tracking-wider" style={{ color: 'var(--accent-yellow)' }}>
-            ♪ PIPE
-          </span>
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {pipeFreq.toFixed(1)} Hz
-          </span>
-          <button
-            onClick={() => { stopTone(); setPipeFreq(null); }}
-            className="ml-auto px-2.5 py-1 rounded text-sm font-medium"
-            style={{
-              background: 'rgba(255, 59, 59, 0.15)',
-              color: 'var(--accent-red)',
-              border: '1px solid rgba(255, 59, 59, 0.3)',
-            }}
-          >
-            STOP
-          </button>
-        </div>
-      )}
     </div>
   );
 }
