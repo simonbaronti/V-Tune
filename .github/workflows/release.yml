@@ -147,11 +147,24 @@ jobs:
 
       # Decode keystore from the GitHub Secret to the path build.gradle
       # expects (android/keystore/v-tune-release.jks).
-      - name: Restore keystore
+      # Pass the secret via env + printf (not echo) so the shell can't
+      # mangle it, then decode. `base64 -d` tolerates whitespace, but the
+      # secret should be a single unwrapped line regardless. Validate the
+      # decoded keystore immediately so a corrupted secret fails here with
+      # a clear message rather than deep inside gradle's signing step.
+      - name: Restore + validate keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p android/keystore
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/keystore/v-tune-release.jks
-          ls -la android/keystore/
+          printf '%s' "$KEYSTORE_B64" | base64 -d > android/keystore/v-tune-release.jks
+          if keytool -list -keystore android/keystore/v-tune-release.jks -storepass "$KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "✓ keystore decoded + opened OK"
+          else
+            echo "✗ keystore invalid after decode — re-create the ANDROID_KEYSTORE_BASE64 secret from a single-line base64"
+            exit 1
+          fi
 
       - name: Build signed release APK
         working-directory: android
