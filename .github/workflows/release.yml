@@ -1,22 +1,29 @@
-# Release pipeline — builds the Android APK and the Windows Tauri
-# installer in parallel, then publishes them (plus the user guide) as
-# a GitHub Release.
+# V-Tune release pipeline — Windows + Linux + Android, single workflow,
+# single GitHub Release per tag.
 #
 # Triggered when you push a git tag matching v*.*.* — e.g.:
 #   git tag v1.0.1
 #   git push origin v1.0.1
 #
-# Required GitHub Secrets (set at Settings → Secrets and variables →
-# Actions):
+# Three job groups run in parallel, then a `publish` job collects all
+# artifacts (+ the user guide PDF) and creates ONE GitHub Release.
+#
+# macOS .dmg is deliberately NOT in CI:
+#   - GitHub free tier macOS runners are scarce, builds queue for
+#     hours-to-days, and macOS minutes burn 10x the budget of Linux.
+#   - You have a Mac. `npm run tauri:build` locally produces the .dmg
+#     in a couple of minutes, and you can drag-and-drop it into the
+#     GitHub Release page after the fact.
+#
+# Required GitHub Secrets:
 #   ANDROID_KEYSTORE_BASE64    — base64-encoded contents of
 #                                android/keystore/v-tune-release.jks
 #   ANDROID_KEYSTORE_PASSWORD  — the keystore password
 #
-# (The key alias is hardcoded in build.gradle as "v-tune-release"; the
-# key password equals the keystore password since we use the same for
-# both. If you ever generate a new keystore with a different alias or
-# split passwords, you'll also need ANDROID_KEY_ALIAS and
-# ANDROID_KEY_PASSWORD secrets.)
+# Required repo setting:
+#   Settings → Actions → General → Workflow permissions
+#   → "Read and write permissions"
+#   (so the workflow can create the Release + upload assets)
 
 name: Release
 
@@ -24,53 +31,127 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:   # manual re-run from the Actions UI
 
 jobs:
   # ───────────────────────────────────────────────────────────────────
-  # Android — produces a signed APK for direct download / sideload
+  # Desktop — Windows (.msi + .exe) + Linux (.deb + .AppImage)
+  # ───────────────────────────────────────────────────────────────────
+  desktop:
+    name: Desktop (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: ubuntu-22.04
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux WebKit deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build Tauri
+        run: npm run tauri:build
+
+      - name: Stage Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp src-tauri/target/release/bundle/msi/*.msi staging/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe staging/ 2>/dev/null || true
+          ls -la staging/
+
+      - name: Stage Linux artifacts
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp src-tauri/target/release/bundle/deb/*.deb staging/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/appimage/*.AppImage staging/ 2>/dev/null || true
+          ls -la staging/
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: staging/*
+          if-no-files-found: error
+
+  # ───────────────────────────────────────────────────────────────────
+  # Android — signed release APK
   # ───────────────────────────────────────────────────────────────────
   android:
-    name: Build Android APK
+    name: Android (APK)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
-      - name: Set up Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install npm dependencies
+      - name: Install npm deps
         run: npm ci
 
       - name: Build web bundle
         run: npm run build
 
-      - name: Capacitor sync (copies web bundle into android/)
+      - name: Capacitor sync into android/
         run: npx cap sync android
 
-      # Decode the keystore from the GitHub Secret to the exact path
-      # build.gradle expects. The secret is the raw .jks file
-      # base64-encoded; produce it locally with:
-      #   base64 -i android/keystore/v-tune-release.jks | pbcopy
+      # Decode keystore from the GitHub Secret to the path build.gradle
+      # expects (android/keystore/v-tune-release.jks).
       - name: Restore keystore
         run: |
           mkdir -p android/keystore
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/keystore/v-tune-release.jks
-          ls -la android/keystore/v-tune-release.jks
+          ls -la android/keystore/
 
-      - name: Build release APK
+      - name: Build signed release APK
         working-directory: android
         env:
           VTUNE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -79,75 +160,29 @@ jobs:
       - name: Verify signature
         working-directory: android/app/build/outputs/apk/release
         run: |
-          ls -la
-          # Use apksigner from build-tools to verify the signature
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose app-release.apk
 
-      - name: Rename APK with version
+      - name: Stage APK with version in filename
         working-directory: android/app/build/outputs/apk/release
-        run: mv app-release.apk V-Tune-${{ github.ref_name }}.apk
+        run: |
+          mkdir -p ../../../../../staging
+          cp app-release.apk ../../../../../staging/V-Tune-${{ github.ref_name }}.apk
+          ls -la ../../../../../staging/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/release/V-Tune-*.apk
+          path: staging/*.apk
           if-no-files-found: error
 
   # ───────────────────────────────────────────────────────────────────
-  # Windows — Tauri desktop installer (.msi + .exe via NSIS)
+  # Publish — collect every artifact, attach the PDF, create Release
   # ───────────────────────────────────────────────────────────────────
-  windows:
-    name: Build Windows installer
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust build artifacts
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install npm dependencies
-        run: npm ci
-
-      - name: Build Tauri (web + Rust + installer)
-        run: npm run tauri:build
-
-      - name: List build artifacts
-        shell: bash
-        run: |
-          echo "── MSI installers ──"
-          find src-tauri/target -name '*.msi' || true
-          echo "── NSIS installers ──"
-          find src-tauri/target -name '*-setup.exe' || true
-
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installers
-          path: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/nsis/*-setup.exe
-          if-no-files-found: error
-
-  # ───────────────────────────────────────────────────────────────────
-  # Publish — collect all artifacts, attach to a GitHub Release
-  # ───────────────────────────────────────────────────────────────────
-  release:
+  publish:
     name: Publish GitHub Release
-    needs: [android, windows]
+    needs: [desktop, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -155,23 +190,20 @@ jobs:
       - name: Checkout (for the user guide PDF)
         uses: actions/checkout@v4
 
-      - name: Download Android artifact
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: android-apk
-          path: artifacts/
+          path: artifacts
 
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-installers
-          path: artifacts/
-
-      - name: Stage user guide
-        run: cp docs/V-Tune-User-Guide.pdf artifacts/
-
-      - name: List final release assets
-        run: ls -la artifacts/
+      - name: Flatten + add PDF
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name '*.msi' -o -name '*-setup.exe' \
+            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.apk' \) \
+            -exec cp {} release-assets/ \;
+          cp docs/V-Tune-User-Guide.pdf release-assets/
+          echo "── Final release assets ──"
+          ls -la release-assets/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -185,19 +217,28 @@ jobs:
 
             ### Downloads
 
-            - **Android (.apk)** — sideload directly. Settings → Security → "Install unknown apps" for your browser must be enabled.
-            - **Windows (.msi or .exe)** — installer that places V-Tune in Program Files and registers a Start menu shortcut. Either works; .msi is preferred if you use Group Policy / MDM.
-            - **iOS** — available via the App Store: https://apps.apple.com/app/v-tune
-            - **User Guide (.pdf)** — comprehensive manual covering every feature.
+            | Platform | File |
+            |---|---|
+            | Windows | `V-Tune_*_x64-setup.exe` (NSIS, recommended) or `V-Tune_*_x64_en-US.msi` |
+            | Linux | `v-tune_*_amd64.deb` (Debian/Ubuntu) or `v-tune_*_amd64.AppImage` (universal) |
+            | Android | `V-Tune-${{ github.ref_name }}.apk` (sideload — enable "Install unknown apps" for your browser) |
+            | iOS | App Store: https://apps.apple.com/app/v-tune |
+            | macOS | Build locally with `npm run tauri:build` (deferred from CI to keep free-tier minutes for the other platforms) |
 
-            ### Verifying the Android APK
+            ### Documentation
 
-            Signature: SHA256 RSA. Verify with `apksigner verify --print-certs V-Tune-${{ github.ref_name }}.apk`.
+            The full [User Guide](V-Tune-User-Guide.pdf) is attached to this release — 12 pages covering every feature.
 
-            ### See also
+            ### Verify the Android APK signature
 
-            - Web app: https://v-tune-handpan.vercel.app
-            - Source: https://github.com/${{ github.repository }}
-          files: artifacts/*
+            ```
+            apksigner verify --print-certs V-Tune-${{ github.ref_name }}.apk
+            ```
+
+            ### Links
+
+            - Web app: <https://v-tune-handpan.vercel.app>
+            - Source: <https://github.com/${{ github.repository }}>
+          files: release-assets/*
           draft: false
           prerelease: false
