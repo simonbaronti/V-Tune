@@ -178,12 +178,14 @@ jobs:
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose app-release.apk
 
+      # Stage from the repo root with a full relative path — avoids the
+      # off-by-one `../../../` counting that put the APK in the wrong
+      # place last run.
       - name: Stage APK with version in filename
-        working-directory: android/app/build/outputs/apk/release
         run: |
-          mkdir -p ../../../../../staging
-          cp app-release.apk ../../../../../staging/V-Tune-${{ github.ref_name }}.apk
-          ls -la ../../../../../staging/
+          mkdir -p staging
+          cp android/app/build/outputs/apk/release/app-release.apk "staging/V-Tune-${{ github.ref_name }}.apk"
+          ls -la staging/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
