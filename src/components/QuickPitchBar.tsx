@@ -152,6 +152,13 @@ export function QuickPitchBar() {
       style={{
         background: 'var(--bg-panel)',
         borderTop: '1px solid var(--border)',
+        // Lock the bar to the viewport width so children can never push it
+        // past the right edge (the symptom that was clipping the corner of
+        // the "Let's Go" button on iPhone).
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
         // Respect the iPhone home-indicator strip + landscape side insets
         paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
         paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',

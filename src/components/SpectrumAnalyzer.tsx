@@ -732,7 +732,9 @@ export function SpectrumAnalyzer() {
     if (e.touches.length === 1) {
       const t = e.touches[0];
       const x = t.clientX - rect.left;
+      const y = t.clientY - rect.top;
       const w = rect.width;
+      const h = rect.height;
 
       // Iso handle resize wins
       const hit = findIsoHandleAt(x, w, 18);
@@ -747,6 +749,25 @@ export function SpectrumAnalyzer() {
           isoId: hit.iso.id,
           startIsoMin: hit.iso.minFreq,
           startIsoMax: hit.iso.maxFreq,
+          startFreq: 0,
+        });
+        return;
+      }
+
+      // Threshold line — same hit zone as the mouse path. Wider on touch
+      // (16px vs the mouse's 10px) since fingers are less precise.
+      const threshY = dbToY(threshold, h - 20, DB_FLOOR, DB_CEIL);
+      if (Math.abs(y - threshY) < 16) {
+        e.preventDefault();
+        setDragState({
+          type: 'threshold',
+          startX: t.clientX,
+          startY: t.clientY,
+          startThreshold: threshold,
+          startRange: viewRange,
+          isoId: null,
+          startIsoMin: 0,
+          startIsoMax: 0,
           startFreq: 0,
         });
         return;
@@ -817,7 +838,13 @@ export function SpectrumAnalyzer() {
       const moved = Math.abs(t.clientX - dragState.startX) + Math.abs(t.clientY - dragState.startY);
       if (moved > DRAG_THRESHOLD_PX) cancelLongPress();
 
-      if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
+      if (dragState.type === 'threshold') {
+        e.preventDefault();
+        const dy = t.clientY - dragState.startY;
+        const dbRange = DB_CEIL - DB_FLOOR;
+        const dbDelta = -(dy / (rect.height - 20)) * dbRange;
+        setThreshold(Math.max(-90, Math.min(-10, Math.round(dragState.startThreshold + dbDelta))));
+      } else if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
         e.preventDefault();
         const x = t.clientX - rect.left;
         const newFreq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, xToFreq(x, rect.width, minF, maxF)));
