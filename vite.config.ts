@@ -3,6 +3,14 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Tauri v2 sets TAURI_ENV_* env vars when it runs `beforeBuildCommand`
+// (our `npm run build`). We use this to detect a desktop build so we can
+// drop the PWA service worker — in the Tauri webview a service worker
+// intercepts the custom tauri:// asset protocol and serves broken
+// responses, producing a black screen. Web (Vercel) and iOS (Capacitor)
+// builds don't set this var, so they keep the PWA + offline caching.
+const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
+
 export default defineConfig({
   // Pin V-Tune's dev server to its own port so it can't collide with other
   // Vite projects (HypaMaps etc.) running on the default 5173. `strictPort`
@@ -20,7 +28,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
+    // Skip the PWA/service worker entirely for Tauri desktop builds.
+    ...(isTauriBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
       manifest: {
@@ -71,6 +80,6 @@ export default defineConfig({
           },
         ],
       },
-    }),
+    })]),
   ],
 });
