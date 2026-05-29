@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy — V-Tune</title>
+<meta name="description" content="V-Tune collects no data. Microphone audio is processed on-device and never stored or transmitted." />
+<meta name="theme-color" content="#08080c" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #08080c; --bg-panel: #101018; --border: #1e1e2a;
+    --text: #f5f5fa; --text-dim: rgba(255,255,255,0.6); --text-faint: rgba(255,255,255,0.4);
+    --cyan: #06b6d4; --cyan-bright: #22d3ee; --green: #00e878; --red: #ff3b3b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  a { color: var(--cyan-bright); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  header { border-bottom: 1px solid var(--border); }
+  .header-inner { display: flex; align-items: center; height: 60px; }
+  .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 20px; letter-spacing: -0.5px; color: var(--text); text-decoration: none; }
+  .logo span { color: var(--cyan); }
+  main { padding: 56px 0 80px; }
+  h1 { font-size: 36px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
+  .updated { color: var(--text-faint); font-size: 14px; margin-bottom: 36px; }
+  h2 { font-size: 20px; font-weight: 700; margin: 32px 0 10px; color: var(--cyan); }
+  h3 { font-size: 16px; font-weight: 700; margin: 20px 0 6px; }
+  p { color: var(--text-dim); margin-bottom: 14px; }
+  ul { color: var(--text-dim); margin: 0 0 14px 22px; }
+  li { margin-bottom: 8px; }
+  .short { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; padding: 24px 26px; margin-bottom: 32px; }
+  .short p { color: var(--text); margin: 0; font-size: 16px; }
+  strong { color: var(--text); }
+  .no { color: var(--red); font-weight: 700; }
+  footer { border-top: 1px solid var(--border); padding: 28px 0; }
+  footer a { color: var(--text-dim); font-size: 14px; text-decoration: none; }
+  footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-inner">
+    <a href="index.html" class="logo">V<span>-</span>Tune</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <h1>Privacy Policy</h1>
+    <div class="updated">Last updated: 28 May 2026</div>
+
+    <div class="short">
+      <p>V-Tune doesn't collect any of your data. No accounts, no analytics, no ads, and it doesn't phone home. Everything the app does happens on your device.</p>
+    </div>
+
+    <h2>What V-Tune uses</h2>
+
+    <h3>Microphone access</h3>
+    <p>V-Tune asks for permission to use your microphone so it can listen to the instrument you're tuning. The audio is processed in real time on your device to detect frequencies and drive the strobe display. <strong>None of this audio is recorded, stored, or transmitted anywhere.</strong> It exists in your device's memory only for the few milliseconds it takes to compute the next strobe frame, and is then discarded.</p>
+
+    <h3>Local settings storage</h3>
+    <p>Your preferences — selected scale, reference frequency, theme, settings panel state — are saved in your device's local storage so they persist between sessions. This data never leaves your device.</p>
+
+    <h2>What V-Tune does not use</h2>
+    <ul>
+      <li><span class="no">No analytics.</span> We don't track which features you use, how long you use the app, or whether you open it at all.</li>
+      <li><span class="no">No accounts.</span> There is no sign-up, no login, no email collection.</li>
+      <li><span class="no">No ads.</span> No third-party advertising SDKs, no tracking pixels.</li>
+      <li><span class="no">No network requests.</span> Apart from downloading the app itself, V-Tune does not connect to any server. The app works fully offline.</li>
+      <li><span class="no">No third-party services.</span> No Firebase, no Google Analytics, no crash reporters.</li>
+    </ul>
+
+    <h2>Children's privacy</h2>
+    <p>V-Tune does not collect any personal information from anyone of any age, so there is no special handling for users under 13. The app is suitable for any user who can operate a touch screen.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If we ever change what V-Tune does with data (we don't plan to, but if this app ever gains a feature that requires it — say, syncing presets across devices), we'll update this policy and bump the date at the top. For material changes, a notice will appear in the app itself.</p>
+
+    <h2>Contact</h2>
+    <p>For questions about this policy or about V-Tune in general, reach out via the <a href="https://github.com/simonbaronti/V-Tune">GitHub repository</a>.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="index.html">&larr; Back to V-Tune</a>
+  </div>
+</footer>
+
+</body>
+</html>
