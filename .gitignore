@@ -47,3 +47,7 @@ android/captures
 # NOTE: gradle-wrapper.jar MUST be committed — it bootstraps the Gradle
 # wrapper, and CI (which has no system Gradle) can't build without it.
 # Do not re-add an ignore rule for it.
+
+# macOS notarization credentials — NEVER commit
+.env.notarize
+src-tauri/.env.notarize

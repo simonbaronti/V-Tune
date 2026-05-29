@@ -17,7 +17,8 @@
     "apk:release": "npm run build && cap sync android && cd android && ./gradlew assembleRelease",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:mac": "set -a && . ./src-tauri/.env.notarize && set +a && tauri build --target universal-apple-darwin"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
