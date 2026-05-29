@@ -106,43 +106,22 @@ def paint_background(canv: rl_canvas.Canvas, doc):
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 8)
     canv.drawRightString(PAGE_W - MARGIN, 7 * mm, f'{doc.page}')
-    canv.drawString(MARGIN, 7 * mm, 'v-tune.app')
+    canv.drawString(MARGIN, 7 * mm, 'v-tune-handpan.vercel.app')
     canv.restoreState()
 
 
 def paint_cover(canv: rl_canvas.Canvas, doc):
-    """Cover page — solid dark plus a stylised strobe-band illustration."""
+    """Cover page — title block up top, a realistic 3-band strobe display
+    as a hero visual filling the centre, footer clear at the bottom."""
     canv.saveState()
     canv.setFillColor(BG)
     canv.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
 
-    # Title block — set later by Paragraphs. Here just decorate.
-    # Decorative strobe-band stripe across the bottom third.
-    band_h = 38
-    band_top = 100
-    colors_seq = [GREEN, GREEN, RED, RED, RED]   # mimics in-tune top + sharp middle
-    for i, c in enumerate(colors_seq):
-        y = band_top - i * (band_h + 4)
-        canv.setFillColor(BG_PANEL)
-        canv.rect(MARGIN, y - band_h, PAGE_W - 2 * MARGIN, band_h,
-                  fill=1, stroke=0)
-        # Strobe bars
-        c.alpha = 0.85
-        canv.setFillColor(c)
-        bar_w = 22
-        n = int((PAGE_W - 2 * MARGIN) // (bar_w * 2))
-        offset = (i * 5) % (bar_w * 2)  # stagger
-        for j in range(n + 2):
-            x = MARGIN + j * (bar_w * 2) - offset
-            canv.rect(x, y - band_h + 4, bar_w, band_h - 8,
-                      fill=1, stroke=0)
-
-    # Top hairline + footer hairline
+    # ── Top accent rule + title block ───────────────────────────────────
     canv.setStrokeColor(CYAN)
     canv.setLineWidth(0.6)
     canv.line(MARGIN, PAGE_H - 35 * mm, MARGIN + 18 * mm, PAGE_H - 35 * mm)
 
-    # Cover textual content (drawn directly, not via flowables)
     canv.setFillColor(TEXT_PRI)
     canv.setFont('V-Sans-Bold', 56)
     canv.drawString(MARGIN, PAGE_H - 60 * mm, 'V-Tune')
@@ -158,12 +137,77 @@ def paint_cover(canv: rl_canvas.Canvas, doc):
     canv.drawString(MARGIN, PAGE_H - 86 * mm,
                     'and other multi-modal instruments.')
 
-    # Version footer
+    # ── Hero strobe display — fills the centre, mimics the real UI ───────
+    # (note, frequency, multiplier, cents, colour)
+    bands = [
+        ('A4', '440.0 Hz', '3×', '+1', GREEN),
+        ('A3', '220.0 Hz', '2×', '0',  GREEN),
+        ('D3', '146.8 Hz', '1×', '−7', RED),
+    ]
+    band_w = PAGE_W - 2 * MARGIN
+    band_h = 64
+    gap = 8
+    top = 486  # top edge (y) of the first band
+
+    for i, (note, freq, mult, cents, c) in enumerate(bands):
+        y = top - i * (band_h + gap)          # y = top edge of this band
+        bottom = y - band_h
+
+        # Panel background (rounded)
+        canv.setFillColor(BG_PANEL)
+        canv.roundRect(MARGIN, bottom, band_w, band_h, 6, fill=1, stroke=0)
+
+        # Strobe bars, clipped to the band rect
+        canv.saveState()
+        clip = canv.beginPath()
+        clip.rect(MARGIN, bottom, band_w, band_h)
+        canv.clipPath(clip, stroke=0, fill=0)
+        c.alpha = 0.9
+        canv.setFillColor(c)
+        bar_w = 18
+        n = int(band_w // (bar_w * 2)) + 2
+        offset = (i * 9) % (bar_w * 2)        # stagger each band
+        for j in range(n):
+            x = MARGIN + j * (bar_w * 2) - offset
+            canv.rect(x, bottom + 5, bar_w, band_h - 10, fill=1, stroke=0)
+        canv.restoreState()
+
+        mid = bottom + band_h / 2
+
+        # ♪ pipe icon (far left)
+        canv.setFillColor(Color(1, 1, 1, alpha=0.85))
+        canv.setFont('V-Sym', 20)
+        canv.drawString(MARGIN + 14, mid - 7, '♪')
+
+        # Note label
+        canv.setFillColor(Color(1, 1, 1, alpha=0.96))
+        canv.setFont('V-Sans-Bold', 26)
+        canv.drawString(MARGIN + 46, mid - 4, note)
+
+        # Frequency + multiplier under the note
+        canv.setFillColor(Color(1, 1, 1, alpha=0.5))
+        canv.setFont('V-Sans', 9)
+        canv.drawString(MARGIN + 46, mid - 18, f'{freq} · {mult}')
+
+        # Cents (far right)
+        canv.setFillColor(Color(1, 1, 1, alpha=0.96))
+        canv.setFont('V-Sans-Bold', 22)
+        canv.drawRightString(MARGIN + band_w - 16, mid - 6, cents)
+
+    # Caption beneath the hero
+    stripe_bottom = top - (len(bands) - 1) * (band_h + gap) - band_h
+    canv.setFillColor(TEXT_DIM)
+    canv.setFont('V-Sans', 9)
+    canv.drawString(MARGIN, stripe_bottom - 16,
+                    'The three-band strobe display — still + green when locked, '
+                    'drifting + red when out of tune.')
+
+    # ── Footer (clear of the hero) ──────────────────────────────────────
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 8)
-    canv.drawString(MARGIN, 7 * mm, 'v-tune.app  ·  v0.1.0')
+    canv.drawString(MARGIN, 7 * mm, 'v-tune-handpan.vercel.app  ·  v1.0.1')
     canv.drawRightString(PAGE_W - MARGIN, 7 * mm,
-                         'Built around FFT peak detection + phase-rate Goertzel analysis')
+                         'FFT peak detection + phase-rate Goertzel analysis')
 
     canv.restoreState()
 
@@ -186,10 +230,15 @@ def make_styles():
     s['h1'] = ParagraphStyle(
         name='h1', fontName='V-Sans-Bold', fontSize=24, leading=28,
         textColor=TEXT_PRI, spaceBefore=4, spaceAfter=2,
+        # Keep a section title glued to its subtitle (and onward) so it
+        # never strands alone at the bottom of a page now that sections
+        # flow continuously instead of each starting a fresh page.
+        keepWithNext=1,
     )
     s['h1_sub'] = ParagraphStyle(
         name='h1_sub', fontName='V-Sans', fontSize=10, leading=14,
         textColor=CYAN, spaceBefore=0, spaceAfter=16,
+        keepWithNext=1,
     )
     s['h2'] = ParagraphStyle(
         name='h2', fontName='V-Sans-Bold', fontSize=14, leading=18,
@@ -422,7 +471,6 @@ def build(out_path: Path):
     story.append(Paragraph('1. Welcome', s['h1']))
     story.append(Paragraph('What V-Tune is and why it exists', s['h1_sub']))
     story.append(HRule(50, length=36))
-    story.append(Spacer(1, 8))
 
     story.append(Paragraph(
         'V-Tune is a precision strobe tuner built for handpans and other '
@@ -452,13 +500,12 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 2. Quick start ────────────────────────────────────────────────
     story.append(Paragraph('2. Quick start', s['h1']))
     story.append(Paragraph('From cold app to tuned note in about a minute', s['h1_sub']))
     story.append(HRule(50, length=36))
-    story.append(Spacer(1, 6))
 
     qs = [
         ('Grant microphone access', 'On first launch V-Tune asks for the mic. Allow it. You can change device later in Settings → Input.'),
@@ -626,7 +673,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 5. The pitch wheel ────────────────────────────────────────────
     story.append(Paragraph('5. The pitch wheel', s['h1']))
@@ -706,7 +753,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 7. Spectrum Analyser + ISO ────────────────────────────────────
     story.append(Paragraph('7. Spectrum Analyser & Isolation windows', s['h1']))
@@ -788,7 +835,7 @@ def build(out_path: Path):
          'Notches out mains hum at 50 Hz (UK/EU) or 60 Hz (US), plus harmonics. Off by default.'),
     ], s))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 9. Stopwatch ──────────────────────────────────────────────────
     story.append(Paragraph('9. Stopwatch', s['h1']))
@@ -811,6 +858,8 @@ def build(out_path: Path):
         'the strobe.',
         s['body_secondary'],
     ))
+
+    story.append(Spacer(1, 40))
 
     # ── 10. Theme / notation / tour ───────────────────────────────────
     story.append(Paragraph('10. Theme, notation, and the onboarding tour', s['h1']))
@@ -850,7 +899,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 11. Tips & troubleshooting ────────────────────────────────────
     story.append(Paragraph('11. Tips & troubleshooting', s['h1']))
