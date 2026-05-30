@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { noteToFrequency, NOTE_NAMES, type NoteInfo, type NoteNaming } from '../utils/notes';
 
 export interface BandConfig {
@@ -239,7 +240,9 @@ const INITIAL_NOTE: NoteInfo = {
 
 const INITIAL_BANDS = defaultBandsForNote(INITIAL_NOTE, 440);
 
-export const useTunerStore = create<TunerState>((set, get) => ({
+export const useTunerStore = create<TunerState>()(
+  persist(
+    (set, get) => ({
   isRunning: false,
   referenceFreq: 440,
   currentNote: null,
@@ -272,8 +275,8 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   isolations: [],
   humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
   alwaysOnTop: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-always-on-top') === '1'),
-  // Always start in chromatic so the full pitch wheel is visible on launch.
-  // The user can switch to any saved scale from the SCALE dropdown.
+  // Default to chromatic on a fresh install. Once the user picks a scale
+  // the persist middleware remembers it across sessions.
   selectedScaleId: 'chromatic',
   onboardingDone: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-onboarding-done') === '1'),
   tourActive: false,
@@ -403,36 +406,17 @@ export const useTunerStore = create<TunerState>((set, get) => ({
     }));
   },
   clearIsolations: () => set({ isolations: [] }),
-  setHumFilter: (mode) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-hum', mode);
-    set({ humFilter: mode });
-  },
-  setAlwaysOnTop: (on) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-always-on-top', on ? '1' : '0');
-    set({ alwaysOnTop: on });
-  },
-  setSelectedScale: (id) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-scale', id);
-    set({ selectedScaleId: id });
-  },
-  setOnboardingDone: (done) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-onboarding-done', done ? '1' : '0');
-    set({ onboardingDone: done });
-  },
+  // The persist middleware handles localStorage automatically for all
+  // whitelisted fields below — setters just update state.
+  setHumFilter: (mode) => set({ humFilter: mode }),
+  setAlwaysOnTop: (on) => set({ alwaysOnTop: on }),
+  setSelectedScale: (id) => set({ selectedScaleId: id }),
+  setOnboardingDone: (done) => set({ onboardingDone: done }),
   setTourActive: (active) => set({ tourActive: active }),
   setPanelOpen: (open) => set({ panelOpen: open }),
-  setTheme: (theme) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-theme', theme);
-    set({ theme });
-  },
-  setHighContrast: (on) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-high-contrast', on ? '1' : '0');
-    set({ highContrast: on });
-  },
-  setLargeText: (on) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('v-tune-large-text', on ? '1' : '0');
-    set({ largeText: on });
-  },
+  setTheme: (theme) => set({ theme }),
+  setHighContrast: (on) => set({ highContrast: on }),
+  setLargeText: (on) => set({ largeText: on }),
 
   addBandByNote: (noteName, octave) => {
     const state = get();
@@ -516,4 +500,79 @@ export const useTunerStore = create<TunerState>((set, get) => ({
   getTargetFrequencies: () => {
     return get().bandConfigs.map((c) => c.frequency);
   },
-}));
+}),
+    {
+      // ─────────────────────────────────────────────────────────────────
+      // Persistence: everything that's a real user preference (settings,
+      // last-tuned note, isolation windows, accordion state) is saved to
+      // localStorage under one key and restored on app launch. Anything
+      // that's transient runtime state (live mic data, audio-running
+      // flag, tour state, etc.) is excluded so it always starts fresh.
+      //
+      // Replaces the per-setting localStorage.setItem calls that only
+      // covered theme / hum / always-on-top / onboarding-done — now
+      // every "wait, why did this reset?" setting is sticky.
+      // ─────────────────────────────────────────────────────────────────
+      name: 'v-tune-store',
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+
+      // Whitelist what gets saved. Transient fields (isRunning, peaks,
+      // rmsLevel, bands runtime data, tour state, etc.) are NOT in here
+      // and therefore reset to their initial values on every launch.
+      partialize: (state) => ({
+        // User settings
+        referenceFreq: state.referenceFreq,
+        tolerance: state.tolerance,
+        noteNaming: state.noteNaming,
+        displaySmoothing: state.displaySmoothing,
+        strobeSpeed: state.strobeSpeed,
+        readoutSmoothing: state.readoutSmoothing,
+        micGainDb: state.micGainDb,
+        inTuneHysteresis: state.inTuneHysteresis,
+        strobeIntensity: state.strobeIntensity,
+        strobeSoftness: state.strobeSoftness,
+        fftSize: state.fftSize,
+        fftSmoothing: state.fftSmoothing,
+        humFilter: state.humFilter,
+        alwaysOnTop: state.alwaysOnTop,
+        selectedScaleId: state.selectedScaleId,
+        showSpectrum: state.showSpectrum,
+        openAccordion: state.openAccordion,
+        inputDeviceId: state.inputDeviceId,
+        // Last-tuned note + custom band setup
+        currentNote: state.currentNote,
+        centsOffset: state.centsOffset,
+        bandConfigs: state.bandConfigs,
+        // User-drawn isolation windows
+        isolations: state.isolations,
+        // Theme / accessibility
+        theme: state.theme,
+        highContrast: state.highContrast,
+        largeText: state.largeText,
+        // One-time flags
+        onboardingDone: state.onboardingDone,
+      }),
+
+      // After hydration, rebuild the derived runtime state (the `bands`
+      // array and `baseFrequency`) from the persisted note + bandConfigs.
+      // These aren't persisted directly because they're derivable, and
+      // doing it here keeps the saved blob smaller and stale-data-free.
+      merge: (persistedState, currentState) => {
+        const merged = {
+          ...currentState,
+          ...(persistedState as Partial<TunerState>),
+        };
+        merged.bands = configsToBands(merged.bandConfigs);
+        merged.baseFrequency = merged.currentNote
+          ? noteToFrequency(
+              merged.currentNote.name,
+              merged.currentNote.octave,
+              merged.referenceFreq,
+            )
+          : merged.referenceFreq;
+        return merged;
+      },
+    },
+  ),
+);
