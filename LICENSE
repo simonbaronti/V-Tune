@@ -1,0 +1,83 @@
+V-Tune — Proprietary License
+============================
+
+Copyright (c) 2026 Simon Baronti. All rights reserved.
+
+V-Tune is source-available: the code is published in this public
+repository so that users and curious developers can read it, learn
+from it, file issues, and propose improvements. **It is not
+open-source software.** The terms below set out what you may and
+may not do with this code and the resulting applications.
+
+
+You MAY
+-------
+
+1. **View, read and study** the contents of this repository for
+   personal, educational, or research purposes.
+
+2. **Download and install** the official V-Tune applications from
+   the channels published by the copyright holder, namely:
+     - The Apple App Store, Google Play Store, or any other store
+       to which V-Tune is officially published in future.
+     - The release pages of this repository at
+       https://github.com/simonbaronti/V-Tune/releases.
+     - The V-Tune landing page at https://v-tune-handpan.vercel.app.
+
+3. **Run** the official V-Tune applications on devices you own or
+   are authorised to use, for any purpose.
+
+4. **File issues and pull requests** against this repository to
+   report bugs, request features, or contribute improvements. By
+   submitting a pull request you agree that any code, text,
+   designs, or other material in your contribution may be
+   incorporated into V-Tune under this same license.
+
+
+You MAY NOT
+-----------
+
+Without prior written permission from the copyright holder, you may
+not:
+
+1. **Redistribute** the source code or any compiled binaries —
+   whether modified or unmodified — through any channel.
+
+2. **Create derivative works** based on this code or its assets
+   for public release, including (but not limited to) repackaged
+   apps, rebrands, "skins", or competing tuner applications built
+   substantially on the V-Tune codebase.
+
+3. **Publish** the official V-Tune applications, or any derivative
+   of them, to any app store, marketplace, website, or other
+   distribution channel under your own name or any name other than
+   V-Tune as published by the copyright holder.
+
+4. **Sell** or charge any fee for access to the source code, the
+   binaries, or any derivative of either.
+
+5. **Remove, alter, or obscure** the V-Tune name, logo, copyright
+   notices, or attributions in any copy of the code or binaries.
+
+6. **Use the name "V-Tune"** (or any confusingly similar name) for
+   any other product, service, or organisation.
+
+
+Warranty Disclaimer
+-------------------
+
+V-Tune is provided "as is", without warranty of any kind, express
+or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose, and
+non-infringement. In no event shall the copyright holder be liable
+for any claim, damages, or other liability arising from the use of
+this software.
+
+
+Contact
+-------
+
+For licensing enquiries, commercial use requests, or any questions
+about what is and isn't allowed, please open an issue at
+https://github.com/simonbaronti/V-Tune/issues or reach out via the
+contact channels listed at https://v-tune-handpan.vercel.app.
