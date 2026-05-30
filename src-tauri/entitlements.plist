@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the V-Tune macOS Tauri build.
+
+  These are required because the app is signed with hardened runtime
+  (a precondition for Apple notarization) and notarized builds run
+  inside a tighter sandbox that denies microphone access by default —
+  even when Info.plist declares NSMicrophoneUsageDescription. Without
+  the audio-input entitlement, getUserMedia silently returns nothing:
+  no permission prompt, no error, the "Let's Go" button just sits
+  there. With it, macOS shows the standard mic-permission alert on
+  first launch and the tuner works as expected.
+
+  com.apple.security.cs.allow-jit lets WKWebView's JavaScriptCore use
+  JIT compilation. Without it the webview falls back to interpreted
+  JS — the app still runs, just slower (and the strobe animation
+  noticeably degrades). Safe to grant: Tauri's webview is the same
+  WKWebView every other notarized Mac app uses.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

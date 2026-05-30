@@ -41,7 +41,8 @@
     "shortDescription": "Precision strobe tuner for handpans.",
     "longDescription": "V-Tune is a precision strobe tuner designed for handpans and other multi-modal instruments. It uses FFT peak detection plus phase-rate Goertzel analysis to give accurate, stable cents readings on each resonant mode.",
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "entitlements": "entitlements.plist"
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"
