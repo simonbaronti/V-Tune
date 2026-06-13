@@ -1,0 +1,93 @@
+# Changelog
+
+All notable changes to V-Tune are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
+[semantic versioning](https://semver.org/).
+
+## [1.0.4] — 2026-05-30
+
+### Improved
+- **Sub-cent tuning precision.** The strobe bands now use phase-rate
+  (Goertzel DTFT) measurement as the primary cents source whenever the
+  signal is on-target, instead of the FFT-peak position. The FFT peak is
+  bin-limited (~1 cent floor at low notes); phase-rate evaluates the
+  frequency exactly and reads accurate to a fraction of a cent on steady
+  tones. The FFT-peak path is still used when the dominant partial sits
+  well off the target note (the multi-modal-instrument case).
+- **Isolation-window strobe bands now move identically to the main
+  strobe bands.** Previously the dedicated strobe for an isolated
+  frequency drifted slowly and barely responded to how sharp or flat the
+  note was. It now uses the exact same phase-rate physics as the main
+  bands: motion speed scales with the real Hz detuning (faster the
+  further out of tune), is frequency-aware, and respects the strobe-speed
+  setting identically.
+
+### Added
+- **PURE / EQUAL tuning-reference toggle** (in the Tuning / Scale panel).
+  - **PURE** (default) references each foundation band against an exact
+    integer multiple of the fundamental, so a perfectly-tuned handpan
+    reads 0 on every partial — the acoustically correct reference for
+    handpan partial tuning.
+  - **EQUAL** references each band against the nearest equal-tempered
+    note. On a pure handpan the compound-fifth band then reads about
+    +2 cents (the real difference between a pure 3:1 fifth and a tempered
+    fifth). For players who tune partials to equal temperament.
+
+## [1.0.3] — 2026-05-30
+
+### Added
+- **Your settings now persist between sessions.** Reference A4, tolerance,
+  strobe speed, brightness, softness, mic gain, FFT size, hum filter,
+  chosen scale, the note you were tuning, any isolation windows you drew,
+  theme and notation — all remembered when you reopen the app. Transient
+  state (audio running, live mic data, the tour) still starts fresh each
+  launch.
+
+### Fixed
+- **macOS: the "Let's Go" button now works.** The desktop app was missing
+  the microphone entitlement required under Apple's hardened runtime, so
+  it silently failed to request mic access. The strobe now responds to
+  audio on macOS.
+
+### Other
+- Added a proprietary source-available license and a proper project
+  README (replacing the default Vite template).
+
+## [1.0.2] — 2026-05-28
+
+### Fixed
+- **Mobile: Quick-Pitch bar no longer overflows the right edge** of the
+  screen (the corner of the "Let's Go" button was being clipped on
+  iPhone).
+- **Spectrum Analyser: the threshold/gate line is now draggable by touch**,
+  not just with a mouse.
+- **macOS / Windows / Linux desktop builds no longer load to a black
+  screen** (the bundled service worker was breaking the desktop webview).
+
+### Changed
+- **Tuning / Scale controls relaid out**: AUTO is full-width on its own
+  row, with Reference A4 and Tolerance as two equal columns beneath it.
+- User-guide PDF redesigned — new cover, cleaner page flow.
+
+## [1.0.1] — 2026-05-27
+
+### Added
+- First public release of V-Tune across **iOS, Android, macOS, Windows,
+  Linux and the web**.
+- **Three-band strobe display** — fundamental, octave and 12th rendered
+  as independent strobe bands.
+- **Per-band pitch pipe** — a continuous reference tone or a beep that
+  fires on each strike, for any band.
+- **Live mic-detected note** lights up on the pitch wheel in real time.
+- **Pre-saved handpan scales** (Kurd, Amara, Celtic and more) with the
+  ding highlighted.
+- **Spectrum analyser with shift-drag isolation windows** that become
+  dedicated tuning bands.
+- **Mains-hum notch filter** (50 / 60 Hz).
+- Light and dark themes; sharp / flat / solfège / German notation.
+- Fully offline — no accounts, no analytics, no network requests.
+
+[1.0.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.4
+[1.0.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.3
+[1.0.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.2
+[1.0.1]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.1

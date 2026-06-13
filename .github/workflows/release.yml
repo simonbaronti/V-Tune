@@ -222,40 +222,49 @@ jobs:
           echo "── Final release assets ──"
           ls -la release-assets/
 
+      # Build the release body: the matching version's section from
+      # CHANGELOG.md (the "what's new") followed by the downloads table.
+      # The tag is vX.Y.Z; the changelog headings are "## [X.Y.Z]", so we
+      # strip the leading "v" and awk out everything between this version's
+      # heading and the next "## [" heading.
+      - name: Build release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "## What's new in ${GITHUB_REF_NAME}"
+            echo ""
+            awk -v v="$VERSION" '
+              $0 ~ "^## \\[" v "\\]" { grab=1; next }
+              grab && /^## \[/ { exit }
+              grab { print }
+            ' CHANGELOG.md | sed '/^\[/d'
+            cat <<'EOF'
+
+          ### Downloads
+
+          | Platform | File |
+          |---|---|
+          | macOS | `V-Tune_*_universal.dmg` — universal (Intel + Apple Silicon), notarized |
+          | Windows | `V-Tune_*_x64-setup.exe` (recommended) or `V-Tune_*_x64_en-US.msi` |
+          | Linux | `V-Tune_*_amd64.deb` (Debian/Ubuntu) or `V-Tune_*_amd64.AppImage` (universal) |
+          | Android | `V-Tune-*.apk` (sideload — enable "Install unknown apps" for your browser) |
+          | iOS | TestFlight beta: https://testflight.apple.com/join/b6pCcWQ7 |
+
+          The full [User Guide](V-Tune-User-Guide.pdf) is attached to this release.
+
+          - Web app: https://v-tune-handpan.vercel.app
+          - Full changelog: https://github.com/simonbaronti/V-Tune/blob/main/CHANGELOG.md
+          EOF
+          } > release-notes.md
+          echo "── Generated release notes ──"
+          cat release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: V-Tune ${{ github.ref_name }}
-          body: |
-            ## V-Tune ${{ github.ref_name }}
-
-            Precision strobe tuner for handpans and other multi-modal instruments.
-
-            ### Downloads
-
-            | Platform | File |
-            |---|---|
-            | Windows | `V-Tune_*_x64-setup.exe` (NSIS, recommended) or `V-Tune_*_x64_en-US.msi` |
-            | Linux | `v-tune_*_amd64.deb` (Debian/Ubuntu) or `v-tune_*_amd64.AppImage` (universal) |
-            | Android | `V-Tune-${{ github.ref_name }}.apk` (sideload — enable "Install unknown apps" for your browser) |
-            | iOS | App Store: https://apps.apple.com/app/v-tune |
-            | macOS | Build locally with `npm run tauri:build` (deferred from CI to keep free-tier minutes for the other platforms) |
-
-            ### Documentation
-
-            The full [User Guide](V-Tune-User-Guide.pdf) is attached to this release — 12 pages covering every feature.
-
-            ### Verify the Android APK signature
-
-            ```
-            apksigner verify --print-certs V-Tune-${{ github.ref_name }}.apk
-            ```
-
-            ### Links
-
-            - Web app: <https://v-tune-handpan.vercel.app>
-            - Source: <https://github.com/${{ github.repository }}>
+          body_path: release-notes.md
           files: release-assets/*
           draft: false
           prerelease: false

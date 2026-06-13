@@ -10,7 +10,24 @@ export interface BandConfig {
   /** Foundation bands (fundamental + octave + 12th) are auto-managed —
    * they can't be edited, removed, or reordered. */
   isFoundation: boolean;
+  /** Which integer harmonic of the fundamental this foundation band
+   * represents: 1 = fundamental, 2 = octave, 3 = compound fifth. Used in
+   * 'pure' harmonic mode to target n × f₀ exactly (so a perfectly-tuned
+   * handpan reads 0 on every partial) rather than the nearest equal-
+   * tempered note. Undefined for user-added custom bands, which always
+   * reference their equal-tempered note frequency. */
+  harmonic?: number;
 }
+
+/** How the foundation bands derive their target frequency.
+ *  'pure'  — n × fundamental (just/harmonic intervals). A handpan tuned so
+ *            its partials are exact integer multiples reads 0/0/0. The
+ *            compound-fifth band targets 3×f₀ (≈ +2¢ above the ET fifth,
+ *            because equal temperament flattens fifths by ~2¢). Default.
+ *  'equal' — nearest equal-tempered note frequency for each band. The
+ *            compound-fifth band targets the ET note, so a pure handpan
+ *            reads +2¢ there. For players who tune partials to ET. */
+export type HarmonicMode = 'pure' | 'equal';
 
 export interface StrobeBand extends BandConfig {
   magnitude: number;
@@ -74,6 +91,10 @@ export interface TunerState {
   availableDevices: MediaDeviceInfo[];
   openAccordion: 'tuning' | 'settings' | 'stopwatch' | null;
   noteNaming: NoteNaming;
+  /** Foundation-band frequency reference. 'pure' = n × fundamental (a
+   *  perfectly-tuned handpan reads 0 on every partial); 'equal' = nearest
+   *  equal-tempered note. See HarmonicMode. */
+  harmonicMode: HarmonicMode;
   displaySmoothing: number;
   strobeSpeed: number;
   showSpectrum: boolean;
@@ -131,6 +152,7 @@ export interface TunerState {
   setSelectedBand: (id: string | null) => void;
   toggleAccordion: (id: 'tuning' | 'settings' | 'stopwatch') => void;
   setNoteNaming: (naming: NoteNaming) => void;
+  setHarmonicMode: (mode: HarmonicMode) => void;
   setDisplaySmoothing: (value: number) => void;
   setStrobeSpeed: (speed: number) => void;
   setShowSpectrum: (show: boolean) => void;
@@ -182,32 +204,64 @@ function configsToBands(configs: BandConfig[]): StrobeBand[] {
   }));
 }
 
-function rebuildFrequencies(configs: BandConfig[], referenceFreq: number): BandConfig[] {
+/** Compute a band's target frequency under the given harmonic mode.
+ *  Foundation bands tagged with a harmonic number use n × f₀ in 'pure'
+ *  mode; everything else (and all bands in 'equal' mode) uses the
+ *  equal-tempered note frequency. f0 is the fundamental's frequency. */
+function bandFrequency(
+  c: Pick<BandConfig, 'noteName' | 'octave' | 'harmonic'>,
+  referenceFreq: number,
+  mode: HarmonicMode,
+  f0: number,
+): number {
+  if (mode === 'pure' && c.harmonic) return f0 * c.harmonic;
+  return noteToFrequency(c.noteName, c.octave, referenceFreq);
+}
+
+/** Recompute every band's target frequency for a new referenceFreq and/or
+ *  harmonic mode. The fundamental (harmonic === 1) sets f₀; pure-mode
+ *  foundation bands then derive as integer multiples of it. */
+function rebuildFrequencies(
+  configs: BandConfig[],
+  referenceFreq: number,
+  mode: HarmonicMode,
+): BandConfig[] {
+  const fund = configs.find((c) => c.harmonic === 1);
+  const f0 = fund
+    ? noteToFrequency(fund.noteName, fund.octave, referenceFreq)
+    : referenceFreq;
   return configs.map((c) => ({
     ...c,
-    frequency: noteToFrequency(c.noteName, c.octave, referenceFreq),
+    frequency: bandFrequency(c, referenceFreq, mode, f0),
   }));
 }
 
-function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[] {
+function defaultBandsForNote(
+  note: NoteInfo,
+  referenceFreq: number,
+  mode: HarmonicMode,
+): BandConfig[] {
+  const f0 = noteToFrequency(note.name, note.octave, referenceFreq);
   const configs: BandConfig[] = [];
-  // Fundamental
+  // Fundamental (1st harmonic)
   configs.push({
     id: makeBandId(),
     noteName: note.name,
     octave: note.octave,
-    frequency: noteToFrequency(note.name, note.octave, referenceFreq),
+    harmonic: 1,
+    frequency: bandFrequency({ noteName: note.name, octave: note.octave, harmonic: 1 }, referenceFreq, mode, f0),
     isFoundation: true,
   });
-  // Octave above
+  // Octave above (2nd harmonic — identical in both modes since 2:1 is exact)
   configs.push({
     id: makeBandId(),
     noteName: note.name,
     octave: note.octave + 1,
-    frequency: noteToFrequency(note.name, note.octave + 1, referenceFreq),
+    harmonic: 2,
+    frequency: bandFrequency({ noteName: note.name, octave: note.octave + 1, harmonic: 2 }, referenceFreq, mode, f0),
     isFoundation: true,
   });
-  // Octave + 5th (compound 5th)
+  // Octave + 5th / compound 5th (3rd harmonic — pure 3:1 vs ET differ ~2¢)
   const fifthIndex = (NOTE_NAMES.indexOf(note.name) + 7) % 12;
   const fifthName = NOTE_NAMES[fifthIndex];
   const fifthOctave = note.octave + 1 + (NOTE_NAMES.indexOf(note.name) + 7 >= 12 ? 1 : 0);
@@ -215,7 +269,8 @@ function defaultBandsForNote(note: NoteInfo, referenceFreq: number): BandConfig[
     id: makeBandId(),
     noteName: fifthName,
     octave: fifthOctave,
-    frequency: noteToFrequency(fifthName, fifthOctave, referenceFreq),
+    harmonic: 3,
+    frequency: bandFrequency({ noteName: fifthName, octave: fifthOctave, harmonic: 3 }, referenceFreq, mode, f0),
     isFoundation: true,
   });
   return configs.sort((a, b) => b.frequency - a.frequency);
@@ -238,7 +293,7 @@ const INITIAL_NOTE: NoteInfo = {
   centsOff: 0,
 };
 
-const INITIAL_BANDS = defaultBandsForNote(INITIAL_NOTE, 440);
+const INITIAL_BANDS = defaultBandsForNote(INITIAL_NOTE, 440, 'pure');
 
 export const useTunerStore = create<TunerState>()(
   persist(
@@ -262,6 +317,7 @@ export const useTunerStore = create<TunerState>()(
   availableDevices: [],
   openAccordion: null,
   noteNaming: 'sharp',
+  harmonicMode: 'pure',
   displaySmoothing: 0.93,
   strobeSpeed: 1,
   showSpectrum: false,
@@ -289,7 +345,7 @@ export const useTunerStore = create<TunerState>()(
 
   setReferenceFreq: (freq) => {
     const state = get();
-    const updated = rebuildFrequencies(state.bandConfigs, freq);
+    const updated = rebuildFrequencies(state.bandConfigs, freq, state.harmonicMode);
     set({
       referenceFreq: freq,
       baseFrequency: state.currentNote
@@ -303,7 +359,7 @@ export const useTunerStore = create<TunerState>()(
   setCurrentNote: (note) => {
     const state = get();
     const newBase = note.frequency * Math.pow(2, state.centsOffset / 1200);
-    const newBands = defaultBandsForNote(note, state.referenceFreq);
+    const newBands = defaultBandsForNote(note, state.referenceFreq, state.harmonicMode);
     set({
       currentNote: note,
       baseFrequency: newBase,
@@ -365,6 +421,18 @@ export const useTunerStore = create<TunerState>()(
   setSelectedBand: (id) => set((s) => ({ selectedBandId: s.selectedBandId === id ? null : id })),
   toggleAccordion: (id) => set((s) => ({ openAccordion: s.openAccordion === id ? null : id })),
   setNoteNaming: (naming) => set({ noteNaming: naming }),
+  setHarmonicMode: (mode) => {
+    const state = get();
+    // Recompute every band's target under the new mode, then update state.
+    // The caller (UI toggle) pushes the new targets to the worklet via
+    // updateWorkletTargets() so the strobe re-references immediately.
+    const updated = rebuildFrequencies(state.bandConfigs, state.referenceFreq, mode);
+    set({
+      harmonicMode: mode,
+      bandConfigs: updated,
+      bands: configsToBands(updated),
+    });
+  },
   setDisplaySmoothing: (value) => set({ displaySmoothing: value }),
   setStrobeSpeed: (speed) => set({ strobeSpeed: speed }),
   setShowSpectrum: (show) => set({ showSpectrum: show }),
@@ -489,7 +557,7 @@ export const useTunerStore = create<TunerState>()(
   syncBandsToCurrentNote: () => {
     const state = get();
     if (!state.currentNote) return;
-    const newBands = defaultBandsForNote(state.currentNote, state.referenceFreq);
+    const newBands = defaultBandsForNote(state.currentNote, state.referenceFreq, state.harmonicMode);
     set({
       bandConfigs: newBands,
       bands: configsToBands(newBands),
@@ -525,6 +593,7 @@ export const useTunerStore = create<TunerState>()(
         referenceFreq: state.referenceFreq,
         tolerance: state.tolerance,
         noteNaming: state.noteNaming,
+        harmonicMode: state.harmonicMode,
         displaySmoothing: state.displaySmoothing,
         strobeSpeed: state.strobeSpeed,
         readoutSmoothing: state.readoutSmoothing,
@@ -563,6 +632,30 @@ export const useTunerStore = create<TunerState>()(
           ...currentState,
           ...(persistedState as Partial<TunerState>),
         };
+        // Re-derive every band's target frequency under the (now restored)
+        // referenceFreq + harmonicMode. This also self-heals bands persisted
+        // by an older build (pre-harmonic-mode) whose foundation bands lack
+        // the `harmonic` tag and would otherwise stay equal-tempered: if any
+        // foundation band is missing its harmonic number, regenerate the
+        // foundation set fresh from the last note while keeping custom bands.
+        const foundationsUntagged = merged.bandConfigs.some(
+          (c) => c.isFoundation && c.harmonic === undefined,
+        );
+        if (foundationsUntagged && merged.currentNote) {
+          const fresh = defaultBandsForNote(
+            merged.currentNote,
+            merged.referenceFreq,
+            merged.harmonicMode,
+          );
+          const custom = merged.bandConfigs.filter((c) => !c.isFoundation);
+          merged.bandConfigs = partitionAndSort([...fresh, ...custom]);
+        } else {
+          merged.bandConfigs = rebuildFrequencies(
+            merged.bandConfigs,
+            merged.referenceFreq,
+            merged.harmonicMode,
+          );
+        }
         merged.bands = configsToBands(merged.bandConfigs);
         merged.baseFrequency = merged.currentNote
           ? noteToFrequency(

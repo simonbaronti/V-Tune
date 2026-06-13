@@ -3,10 +3,12 @@ import { updateWorkletTargets } from '../audio/AudioEngine';
 
 /**
  * Top of the TUNING / SCALE accordion: AUTO full-width on its own row,
- * then A4 and TOL beneath it as two equal-width columns.
+ * then a PURE/EQUAL reference toggle, then A4 and TOL as two columns.
  *   ┌───────────────────────────────┐
  *   │            AUTO               │
  *   ├───────────────┬───────────────┤
+ *   │     PURE      │     EQUAL     │
+ *   ├───────────────┼───────────────┤
  *   │     A4=       │     TOL       │
  *   │   [- v +]     │   [- v +]     │
  *   └───────────────┴───────────────┘
@@ -15,10 +17,18 @@ export function ReferenceBar() {
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
   const tolerance = useTunerStore((s) => s.tolerance);
   const autoDetect = useTunerStore((s) => s.autoDetect);
+  const harmonicMode = useTunerStore((s) => s.harmonicMode);
 
   const handleRefChange = (delta: number) => {
     const store = useTunerStore.getState();
     store.setReferenceFreq(store.referenceFreq + delta);
+    updateWorkletTargets();
+  };
+
+  const handleModeChange = (mode: 'pure' | 'equal') => {
+    const store = useTunerStore.getState();
+    if (store.harmonicMode === mode) return;
+    store.setHarmonicMode(mode);
     updateWorkletTargets();
   };
 
@@ -56,7 +66,44 @@ export function ReferenceBar() {
         AUTO
       </button>
 
-      {/* Row 2 — A4 and TOL, equal columns */}
+      {/* Row 2 — PURE / EQUAL reference toggle. PURE references each
+          foundation band against n × the fundamental (a perfectly-tuned
+          handpan reads 0 on every partial); EQUAL references against the
+          nearest equal-tempered note (compound 5th reads ~+2¢ on a pure
+          handpan). Segmented control, two halves. */}
+      <div
+        className="grid grid-cols-2 rounded overflow-hidden"
+        style={{ border: '1px solid var(--border)' }}
+        role="group"
+        aria-label="Tuning reference"
+      >
+        {(['pure', 'equal'] as const).map((mode) => {
+          const active = harmonicMode === mode;
+          return (
+            <button
+              key={mode}
+              onClick={() => handleModeChange(mode)}
+              className="text-xs font-semibold tracking-wide uppercase transition-colors"
+              style={{
+                padding: '7px 6px',
+                background: active ? 'rgba(168, 85, 247, 0.15)' : 'var(--bg-tertiary)',
+                color: active ? '#a855f7' : 'var(--text-dim)',
+                borderLeft: mode === 'equal' ? '1px solid var(--border)' : 'none',
+              }}
+              aria-pressed={active}
+              title={
+                mode === 'pure'
+                  ? 'Pure harmonics — partials referenced against n × the fundamental'
+                  : 'Equal temperament — partials referenced against the nearest ET note'
+              }
+            >
+              {mode}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Row 3 — A4 and TOL, equal columns */}
       <div className="grid grid-cols-2 gap-2">
         {/* A4 column — title above, value flanked by − / + below */}
         <div className="flex flex-col gap-1 min-w-0">

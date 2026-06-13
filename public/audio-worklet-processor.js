@@ -322,12 +322,39 @@ class TunerProcessor extends AudioWorkletProcessor {
 
       let centsDelta;
       let outSlope;
+      // Precision policy:
+      //   - The FFT-peak path can localise a peak to roughly ±0.01 bin via
+      //     parabolic interpolation. At a 4096-sample buffer / 48 kHz, that's
+      //     ~0.12 Hz absolute error → ~1.4 cents at D3 worst-case. This is the
+      //     Heisenberg-uncertainty floor for that buffer length.
+      //   - The Goertzel phase-rate path evaluates the DTFT exactly at the
+      //     target frequency (infinite frequency resolution by construction)
+      //     and, with the multi-hop least-squares slope, gives sub-0.1-cent
+      //     precision on steady tones.
+      //
+      // Combine: use phase-rate when the spectral peak confirms the signal
+      // IS at the target (within a tight window, AND we've accumulated enough
+      // phase history for the slope to be trustworthy). Use FFT-peak when the
+      // dominant partial sits well off-target — that's the multi-modal-
+      // instrument case the peak path was designed for.
+      const PHASE_RATE_WINDOW_CENTS = 25;     // ±25¢ → "signal is at target"
       if (bestPeak) {
-        centsDelta = 1200 * Math.log2(bestPeak.freq / freq);
-        outSlope = (2 * Math.PI * (bestPeak.freq - freq) * this.hopSize) / this.sampleRate;
+        const peakCents = 1200 * Math.log2(bestPeak.freq / freq);
+        const phaseHistoryReady = n >= PHASE_HISTORY;
+        if (Math.abs(peakCents) < PHASE_RATE_WINDOW_CENTS && phaseHistoryReady) {
+          // Signal is on-target — use sub-cent-accurate phase-rate.
+          const hzDelta = (slope * this.sampleRate) / (2 * Math.PI * this.hopSize);
+          const ratio = 1 + hzDelta / freq;
+          centsDelta = ratio > 0 ? 1200 * Math.log2(ratio) : 0;
+          outSlope = slope;
+        } else {
+          // Peak is well off-target → trust the peak position.
+          centsDelta = peakCents;
+          outSlope = (2 * Math.PI * (bestPeak.freq - freq) * this.hopSize) / this.sampleRate;
+        }
       } else {
-        // Fallback: phase-rate Goertzel/regression result (works for steady
-        // tones where the band's exact target IS the signal frequency).
+        // No peak in the ±150¢ window → phase-rate fallback (steady tones
+        // where the band's exact target IS the signal frequency).
         const hzDelta = (slope * this.sampleRate) / (2 * Math.PI * this.hopSize);
         const ratio = 1 + hzDelta / freq;
         centsDelta = ratio > 0 ? 1200 * Math.log2(ratio) : 0;
