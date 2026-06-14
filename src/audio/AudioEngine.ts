@@ -26,6 +26,8 @@ let liveSilentFrames = 0;
 
 export async function startAudio(deviceId?: string): Promise<void> {
   const store = useTunerStore.getState();
+  // Clear any stale error from a previous attempt.
+  store.setAudioError(null);
 
   try {
     const constraints: MediaStreamConstraints = {
@@ -102,7 +104,25 @@ export async function startAudio(deviceId?: string): Promise<void> {
     store.setRunning(true);
   } catch (err) {
     console.error('Failed to start audio:', err);
-    throw err;
+    // Translate the raw getUserMedia/DOMException into a friendly,
+    // actionable message and surface it via the store (toast). We do NOT
+    // re-throw — callers `await startAudio()` without a catch, so throwing
+    // would just become a silent unhandled rejection (the original "Let's
+    // Go does nothing" bug). Recording the message is what makes the
+    // failure visible.
+    const name =
+      err && typeof err === 'object' && 'name' in err ? (err as DOMException).name : '';
+    let msg = 'Couldn’t start audio. Check your microphone and try again.';
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') {
+      msg = 'No microphone detected. Connect a microphone, then tap Let’s Go again.';
+    } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
+      msg = 'Microphone access is blocked. Allow microphone access in your system settings, then try again.';
+    } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+      msg = 'Your microphone is in use by another app. Close it and try again.';
+    }
+    useTunerStore.getState().setAudioError(msg);
+    // Make sure we're not left in a half-started state.
+    useTunerStore.getState().setRunning(false);
   }
 }
 

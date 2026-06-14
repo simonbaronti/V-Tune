@@ -4,6 +4,16 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.0.6] — 2026-06-14
+
+### Added
+- **Clear feedback when audio can't start.** Pressing "Let's Go" with no
+  microphone connected (or with mic access blocked, or the mic in use by
+  another app) used to do nothing at all — no error, no hint. V-Tune now
+  shows a brief, dismissible message explaining exactly what's wrong and
+  what to do, e.g. *"No microphone detected. Connect a microphone, then
+  tap Let's Go again."*
+
 ## [1.0.5] — 2026-06-14
 
 ### Fixed
@@ -100,6 +110,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.0.6]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.6
 [1.0.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.5
 [1.0.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.4
 [1.0.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.3

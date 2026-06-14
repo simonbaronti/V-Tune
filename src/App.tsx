@@ -9,6 +9,7 @@ import { IsolationBand } from './components/IsolationBand';
 import { ReferenceBar } from './components/ReferenceBar';
 import { QuickPitchBar } from './components/QuickPitchBar';
 import { OnboardingTour } from './components/OnboardingTour';
+import { AudioErrorToast } from './components/AudioErrorToast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
 import { applyAlwaysOnTop, isTauri } from './audio/alwaysOnTop';
@@ -125,6 +126,7 @@ function App() {
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative">
       <OnboardingTour />
+      <AudioErrorToast />
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status
           bar), so we pad the top + sides with the safe-area insets so the

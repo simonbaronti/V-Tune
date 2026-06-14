@@ -67,6 +67,10 @@ export interface TunerState {
   rmsLevel: number;
   peaks: PeakData[];
   tolerance: number;
+  /** Transient, user-facing message when audio fails to start (no mic,
+   *  permission denied, device in use). Shown as a dismissible toast;
+   *  null when there's nothing to report. Not persisted. */
+  audioError: string | null;
   autoDetect: boolean;
   /** Live pitch indicator — the MIDI number of whichever note the
    *  microphone is currently picking up while audio is running. Updated
@@ -138,6 +142,7 @@ export interface TunerState {
   setRmsLevel: (level: number) => void;
   setPeaks: (peaks: PeakData[]) => void;
   setTolerance: (cents: number) => void;
+  setAudioError: (msg: string | null) => void;
   setAutoDetect: (auto: boolean) => void;
   setDetectedMidi: (midi: number | null) => void;
   /** Cycle the pitch-pipe for the given band id (off → tone → beep → off).
@@ -309,6 +314,7 @@ export const useTunerStore = create<TunerState>()(
   rmsLevel: 0,
   peaks: [],
   tolerance: 5,
+  audioError: null,
   autoDetect: false,
   detectedMidi: null,
   pipeBandId: null,
@@ -400,6 +406,7 @@ export const useTunerStore = create<TunerState>()(
   setRmsLevel: (level) => set({ rmsLevel: level }),
   setPeaks: (peaks) => set({ peaks }),
   setTolerance: (cents) => set({ tolerance: cents }),
+  setAudioError: (msg) => set({ audioError: msg }),
   setAutoDetect: (auto) => set({ autoDetect: auto }),
   setDetectedMidi: (midi) => set({ detectedMidi: midi }),
   cyclePipeBand: (id) => set((s) => {
