@@ -21,9 +21,26 @@ export function SettingsPanel() {
   const largeText = useTunerStore((s) => s.largeText);
 
   useEffect(() => {
-    enumerateDevices();
-    navigator.mediaDevices.addEventListener('devicechange', () => enumerateDevices());
+    // Passive enumerate on mount + keep the list live as devices come and go.
+    enumerateDevices(false);
+    const onChange = () => enumerateDevices(false);
+    navigator.mediaDevices.addEventListener('devicechange', onChange);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', onChange);
   }, []);
+
+  // Populate the input list automatically the moment the Settings accordion
+  // opens — not on the first dropdown click. enumerateDevices() needs mic
+  // permission to expose device names (a browser/WKWebView rule), and the
+  // permission probe is async; doing it here means it completes while the
+  // user is still moving toward the dropdown, so the very first time they
+  // open it the real devices are already listed. (Previously the probe
+  // fired on dropdown-open, so the list only appeared after a close/reopen.)
+  useEffect(() => {
+    if (!open) return;
+    const labelled = availableDevices.some((d) => d.label);
+    if (!labelled) enumerateDevices(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleDeviceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const deviceId = e.target.value;

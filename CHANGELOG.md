@@ -4,6 +4,19 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.0.5] — 2026-06-14
+
+### Fixed
+- **Input device dropdown was empty.** On a fresh launch the Settings →
+  Input list showed nothing but "Default" — neither connected USB mics
+  nor the built-in microphone appeared. Browsers (and especially the
+  macOS desktop webview) only reveal device names once microphone
+  permission has been granted, and the app wasn't triggering that. Now,
+  when you open the input dropdown, V-Tune requests permission if needed
+  and immediately populates the real device list; it also refreshes the
+  list automatically once audio starts, and updates live when you plug or
+  unplug a device.
+
 ## [1.0.4] — 2026-05-30
 
 ### Improved
@@ -87,6 +100,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.0.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.5
 [1.0.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.4
 [1.0.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.3
 [1.0.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.2

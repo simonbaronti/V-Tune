@@ -94,6 +94,11 @@ export async function startAudio(deviceId?: string): Promise<void> {
     // selecting them.
     startLiveNoteDetection();
 
+    // Permission is now granted, so device labels are available — refresh
+    // the input list (passively, no second prompt) so the Settings dropdown
+    // shows real device names even if it was opened before audio started.
+    enumerateDevices(false).catch(() => {});
+
     store.setRunning(true);
   } catch (err) {
     console.error('Failed to start audio:', err);
@@ -323,9 +328,42 @@ export function getAudioContext(): AudioContext | null {
   return audioContext;
 }
 
-export async function enumerateDevices(): Promise<MediaDeviceInfo[]> {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const audioInputs = devices.filter((d) => d.kind === 'audioinput');
+/**
+ * Populate the input-device dropdown.
+ *
+ * Browsers — and especially the macOS WKWebView the Tauri desktop build
+ * runs in — only return *labelled* devices from enumerateDevices() once
+ * microphone permission has been granted. Before that, the call returns
+ * either an empty list or entries with blank `label`/`deviceId`, which is
+ * why the dropdown looked empty on a fresh launch (Settings opened before
+ * the user ever pressed "Let's Go").
+ *
+ * If we detect that state, do a one-shot getUserMedia() to trigger the
+ * permission prompt — that unlocks the real device list — then immediately
+ * stop the probe stream so we don't hold the mic open. Pass
+ * `probe = false` to skip the prompt (e.g. a passive refresh after audio
+ * is already running and permission is therefore already granted).
+ */
+export async function enumerateDevices(probe = true): Promise<MediaDeviceInfo[]> {
+  let devices = await navigator.mediaDevices.enumerateDevices();
+  let audioInputs = devices.filter((d) => d.kind === 'audioinput');
+
+  const needsPermission =
+    audioInputs.length === 0 || audioInputs.every((d) => d.label === '');
+
+  if (probe && needsPermission) {
+    try {
+      const probeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probeStream.getTracks().forEach((t) => t.stop());
+      devices = await navigator.mediaDevices.enumerateDevices();
+      audioInputs = devices.filter((d) => d.kind === 'audioinput');
+    } catch (err) {
+      // Permission denied, or no input device present — surface whatever
+      // we have (likely empty) rather than throwing.
+      console.warn('Microphone permission probe failed; input list may be empty.', err);
+    }
+  }
+
   useTunerStore.getState().setAvailableDevices(audioInputs);
   return audioInputs;
 }
