@@ -164,6 +164,21 @@
   .badge.your-os { background: rgba(6, 182, 212, 0.15); color: var(--cyan-bright); }
   .badge.soon { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
 
+  /* Windows SmartScreen reassurance note — collapsed by default */
+  .win-note { margin-top: 12px; }
+  .win-note summary {
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--cyan-bright); list-style: none; user-select: none;
+  }
+  .win-note summary::-webkit-details-marker { display: none; }
+  .win-note summary::before { content: '▸ '; }
+  .win-note[open] summary::before { content: '▾ '; }
+  .win-note summary:hover { text-decoration: underline; }
+  .win-note p { font-size: 12px; color: var(--text-faint); margin: 10px 0 6px; line-height: 1.55; }
+  .win-note ol { font-size: 12px; color: var(--text-faint); margin: 0; padding-left: 18px; line-height: 1.55; }
+  .win-note li { margin-bottom: 5px; }
+  .win-note strong { color: var(--text-dim); }
+
   /* ── Features ── */
   .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
   .feat {
@@ -295,6 +310,18 @@
         <p class="meta">64-bit installer. Windows 10 &amp; 11.</p>
         <a class="dl-link" href="https://github.com/simonbaronti/V-Tune/releases/download/v1.0.5/V-Tune_1.0.5_x64-setup.exe">Download .exe &rarr;</a>
         <br><a class="dl-link secondary" href="https://github.com/simonbaronti/V-Tune/releases/download/v1.0.5/V-Tune_1.0.5_x64_en-US.msi">or .msi installer</a>
+        <details class="win-note">
+          <summary>Windows shows a security warning?</summary>
+          <p>
+            Windows SmartScreen flags installers it hasn't seen many times
+            yet — it's not a virus warning, just an "unrecognised app" notice
+            (V-Tune is open-source and new). To install:
+          </p>
+          <ol>
+            <li>In the browser's download bar, click the <strong>⋯</strong> next to the file → <strong>Keep</strong> (then <strong>Keep anyway</strong> if asked).</li>
+            <li>Open it. If you see <em>"Windows protected your PC"</em>, click <strong>More info</strong> → <strong>Run anyway</strong>.</li>
+          </ol>
+        </details>
       </div>
 
       <!-- Linux -->
