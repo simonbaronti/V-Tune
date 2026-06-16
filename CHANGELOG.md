@@ -4,6 +4,21 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.0.7] — 2026-06-14
+
+### Fixed
+- **Mobile: removed dead space above the "Let's Go" button** in the
+  slide-out side panel. The drawer was applying the top safe-area inset a
+  second time on top of the header, leaving a large empty gap above the
+  button on iPhone (and a smaller one on Android).
+
+### Added
+- **Android: "update available" banner.** Sideloaded APKs don't get store
+  auto-updates, so V-Tune now checks for a newer release on launch and
+  shows a dismissible banner with a one-tap link to the download page when
+  one exists. (iOS updates via the App Store; the web app auto-updates;
+  a built-in auto-installer for the desktop apps is coming next.)
+
 ## [1.0.6] — 2026-06-14
 
 ### Added
@@ -110,6 +125,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.0.7]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.7
 [1.0.6]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.6
 [1.0.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.5
 [1.0.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.4

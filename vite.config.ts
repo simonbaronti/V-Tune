@@ -2,6 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+// Inject the package.json version at build time so the in-app update
+// checker can compare the running build against the latest GitHub release.
+const pkgVersion = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
+).version as string;
 
 // Tauri v2 sets TAURI_ENV_* env vars when it runs `beforeBuildCommand`
 // (our `npm run build`). We use this to detect a desktop build so we can
@@ -12,6 +19,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkgVersion),
+  },
   // Pin V-Tune's dev server to its own port so it can't collide with other
   // Vite projects (HypaMaps etc.) running on the default 5173. `strictPort`
   // makes Vite fail loudly if something else is already using it instead

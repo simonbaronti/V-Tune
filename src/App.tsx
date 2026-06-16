@@ -10,6 +10,7 @@ import { ReferenceBar } from './components/ReferenceBar';
 import { QuickPitchBar } from './components/QuickPitchBar';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AudioErrorToast } from './components/AudioErrorToast';
+import { UpdateBanner } from './components/UpdateBanner';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
 import { applyAlwaysOnTop, isTauri } from './audio/alwaysOnTop';
@@ -127,6 +128,7 @@ function App() {
     <div className="h-dvh flex flex-col overflow-hidden relative">
       <OnboardingTour />
       <AudioErrorToast />
+      <UpdateBanner />
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status
           bar), so we pad the top + sides with the safe-area insets so the
@@ -240,10 +242,11 @@ function App() {
           style={{
             background: 'var(--bg-secondary)',
             borderLeft: '1px solid var(--border)',
-            // Safe-area padding so the drawer chrome (Let's Go button at
-            // the top, Stopwatch/SA toggle at the bottom) clears the
-            // notch + home indicator on iOS PWA installs.
-            paddingTop: 'env(safe-area-inset-top)',
+            // Safe-area padding for the bottom (home indicator, under the
+            // SA toggle) and right (landscape notch). NOT the top: the
+            // drawer sits below the header, which already pads the top
+            // safe-area inset — adding it here too pushed the "Let's Go"
+            // button down by a second notch-height of empty space.
             paddingBottom: 'env(safe-area-inset-bottom)',
             paddingRight: 'env(safe-area-inset-right)',
           }}
