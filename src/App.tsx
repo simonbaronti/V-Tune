@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StrobeDisplay } from './components/StrobeDisplay';
 import { ControlBar } from './components/ControlBar';
 import { PitchDial } from './components/PitchDial';
@@ -11,6 +11,7 @@ import { QuickPitchBar } from './components/QuickPitchBar';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AudioErrorToast } from './components/AudioErrorToast';
 import { UpdateBanner } from './components/UpdateBanner';
+import { DesktopUpdater } from './components/DesktopUpdater';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
 import { applyAlwaysOnTop, isTauri } from './audio/alwaysOnTop';
@@ -25,6 +26,25 @@ function App() {
   const tuningOpen = useTunerStore((s) => s.openAccordion === 'tuning');
   const panelOpen = useTunerStore((s) => s.panelOpen);
   const setPanelOpen = useTunerStore((s) => s.setPanelOpen);
+  const sidebarCollapsed = useTunerStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useTunerStore((s) => s.setSidebarCollapsed);
+
+  // True desktop only — min 1024px AND a fine pointer with hover. This
+  // deliberately excludes touch tablets in landscape (which are ≥1024px
+  // but coarse-pointer), so the collapsible-sidebar control is desktop-only
+  // as requested.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(
+      '(min-width: 1024px) and (hover: hover) and (pointer: fine)',
+    );
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  // Collapse only takes effect on true desktop.
+  const collapsed = isDesktop && sidebarCollapsed;
 
   // Swipe-to-close: a rightward swipe (the way the drawer exits) closes it.
   const swipeRef = useRef<{ x: number; y: number } | null>(null);
@@ -129,6 +149,7 @@ function App() {
       <OnboardingTour />
       <AudioErrorToast />
       <UpdateBanner />
+      <DesktopUpdater />
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status
           bar), so we pad the top + sides with the safe-area insets so the
@@ -235,9 +256,10 @@ function App() {
             sidebar at lg+ (desktop & tablet landscape). */}
         <div
           data-side-panel
-          className={`flex flex-col transition-transform duration-200
+          className={`flex flex-col transition-[transform,width] duration-200
             absolute inset-y-0 right-0 z-50 w-[88%] max-w-[420px]
-            lg:static lg:z-auto lg:w-[420px] lg:max-w-none lg:translate-x-0
+            lg:static lg:z-auto lg:max-w-none lg:translate-x-0
+            ${collapsed ? 'lg:w-12' : 'lg:w-[420px]'}
             ${panelOpen ? 'translate-x-0' : 'translate-x-full'}`}
           style={{
             background: 'var(--bg-secondary)',
@@ -254,66 +276,109 @@ function App() {
           onTouchMove={onDrawerTouchMove}
           onTouchEnd={onDrawerTouchEnd}
         >
-          {/* Pinned top — Let's Go / Stop */}
-          <div className="shrink-0">
-            <ControlBar />
-          </div>
+          {/* Full panel content — hidden on desktop when collapsed. */}
+          <div className={`flex-1 min-h-0 flex flex-col ${collapsed ? 'lg:hidden' : ''}`}>
+            {/* Pinned top — Let's Go / Stop */}
+            <div className="shrink-0">
+              <ControlBar />
+            </div>
 
-          {/* Scrollable region — accordions */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {/* Tuning / Scale accordion */}
-            <div
-              className="shrink-0"
-              style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}
-            >
-              <button
-                data-tour="tuning-header"
-                onClick={() => useTunerStore.getState().toggleAccordion('tuning')}
-                className="w-full flex items-center justify-between px-4 py-3 transition-colors"
-                style={{ background: 'transparent', color: 'var(--text-secondary)' }}
-                aria-expanded={tuningOpen}
+            {/* Scrollable region — accordions + SA toggle */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {/* Tuning / Scale accordion */}
+              <div
+                className="shrink-0"
+                style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}
               >
-                <span className="text-lg font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                  TUNING / SCALE
-                </span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{
-                    color: 'var(--text-dim)',
-                    transform: tuningOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 150ms ease',
-                  }}
+                <button
+                  data-tour="tuning-header"
+                  onClick={() => useTunerStore.getState().toggleAccordion('tuning')}
+                  className="w-full flex items-center justify-between px-4 py-3 transition-colors"
+                  style={{ background: 'transparent', color: 'var(--text-secondary)' }}
+                  aria-expanded={tuningOpen}
                 >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {tuningOpen && (
-                <>
-                  <ReferenceBar />
-                  <PitchDial />
-                </>
+                  <span className="text-lg font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                    TUNING / SCALE
+                  </span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      color: 'var(--text-dim)',
+                      transform: tuningOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 150ms ease',
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {tuningOpen && (
+                  <>
+                    <ReferenceBar />
+                    <PitchDial />
+                  </>
+                )}
+              </div>
+              <SettingsPanel />
+              {/* Spectrum Analyser toggle — now directly under Settings */}
+              <FooterToggle
+                dataTour="sa-toggle"
+                label="SPECTRUM ANALYSER"
+                value={showSpectrum}
+                onChange={(v) => useTunerStore.getState().setShowSpectrum(v)}
+              />
+            </div>
+
+            {/* Pinned footer — stopwatch, plus the desktop-only collapse
+                control beneath it (bottom-right). */}
+            <div className="shrink-0">
+              <Stopwatch />
+              {isDesktop && (
+                <div
+                  className="hidden lg:flex justify-end px-3 py-2"
+                  style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
+                >
+                  <button
+                    onClick={() => setSidebarCollapsed(true)}
+                    aria-label="Collapse sidebar"
+                    title="Collapse sidebar"
+                    className="w-8 h-8 rounded flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 17 5-5-5-5" />
+                      <path d="m13 17 5-5-5-5" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
-            <SettingsPanel />
           </div>
 
-          {/* Pinned footer — stopwatch + spectrum / pitch-graph toggles */}
-          <div className="shrink-0">
-            <Stopwatch />
-            <FooterToggle
-              dataTour="sa-toggle"
-              label="SPECTRUM ANALYSER"
-              value={showSpectrum}
-              onChange={(v) => useTunerStore.getState().setShowSpectrum(v)}
-            />
-          </div>
+          {/* Skinny strip — desktop-only, shown when collapsed: just the
+              expand control pinned to the bottom. */}
+          {collapsed && (
+            <div className="hidden lg:flex flex-1 flex-col items-center justify-end pb-3">
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+                className="w-8 h-8 rounded flex items-center justify-center transition-colors"
+                style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m11 17-5-5 5-5" />
+                  <path d="m18 17-5-5 5-5" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

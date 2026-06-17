@@ -1,7 +1,7 @@
 {
   "name": "v-tune",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Simon Baronti",
@@ -20,13 +20,16 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "tauri:build:mac": "set -a && . ./src-tauri/.env.notarize && set +a && tauri build --target universal-apple-darwin"
+    "tauri:build:mac": "set -a && . ./src-tauri/.env.notarize && set +a && tauri build --target universal-apple-darwin",
+    "publish:update": "node scripts/publish-desktop-update.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
     "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "pitchfinder": "^2.3.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

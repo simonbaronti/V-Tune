@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useTunerStore, MAX_ISOLATIONS } from '../store/tunerStore';
+import { useTunerStore, MAX_ISOLATIONS, ISO_COLORS } from '../store/tunerStore';
 import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 
@@ -359,13 +359,18 @@ export function SpectrumAnalyzer() {
     // Isolation windows — draw each existing one, then the in-progress
     // pending bracket if the user is mid-drag. (Peak detection happens
     // earlier, inside the FFT block, so it can use threshold-gated data.)
-    const drawIsoBracket = (isoMin: number, isoMax: number, opts: { label?: string; pending?: boolean }) => {
+    const drawIsoBracket = (
+      isoMin: number,
+      isoMax: number,
+      opts: { label?: string; pending?: boolean; rgb: string; hex: string },
+    ) => {
+      const { rgb, hex } = opts;
       const lx = freqToX(Math.max(minF, isoMin), w, minF, maxF);
       const rx = freqToX(Math.min(maxF, isoMax), w, minF, maxF);
-      ctx.fillStyle = opts.pending ? 'rgba(168, 85, 247, 0.18)' : 'rgba(168, 85, 247, 0.10)';
+      ctx.fillStyle = opts.pending ? `rgba(${rgb}, 0.18)` : `rgba(${rgb}, 0.10)`;
       ctx.fillRect(lx, 0, rx - lx, h - 20);
 
-      ctx.strokeStyle = opts.pending ? 'rgba(168, 85, 247, 0.7)' : 'rgba(168, 85, 247, 0.9)';
+      ctx.strokeStyle = opts.pending ? `rgba(${rgb}, 0.7)` : `rgba(${rgb}, 0.9)`;
       ctx.lineWidth = 2;
       if (opts.pending) ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -378,21 +383,21 @@ export function SpectrumAnalyzer() {
 
       if (!opts.pending) {
         // Grab tabs near the bottom of each locator
-        ctx.fillStyle = '#a855f7';
+        ctx.fillStyle = hex;
         const handleY = h - 26;
         ctx.fillRect(lx - 4, handleY, 8, 12);
         ctx.fillRect(rx - 4, handleY, 8, 12);
       }
 
       // Frequency labels at the top of each locator
-      ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
+      ctx.fillStyle = `rgba(${rgb}, 0.95)`;
       ctx.font = 'bold 9px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText(`${Math.round(isoMin)}`, lx, 10);
       ctx.fillText(`${Math.round(isoMax)}`, rx, 10);
 
       if (opts.label) {
-        ctx.fillStyle = 'rgba(168, 85, 247, 0.7)';
+        ctx.fillStyle = `rgba(${rgb}, 0.7)`;
         ctx.font = '8px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(opts.label, (lx + rx) / 2, 10);
@@ -401,23 +406,37 @@ export function SpectrumAnalyzer() {
 
     for (let i = 0; i < isolationsRef.current.length; i++) {
       const iso = isolationsRef.current[i];
+      const color = ISO_COLORS[iso.colorIndex] ?? ISO_COLORS[0];
       drawIsoBracket(iso.minFreq, iso.maxFreq, {
         label: isolationsRef.current.length > 1 ? `${i + 1}` : undefined,
+        rgb: color.rgb,
+        hex: color.hex,
       });
     }
 
-    // In-progress drag rectangle
+    // In-progress drag rectangle — paints in the colour of the slot it will
+    // claim on release (teal if the teal slot is free, otherwise purple).
     const pending = pendingIsoRef.current;
     if (pending) {
       const lo = Math.min(pending.startFreq, pending.currentFreq);
       const hi = Math.max(pending.startFreq, pending.currentFreq);
-      drawIsoBracket(lo, hi, { pending: true });
+      const usedSlot = new Set(isolationsRef.current.map((i) => i.colorIndex));
+      const pendingColor = usedSlot.has(0) ? ISO_COLORS[1] : ISO_COLORS[0];
+      drawIsoBracket(lo, hi, { pending: true, rgb: pendingColor.rgb, hex: pendingColor.hex });
     }
 
     // Hover readout — vertical guide line + freq/note label that follows
-    // the cursor while the mouse is inside the canvas (and not dragging).
+    // the cursor while the mouse is inside the canvas. Shown when idle and
+    // *also* while drawing or resizing an isolation bracket (handy for
+    // dialling in a window edge against a note/cents), but not during a pan
+    // or threshold-line drag.
+    const hoverDrag = dragStateRef.current.type;
+    const showHoverDuringDrag =
+      hoverDrag === 'iso-create' ||
+      hoverDrag === 'iso-resize-left' ||
+      hoverDrag === 'iso-resize-right';
     const hover = hoverRef.current;
-    if (hover && !dragStateRef.current.type) {
+    if (hover && (!hoverDrag || showHoverDuringDrag)) {
       const hx = Math.max(0, Math.min(w, hover.x));
       const hoverFreq = xToFreq(hx, w, minF, maxF);
       if (hoverFreq >= MIN_FREQ && hoverFreq <= MAX_FREQ) {
@@ -837,6 +856,17 @@ export function SpectrumAnalyzer() {
       // Cancel the long-press as soon as the finger has moved enough.
       const moved = Math.abs(t.clientX - dragState.startX) + Math.abs(t.clientY - dragState.startY);
       if (moved > DRAG_THRESHOLD_PX) cancelLongPress();
+
+      // Track the finger so the freq/note/cents readout follows the bracket
+      // edge while drawing or resizing an isolation window on touch (it's
+      // cleared on touch-end). Pan/threshold drags don't show the readout.
+      if (
+        dragState.type === 'iso-create' ||
+        dragState.type === 'iso-resize-left' ||
+        dragState.type === 'iso-resize-right'
+      ) {
+        hoverRef.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      }
 
       if (dragState.type === 'threshold') {
         e.preventDefault();

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.7"
+version = "1.0.8"
 description = "Precision strobe tuner for handpans and other multi-modal instruments."
 authors = ["Simon Baronti"]
 license-file = "../LICENSE"
@@ -23,3 +23,9 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
+
+# In-app auto-updater — desktop only (iOS/Android update through their
+# stores). `process` provides the relaunch-after-install call.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

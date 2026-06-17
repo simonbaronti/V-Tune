@@ -161,7 +161,7 @@ export function SettingsPanel() {
 
           <div data-tour="settings-speed" className="flex items-center gap-2">
             <span className="text-sm mr-1" style={{ color: 'var(--text-dim)' }}>SPEED</span>
-            {[1, 2, 3, 5, 10].map((s) => (
+            {[0.5, 1, 2, 3, 5].map((s) => (
               <button
                 key={s}
                 onClick={() => useTunerStore.getState().setStrobeSpeed(s)}

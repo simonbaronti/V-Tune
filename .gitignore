@@ -51,3 +51,7 @@ android/captures
 # macOS notarization credentials — NEVER commit
 .env.notarize
 src-tauri/.env.notarize
+
+# Tauri update-signing key — NEVER commit
+src-tauri/.tauri-signing.key
+src-tauri/.tauri-signing.key.pub

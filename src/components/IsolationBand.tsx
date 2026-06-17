@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useTunerStore, type IsolationWindow } from '../store/tunerStore';
+import { useTunerStore, ISO_COLORS, type IsolationWindow } from '../store/tunerStore';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 import { getAudioContext } from '../audio/AudioEngine';
 
@@ -23,15 +23,16 @@ export function IsolationBand() {
   return (
     <div
       className="shrink-0 flex"
-      style={{ borderTop: '2px solid rgba(168, 85, 247, 0.4)' }}
+      style={{ borderTop: '2px solid var(--border)' }}
     >
       {isolations.map((iso, idx) => (
         <div
           key={iso.id}
           className="flex-1 min-w-0 flex flex-col"
           style={{
-            // Separator between bandlets when there are two.
-            borderLeft: idx > 0 ? '1px solid rgba(168, 85, 247, 0.35)' : 'none',
+            // Neutral separator between bandlets — each band's own colour
+            // (teal / purple) comes from its ISO label + accent below.
+            borderLeft: idx > 0 ? '1px solid var(--border)' : 'none',
           }}
         >
           <IsolationBandItem iso={iso} index={idx + 1} total={isolations.length} />
@@ -200,13 +201,21 @@ function IsolationBandItem({
     return () => cancelAnimationFrame(animRef.current);
   }, [iso.id, total]);
 
+  // This window's colour slot (teal = 1st, purple = 2nd) — drives the
+  // header accent, ISO label, and remove button so it visibly matches its
+  // bracket on the spectrum above.
+  const color = ISO_COLORS[iso.colorIndex] ?? ISO_COLORS[0];
+
   return (
     <>
       <div
         className="flex items-center justify-between px-2 py-1"
-        style={{ background: 'var(--bg-panel)' }}
+        style={{
+          background: 'var(--bg-panel)',
+          borderLeft: `3px solid ${color.hex}`,
+        }}
       >
-        <span className="text-[10px] font-semibold tracking-wider" style={{ color: '#a855f7' }}>
+        <span className="text-[10px] font-semibold tracking-wider" style={{ color: color.hex }}>
           ISO {total > 1 ? `· ${index}/${total}` : ''}
         </span>
         <div className="flex items-center gap-2">
@@ -217,9 +226,9 @@ function IsolationBandItem({
             onClick={() => useTunerStore.getState().removeIsolation(iso.id)}
             className="text-[10px] leading-none px-1.5 py-0.5 rounded"
             style={{
-              color: '#a855f7',
-              background: 'rgba(168, 85, 247, 0.15)',
-              border: '1px solid rgba(168, 85, 247, 0.4)',
+              color: color.hex,
+              background: `rgba(${color.rgb}, 0.15)`,
+              border: `1px solid rgba(${color.rgb}, 0.4)`,
             }}
             aria-label="Remove this isolation"
             title="Remove this isolation"

@@ -350,12 +350,16 @@ export function OnboardingTour() {
     });
   };
 
-  /** Natural completion — clean up SA / ISO / open accordion so the user
-   *  starts fresh after the tour walks them through those features. */
+  /** Natural completion — leave the app's default working layout: the
+   *  Spectrum Analyser on with its two colour-coded isolation windows (teal
+   *  + purple), and any open accordion closed. The tour itself cleared
+   *  these on entry so its "turn on SA" / "draw an isolation" steps were
+   *  genuine; here we restore the standard default so the user lands on the
+   *  full experience rather than a blank canvas. */
   const completeTour = () => {
     const s = useTunerStore.getState();
-    if (s.showSpectrum) s.setShowSpectrum(false);
-    if (s.isolations.length > 0) s.clearIsolations();
+    s.setShowSpectrum(true);
+    s.resetIsolationsToDefault();
     if (s.openAccordion !== null) s.toggleAccordion(s.openAccordion);
     s.setOnboardingDone(true);
     s.setTourActive(false);

@@ -51,9 +51,23 @@ export interface IsolationWindow {
   /** Loudest peak (Hz) found inside the window on the last frame, or null
    * when there's nothing above the noise gate inside the bracket. */
   peakFreq: number | null;
+  /** Stable colour slot: 0 = teal (1st window), 1 = purple (2nd). Tied to
+   * the window itself, not its array position, so removing the teal window
+   * leaves the purple one purple — and a re-added window takes the freed
+   * slot's colour. Makes it obvious which spectrum bracket feeds which
+   * strobe band. */
+  colorIndex: number;
 }
 
 export const MAX_ISOLATIONS = 2;
+
+/** Colour per isolation slot — index 0 teal, index 1 purple. Components
+ * build rgba()/hex from these so the spectrum bracket and its strobe band
+ * always match. */
+export const ISO_COLORS = [
+  { rgb: '6, 182, 212', hex: '#06b6d4' },   // teal  — 1st window
+  { rgb: '168, 85, 247', hex: '#a855f7' },  // purple — 2nd window
+] as const;
 
 export interface TunerState {
   isRunning: boolean;
@@ -130,6 +144,10 @@ export interface TunerState {
   onboardingDone: boolean;
   tourActive: boolean;
   panelOpen: boolean;
+  /** Desktop-only: collapse the right sidebar to a skinny strip to give
+   *  the strobe display more width. Ignored on tablet/mobile (where the
+   *  panel is the slide-out drawer). Persisted. */
+  sidebarCollapsed: boolean;
   theme: 'dark' | 'light';
   highContrast: boolean;
   largeText: boolean;
@@ -174,12 +192,14 @@ export interface TunerState {
   updateIsolationRange: (id: string, minFreq: number, maxFreq: number) => void;
   setIsolationPeak: (id: string, freq: number | null) => void;
   clearIsolations: () => void;
+  resetIsolationsToDefault: () => void;
   setHumFilter: (mode: 'off' | '50' | '60') => void;
   setAlwaysOnTop: (on: boolean) => void;
   setSelectedScale: (id: string) => void;
   setOnboardingDone: (done: boolean) => void;
   setTourActive: (active: boolean) => void;
   setPanelOpen: (open: boolean) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   setHighContrast: (on: boolean) => void;
   setLargeText: (on: boolean) => void;
@@ -197,6 +217,16 @@ function makeBandId(): string {
 }
 
 let isolationCounter = 0;
+
+/** Two default isolation windows shown on first launch — a teal one and a
+ * purple one in sensible, non-overlapping spots in the lower-mid spectrum.
+ * The user can drag, resize, remove, and re-add them as before. */
+function defaultIsolations(): IsolationWindow[] {
+  return [
+    { id: `iso-${++isolationCounter}`, minFreq: 250, maxFreq: 400, peakFreq: null, colorIndex: 0 },
+    { id: `iso-${++isolationCounter}`, minFreq: 700, maxFreq: 1000, peakFreq: null, colorIndex: 1 },
+  ];
+}
 
 function configsToBands(configs: BandConfig[]): StrobeBand[] {
   return configs.map((c) => ({
@@ -324,17 +354,17 @@ export const useTunerStore = create<TunerState>()(
   openAccordion: null,
   noteNaming: 'sharp',
   harmonicMode: 'pure',
-  displaySmoothing: 0.93,
+  displaySmoothing: 0.75,
   strobeSpeed: 1,
-  showSpectrum: false,
-  readoutSmoothing: 0.95,
+  showSpectrum: true,
+  readoutSmoothing: 0.75,
   micGainDb: 0,
   inTuneHysteresis: 1.0,
   strobeIntensity: 0.9,
   strobeSoftness: 0.35,
   fftSize: 16384,
   fftSmoothing: 0.80,
-  isolations: [],
+  isolations: defaultIsolations(),
   humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
   alwaysOnTop: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-always-on-top') === '1'),
   // Default to chromatic on a fresh install. Once the user picks a scale
@@ -343,6 +373,7 @@ export const useTunerStore = create<TunerState>()(
   onboardingDone: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-onboarding-done') === '1'),
   tourActive: false,
   panelOpen: false,
+  sidebarCollapsed: false,
   theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
   highContrast: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-high-contrast') === '1'),
   largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
@@ -456,8 +487,12 @@ export const useTunerStore = create<TunerState>()(
     const lo = Math.min(minFreq, maxFreq);
     const hi = Math.max(minFreq, maxFreq);
     const id = `iso-${++isolationCounter}`;
+    // Take whichever colour slot is free (teal first), so a re-added window
+    // reclaims the colour of the one that was removed.
+    const used = new Set(state.isolations.map((i) => i.colorIndex));
+    const colorIndex = used.has(0) ? 1 : 0;
     set({
-      isolations: [...state.isolations, { id, minFreq: lo, maxFreq: hi, peakFreq: null }],
+      isolations: [...state.isolations, { id, minFreq: lo, maxFreq: hi, peakFreq: null, colorIndex }],
     });
     return id;
   },
@@ -481,6 +516,7 @@ export const useTunerStore = create<TunerState>()(
     }));
   },
   clearIsolations: () => set({ isolations: [] }),
+  resetIsolationsToDefault: () => set({ isolations: defaultIsolations() }),
   // The persist middleware handles localStorage automatically for all
   // whitelisted fields below — setters just update state.
   setHumFilter: (mode) => set({ humFilter: mode }),
@@ -489,6 +525,13 @@ export const useTunerStore = create<TunerState>()(
   setOnboardingDone: (done) => set({ onboardingDone: done }),
   setTourActive: (active) => set({ tourActive: active }),
   setPanelOpen: (open) => set({ panelOpen: open }),
+  setSidebarCollapsed: (collapsed) =>
+    set((s) => ({
+      sidebarCollapsed: collapsed,
+      // Collapsing to the skinny strip also closes any open accordion so
+      // expanding the sidebar again starts from a clean, all-closed state.
+      openAccordion: collapsed ? null : s.openAccordion,
+    })),
   setTheme: (theme) => set({ theme }),
   setHighContrast: (on) => set({ highContrast: on }),
   setLargeText: (on) => set({ largeText: on }),
@@ -589,8 +632,30 @@ export const useTunerStore = create<TunerState>()(
       // every "wait, why did this reset?" setting is sticky.
       // ─────────────────────────────────────────────────────────────────
       name: 'v-tune-store',
-      version: 1,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
+
+      // → v3: new default experience — Spectrum Analyser on with two
+      // colour-coded isolation windows (teal + purple), and gentler 75 %
+      // display + readout smoothing. Applied to any pre-v3 install; existing
+      // isolation windows keep their positions (only colorIndex is backfilled).
+      migrate: (persisted, version) => {
+        const s = persisted as Partial<TunerState>;
+        if (version < 3) {
+          s.showSpectrum = true;
+          s.displaySmoothing = 0.75;
+          s.readoutSmoothing = 0.75;
+          if (!s.isolations || s.isolations.length === 0) {
+            s.isolations = defaultIsolations();
+          } else {
+            s.isolations = s.isolations.map((iso, i) => ({
+              ...iso,
+              colorIndex: iso.colorIndex ?? (i % ISO_COLORS.length),
+            }));
+          }
+        }
+        return s;
+      },
 
       // Whitelist what gets saved. Transient fields (isRunning, peaks,
       // rmsLevel, bands runtime data, tour state, etc.) are NOT in here
@@ -615,6 +680,7 @@ export const useTunerStore = create<TunerState>()(
         selectedScaleId: state.selectedScaleId,
         showSpectrum: state.showSpectrum,
         openAccordion: state.openAccordion,
+        sidebarCollapsed: state.sidebarCollapsed,
         inputDeviceId: state.inputDeviceId,
         // Last-tuned note + custom band setup
         currentNote: state.currentNote,

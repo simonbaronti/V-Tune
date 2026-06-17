@@ -4,6 +4,31 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.0.8] — 2026-06-17
+
+### Added
+- **Desktop apps now update themselves.** Windows, macOS and Linux builds
+  check for a newer signed release on launch and offer a one-click
+  "Install & Restart" — no more redownloading and reinstalling by hand.
+  (This release installs the updater; the first auto-update happens when
+  the next version ships.)
+- **Spectrum Analyser on by default**, with two isolation windows ready to
+  go — the first **teal**, the second **purple** — so it's obvious which
+  bracket on the spectrum feeds which strobe band. Remove or re-add them
+  as before; a re-added window reclaims the freed colour.
+- **Speed** now offers **0.5×** (the 10× option was dropped).
+- **Collapsible sidebar (desktop)** — collapse the panel to a skinny strip
+  to give the strobe more width, via a control beneath the stopwatch.
+
+### Changed
+- **Smooth** and **Readout** now default to a calmer **75 %**.
+- The **Spectrum Analyser toggle** moved to sit directly under Settings.
+- The frequency / note / cents readout now stays visible **while dragging
+  an isolation bracket**, so you can line an edge up against a note.
+
+### Fixed
+- Removed dead space above the "Let's Go" button in the mobile side panel.
+
 ## [1.0.7] — 2026-06-14
 
 ### Fixed
@@ -125,6 +150,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.0.8]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.8
 [1.0.7]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.7
 [1.0.6]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.6
 [1.0.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.5

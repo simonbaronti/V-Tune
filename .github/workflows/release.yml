@@ -81,8 +81,15 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
+      # Signing-key env makes `tauri build` emit the updater `.sig` files
+      # (createUpdaterArtifacts is on in tauri.conf.json). Required for the
+      # in-app auto-updater; without the secrets the build still succeeds
+      # but produces no signatures.
       - name: Build Tauri
         run: npm run tauri:build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Stage Windows artifacts
         if: matrix.platform == 'windows-latest'
@@ -91,6 +98,8 @@ jobs:
           mkdir -p staging
           cp src-tauri/target/release/bundle/msi/*.msi staging/ 2>/dev/null || true
           cp src-tauri/target/release/bundle/nsis/*-setup.exe staging/ 2>/dev/null || true
+          # Updater signature for the NSIS installer.
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig staging/ 2>/dev/null || true
           ls -la staging/
 
       - name: Stage Linux artifacts
@@ -100,6 +109,8 @@ jobs:
           mkdir -p staging
           cp src-tauri/target/release/bundle/deb/*.deb staging/ 2>/dev/null || true
           cp src-tauri/target/release/bundle/appimage/*.AppImage staging/ 2>/dev/null || true
+          # Updater signature for the AppImage.
+          cp src-tauri/target/release/bundle/appimage/*.AppImage.sig staging/ 2>/dev/null || true
           ls -la staging/
 
       - name: Upload desktop artifacts
@@ -215,8 +226,12 @@ jobs:
       - name: Flatten + add PDF
         run: |
           mkdir -p release-assets
+          # Installers + the updater .sig files (the macOS .dmg, .app.tar.gz
+          # and its .sig are added later by the local publish-desktop-update
+          # step, since macOS builds outside CI).
           find artifacts -type f \( -name '*.msi' -o -name '*-setup.exe' \
-            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.apk' \) \
+            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.apk' \
+            -o -name '*.sig' \) \
             -exec cp {} release-assets/ \;
           cp docs/V-Tune-User-Guide.pdf release-assets/
           echo "── Final release assets ──"
