@@ -126,10 +126,10 @@ export function DesktopUpdater() {
               </div>
               {phase.notes && (
                 <div
-                  className="text-xs mt-1 leading-snug"
-                  style={{ color: 'var(--text-dim)', maxHeight: '4.5em', overflow: 'hidden' }}
+                  className="text-xs mt-1 leading-snug whitespace-pre-line"
+                  style={{ color: 'var(--text-dim)', maxHeight: '7.5em', overflowY: 'auto' }}
                 >
-                  {phase.notes.split('\n')[0]}
+                  {phase.notes}
                 </div>
               )}
             </div>

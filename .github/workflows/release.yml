@@ -273,6 +273,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # tauri-action leaves latest.json's "notes" empty. Inject this version's
+      # CHANGELOG section (markdown stripped to plain text) so the in-app
+      # updater shows what's new. Runs after all desktop jobs, so latest.json
+      # already has every platform.
+      - name: Inject changelog notes into latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES=$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { grab=1; next }
+            grab && /^## \[/ { exit }
+            grab { print }
+          ' CHANGELOG.md | sed -e 's/^### /\n/' -e 's/^- /• /' -e 's/\*\*//g' | sed '/^\[/d')
+          gh release download "$GITHUB_REF_NAME" --pattern latest.json --dir /tmp --clobber
+          jq --arg notes "$NOTES" '.notes = ($notes | ltrimstr("\n"))' /tmp/latest.json > /tmp/latest.new.json
+          mv /tmp/latest.new.json /tmp/latest.json
+          gh release upload "$GITHUB_REF_NAME" /tmp/latest.json --clobber
+          echo "── latest.json notes ──"; jq -r .notes /tmp/latest.json
+
       - name: Attach user guide + publish
         env:
           GH_TOKEN: ${{ github.token }}
