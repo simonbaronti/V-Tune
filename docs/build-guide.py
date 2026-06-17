@@ -243,6 +243,9 @@ def make_styles():
     s['h2'] = ParagraphStyle(
         name='h2', fontName='V-Sans-Bold', fontSize=14, leading=18,
         textColor=CYAN, spaceBefore=14, spaceAfter=4,
+        # Never strand a subsection heading at the bottom of a page — keep it
+        # with the paragraph it introduces.
+        keepWithNext=1,
     )
     s['h3'] = ParagraphStyle(
         name='h3', fontName='V-Sans-Bold', fontSize=11, leading=15,
@@ -442,8 +445,8 @@ def build(out_path: Path):
         ('2.  Quick start', 'Strike a note. Watch it lock in. Done.'),
         ('3.  The strobe display', 'Bands, bars, colours, cents readout'),
         ('4.  The pitch pipe (♪)', 'Per-band reference tones, three click states'),
-        ('5.  The pitch wheel', 'Chromatic and scale modes'),
-        ('6.  Mobile Quick-Pitch bar', 'The pitch wheel on phones / tablets'),
+        ('5.  The pitch selector', 'Chromatic and scale modes'),
+        ('6.  Mobile Quick-Pitch bar', 'The pitch selector on phones / tablets'),
         ('7.  Spectrum Analyser + ISO', 'See the full spectrum, isolate frequencies'),
         ('8.  Settings', 'Every knob, what it does'),
         ('9.  Stopwatch', 'Time your tuning sessions'),
@@ -608,14 +611,6 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Paragraph('Reordering bands', s['h2']))
-    story.append(Paragraph(
-        'Custom bands (anything below the cyan separator) can be re-ordered '
-        'by <b>long-pressing and dragging</b> them up or down. Foundation '
-        'bands — the 1×, 2×, 3× set — are fixed and can’t be moved.',
-        s['body'],
-    ))
-
     story.append(PageBreak())
 
     # ── 4. Pitch pipe ─────────────────────────────────────────────────
@@ -675,13 +670,13 @@ def build(out_path: Path):
 
     story.append(Spacer(1, 40))
 
-    # ── 5. The pitch wheel ────────────────────────────────────────────
-    story.append(Paragraph('5. The pitch wheel', s['h1']))
+    # ── 5. The pitch selector ─────────────────────────────────────────
+    story.append(Paragraph('5. The pitch selector', s['h1']))
     story.append(Paragraph('Where you tell V-Tune which note to listen for', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'On desktop and tablet the pitch wheel lives inside the '
+        'On desktop and tablet the pitch selector lives inside the '
         '<b>Tuning / Scale</b> accordion in the side panel. On phones it '
         'becomes the Quick-Pitch bar at the bottom of the screen (see '
         'section 6). It has two modes:',
@@ -724,17 +719,49 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(PageBreak())
+    story.append(Paragraph('Tuning reference — PURE vs EQUAL', s['h2']))
+    story.append(Paragraph(
+        'Above the note layout is a <b>PURE / EQUAL</b> toggle that decides '
+        'what the three foundation bands are measured against:',
+        s['body'],
+    ))
+    story += bullets([
+        '<b>PURE</b> (default) references each band against an exact integer '
+        'multiple of the fundamental — 1×, 2×, 3×. A handpan whose partials '
+        'are tuned to those pure ratios reads <b>0 on every band</b>. This '
+        'is the acoustically correct reference for handpan partial tuning.',
+        '<b>EQUAL</b> references each band against the nearest equal-tempered '
+        'note instead. On a pure handpan the compound-fifth (3×) band then '
+        'reads about <b>+2 cents</b> — the real, constant difference between '
+        'a pure 3:1 fifth and a tempered fifth. Use this if you tune your '
+        'partials to equal temperament.',
+    ], s)
+    story.append(Paragraph(
+        'The octave (2×) band reads the same either way — octaves are an '
+        'exact 2:1 in both systems. Only the compound fifth differs.',
+        s['body_secondary'],
+    ))
+
+    story.append(Paragraph('Collapsing the panel (desktop)', s['h2']))
+    story.append(Paragraph(
+        'On desktop you can collapse the whole side panel to a slim strip — '
+        'use the control beneath the stopwatch — to give the strobe display '
+        'more width. Click the matching control on the strip to bring it '
+        'back; collapsing also closes any open section so it reopens tidy.',
+        s['body'],
+    ))
+
+    story.append(Spacer(1, 40))
 
     # ── 6. Mobile Quick-Pitch bar ─────────────────────────────────────
     story.append(Paragraph('6. Mobile Quick-Pitch bar', s['h1']))
-    story.append(Paragraph('The pitch wheel, condensed for thumbs', s['h1_sub']))
+    story.append(Paragraph('The pitch selector, condensed for thumbs', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'On phones and narrow tablets the pitch wheel collapses into a '
+        'On phones and narrow tablets the pitch selector collapses into a '
         'sticky bar at the bottom of the screen. It does everything the '
-        'desktop pitch wheel does — scale dropdown, note selection, octave '
+        'desktop pitch selector does — scale dropdown, note selection, octave '
         '+/−, start/stop — in a touch-friendly layout that respects the '
         'iPhone home-indicator strip.',
         s['body'],
@@ -761,32 +788,37 @@ def build(out_path: Path):
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'Toggle the <b>Spectrum Analyser</b> from the side panel (look for '
-        'the SA toggle). It opens a frequency-domain view across the '
-        'audible range — a real-time picture of every harmonic your '
-        'instrument is producing.',
+        'The <b>Spectrum Analyser</b> is on by default (toggle it under '
+        '<i>Settings</i> if you want it off). It opens a frequency-domain '
+        'view across the audible range — a real-time picture of every '
+        'harmonic your instrument is producing.',
         s['body'],
     ))
 
     story.append(Paragraph('Isolation windows (ISO)', s['h2']))
     story.append(Paragraph(
-        '<b>Shift + drag</b> across the spectrum (or touch-hold then drag '
-        'on mobile) to draw an isolation window — a coloured bracket '
-        'covering whatever frequency range you select. V-Tune finds the '
-        '<i>loudest peak inside the bracket</i> and creates a dedicated '
-        'tuning band for it, rendered beneath the spectrum.',
+        'V-Tune starts with <b>two isolation windows</b> ready to go — a '
+        '<font color="#06b6d4">teal</font> one and a '
+        '<font color="#a855f7">purple</font> one. Each is a bracket on the '
+        'spectrum; V-Tune finds the <i>loudest peak inside the bracket</i> '
+        'and drives a dedicated strobe band from it, shown beneath the '
+        'spectrum. The band carries the same colour as its bracket, so it’s '
+        'always clear which window feeds which band.',
         s['body'],
     ))
     story.append(Paragraph(
-        'This is how you tune partials that aren’t the fundamental, '
-        'octave, or 12th — say, the third overtone of a particular note. '
-        'Bracket the peak you care about, let go, and it gets its own '
-        'strobe band. You can have up to two isolation windows at once; '
-        'they split the band area 50/50.',
+        'Drag either end of a bracket to move it; the frequency / note / '
+        'cents readout follows so you can line an edge up against a note. '
+        'This is how you tune partials that aren’t the fundamental, octave '
+        'or 12th — say, a particular overtone. Remove a window with its '
+        '× button, and draw a new one any time with <b>Shift + drag</b> '
+        '(or touch-hold then drag on mobile) across the spectrum; you can '
+        'have up to two at once, splitting the band area 50/50. A re-added '
+        'window reclaims the freed colour slot.',
         s['body'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, 40))
 
     # ── 8. Settings ───────────────────────────────────────────────────
     story.append(Paragraph('8. Settings', s['h1']))
@@ -811,26 +843,22 @@ def build(out_path: Path):
          'How fast the strobe pattern reacts. Higher = livelier, lower = calmer / easier to read.'),
     ], s))
 
-    story.append(Paragraph('Reading the tune', s['h2']))
+    story.append(Paragraph('Reading the frequencies', s['h2']))
     story.append(settings_table([
         ('Tolerance (±cents)',
          'How close you have to be before V-Tune calls you in tune. Default is ±5 cents.'),
         ('Hysteresis',
          'Extra slack once you’re locked, so a tiny wobble doesn’t flicker back to red. Default 1.5 cents.'),
         ('Readout smoothing',
-         'How much to smooth the cents number on the right. Higher = steadier digit, slower response.'),
+         'How much to smooth the cents number on the right. Higher = steadier digit, slower response. Default 75%.'),
         ('Display smoothing',
-         'Smoothing applied to the strobe motion itself. Independent of readout smoothing.'),
+         'Smoothing applied to the strobe motion itself. Independent of readout smoothing. Default 75%.'),
     ], s))
 
     story.append(Paragraph('Analysis', s['h2']))
     story.append(settings_table([
         ('Reference A4',
          'Concert pitch. Default 440 Hz. Set to 442 for some orchestral work, 432 if you’re into that.'),
-        ('FFT size',
-         'Resolution of the spectrum analyser. Bigger = finer frequency resolution, but slower to update.'),
-        ('FFT smoothing',
-         'Time-smoothing on the spectrum display. Higher = calmer trace.'),
         ('Hum filter',
          'Notches out mains hum at 50 Hz (UK/EU) or 60 Hz (US), plus harmonics. Off by default.'),
     ], s))
@@ -894,9 +922,20 @@ def build(out_path: Path):
         'Press <font name="Courier">Esc</font> or click the × to skip at '
         'any time — your scale and selection get restored. Complete the '
         'tour by pressing <font color="#00e878">Let’s Go</font> on the '
-        'last step and V-Tune leaves you on a clean canvas: spectrum '
-        'analyser closed, isolation windows cleared, accordions collapsed.',
+        'last step and V-Tune leaves you on the default working layout: '
+        'spectrum analyser on with its two isolation windows, accordions '
+        'closed.',
         s['body_secondary'],
+    ))
+
+    story.append(Paragraph('Staying up to date (desktop)', s['h2']))
+    story.append(Paragraph(
+        'The macOS, Windows and Linux apps update themselves. When a newer '
+        'version is published, V-Tune notices on launch and offers a '
+        'one-click <b>Install &amp; Restart</b> — no need to redownload or '
+        'reinstall. (iOS and Android update through their stores; the web '
+        'app refreshes itself.)',
+        s['body'],
     ))
 
     story.append(Spacer(1, 40))
@@ -932,7 +971,7 @@ def build(out_path: Path):
         'Also check you’re on the right note — handpans have rich '
         'overtones, and it’s easy to accidentally lock onto a partial '
         'that isn’t the fundamental. The live note indicator on the pitch '
-        'wheel (cyan glow) helps catch this.',
+        'selector (cyan glow) helps catch this.',
         s['body'],
     ))
 
