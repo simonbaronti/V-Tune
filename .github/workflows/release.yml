@@ -1,29 +1,37 @@
-# V-Tune release pipeline — Windows + Linux + Android, single workflow,
-# single GitHub Release per tag.
+# V-Tune release pipeline — fully automated, all platforms in CI.
 #
-# Triggered when you push a git tag matching v*.*.* — e.g.:
-#   git tag v1.0.1
-#   git push origin v1.0.1
+# Triggered on a git tag matching v*.*.* (e.g. `git tag v1.0.8 && git push
+# origin v1.0.8`). Flow:
 #
-# Three job groups run in parallel, then a `publish` job collects all
-# artifacts (+ the user guide PDF) and creates ONE GitHub Release.
+#   create-release → builds a draft GitHub Release with the changelog notes
+#   desktop (matrix) → macOS (universal, signed + notarized), Windows, Linux
+#                      via tauri-action: builds, signs the updater artifacts,
+#                      uploads installers + .sig, and merges latest.json
+#   android          → signed APK, uploaded to the draft release
+#   publish          → attaches the user-guide PDF, then publishes (un-drafts)
 #
-# macOS .dmg is deliberately NOT in CI:
-#   - GitHub free tier macOS runners are scarce, builds queue for
-#     hours-to-days, and macOS minutes burn 10x the budget of Linux.
-#   - You have a Mac. `npm run tauri:build` locally produces the .dmg
-#     in a couple of minutes, and you can drag-and-drop it into the
-#     GitHub Release page after the fact.
+# The desktop apps poll
+#   https://github.com/simonbaronti/V-Tune/releases/latest/download/latest.json
+# (set in tauri.conf.json) and update themselves from it.
 #
-# Required GitHub Secrets:
-#   ANDROID_KEYSTORE_BASE64    — base64-encoded contents of
-#                                android/keystore/v-tune-release.jks
-#   ANDROID_KEYSTORE_PASSWORD  — the keystore password
+# Required GitHub Secrets
+#   # Android signing
+#   ANDROID_KEYSTORE_BASE64            base64 of the release keystore
+#   ANDROID_KEYSTORE_PASSWORD          its password
+#   # Tauri update signing (all desktop platforms)
+#   TAURI_SIGNING_PRIVATE_KEY          contents of src-tauri/.tauri-signing.key
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD its password
+#   # macOS code signing + notarization
+#   APPLE_CERTIFICATE                  base64 of the Developer ID .p12
+#   APPLE_CERTIFICATE_PASSWORD         the .p12 export password
+#   APPLE_SIGNING_IDENTITY             "Developer ID Application: … (TEAMID)"
+#   APPLE_ID                           Apple ID email
+#   APPLE_PASSWORD                     app-specific password
+#   APPLE_TEAM_ID                      10-char team id
+#   KEYCHAIN_PASSWORD                  any string (temp keychain in CI)
 #
-# Required repo setting:
-#   Settings → Actions → General → Workflow permissions
-#   → "Read and write permissions"
-#   (so the workflow can create the Release + upload assets)
+# Required repo setting: Settings → Actions → General → Workflow permissions
+#   → "Read and write permissions".
 
 name: Release
 
@@ -31,23 +39,95 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch:   # manual re-run from the Actions UI
+  workflow_dispatch:
 
 jobs:
   # ───────────────────────────────────────────────────────────────────
-  # Desktop — Windows (.msi + .exe) + Linux (.deb + .AppImage)
+  # Create a DRAFT release first so every build job uploads into the same
+  # release without racing to create it. Body = this version's changelog.
+  # ───────────────────────────────────────────────────────────────────
+  create-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "## What's new in ${GITHUB_REF_NAME}"
+            echo ""
+            awk -v v="$VERSION" '
+              $0 ~ "^## \\[" v "\\]" { grab=1; next }
+              grab && /^## \[/ { exit }
+              grab { print }
+            ' CHANGELOG.md | sed '/^\[/d'
+            cat <<'EOF'
+
+          ### Downloads
+
+          | Platform | File |
+          |---|---|
+          | macOS | `V-Tune_*_universal.dmg` — universal (Intel + Apple Silicon), notarized |
+          | Windows | `V-Tune_*_x64-setup.exe` (recommended) or `V-Tune_*_x64_en-US.msi` |
+          | Linux | `V-Tune_*_amd64.deb` or `V-Tune_*_amd64.AppImage` |
+          | Android | `V-Tune-*.apk` (sideload — enable "Install unknown apps") |
+          | iOS | TestFlight beta: https://testflight.apple.com/join/b6pCcWQ7 |
+
+          Desktop apps (macOS / Windows / Linux) update themselves in-app from here on.
+          The full [User Guide](V-Tune-User-Guide.pdf) is attached.
+
+          - Web app: https://v-tune-handpan.vercel.app
+          - Full changelog: https://github.com/simonbaronti/V-Tune/blob/main/CHANGELOG.md
+          EOF
+          } > release-notes.md
+
+      - name: Create draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Idempotent: create the draft if it doesn't exist, then read its id.
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --title "V-Tune $GITHUB_REF_NAME" \
+              --notes-file release-notes.md
+          fi
+          id=$(gh api "repos/${{ github.repository }}/releases/tags/$GITHUB_REF_NAME" --jq .id)
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+          echo "Draft release id: $id"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Desktop — macOS (universal, signed + notarized) + Windows + Linux.
+  # tauri-action builds, signs the updater artifacts, uploads them to the
+  # draft release, and maintains latest.json across the matrix.
   # ───────────────────────────────────────────────────────────────────
   desktop:
     name: Desktop (${{ matrix.platform }})
+    needs: create-release
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-latest
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
           - platform: ubuntu-22.04
-
+            args: ''
+            rust-targets: ''
+          - platform: windows-latest
+            args: ''
+            rust-targets: ''
     runs-on: ${{ matrix.platform }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +140,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -81,51 +163,34 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      # Signing-key env makes `tauri build` emit the updater `.sig` files
-      # (createUpdaterArtifacts is on in tauri.conf.json). Required for the
-      # in-app auto-updater; without the secrets the build still succeeds
-      # but produces no signatures.
-      - name: Build Tauri
-        run: npm run tauri:build
+      - name: Build + sign + upload (tauri-action)
+        uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signing — all platforms.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Stage Windows artifacts
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          mkdir -p staging
-          cp src-tauri/target/release/bundle/msi/*.msi staging/ 2>/dev/null || true
-          cp src-tauri/target/release/bundle/nsis/*-setup.exe staging/ 2>/dev/null || true
-          # Updater signature for the NSIS installer.
-          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig staging/ 2>/dev/null || true
-          ls -la staging/
-
-      - name: Stage Linux artifacts
-        if: matrix.platform == 'ubuntu-22.04'
-        shell: bash
-        run: |
-          mkdir -p staging
-          cp src-tauri/target/release/bundle/deb/*.deb staging/ 2>/dev/null || true
-          cp src-tauri/target/release/bundle/appimage/*.AppImage staging/ 2>/dev/null || true
-          # Updater signature for the AppImage.
-          cp src-tauri/target/release/bundle/appimage/*.AppImage.sig staging/ 2>/dev/null || true
-          ls -la staging/
-
-      - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+          # macOS code signing + notarization (ignored on Win/Linux).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         with:
-          name: desktop-${{ matrix.platform }}
-          path: staging/*
-          if-no-files-found: error
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
 
   # ───────────────────────────────────────────────────────────────────
-  # Android — signed release APK
+  # Android — signed APK, uploaded straight to the draft release.
   # ───────────────────────────────────────────────────────────────────
   android:
     name: Android (APK)
+    needs: create-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -136,8 +201,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Capacitor 8 compiles its Android library against source release
-      # 21, so the build JDK must be 21 (not 17).
+      # Capacitor 8 compiles its Android library against source release 21.
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -156,13 +220,6 @@ jobs:
       - name: Capacitor sync into android/
         run: npx cap sync android
 
-      # Decode keystore from the GitHub Secret to the path build.gradle
-      # expects (android/keystore/v-tune-release.jks).
-      # Pass the secret via env + printf (not echo) so the shell can't
-      # mangle it, then decode. `base64 -d` tolerates whitespace, but the
-      # secret should be a single unwrapped line regardless. Validate the
-      # decoded keystore immediately so a corrupted secret fails here with
-      # a clear message rather than deep inside gradle's signing step.
       - name: Restore + validate keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -173,7 +230,7 @@ jobs:
           if keytool -list -keystore android/keystore/v-tune-release.jks -storepass "$KEYSTORE_PASSWORD" >/dev/null 2>&1; then
             echo "✓ keystore decoded + opened OK"
           else
-            echo "✗ keystore invalid after decode — re-create the ANDROID_KEYSTORE_BASE64 secret from a single-line base64"
+            echo "✗ keystore invalid after decode — re-create ANDROID_KEYSTORE_BASE64"
             exit 1
           fi
 
@@ -189,97 +246,31 @@ jobs:
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose app-release.apk
 
-      # Stage from the repo root with a full relative path — avoids the
-      # off-by-one `../../../` counting that put the APK in the wrong
-      # place last run.
-      - name: Stage APK with version in filename
+      - name: Upload APK to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p staging
-          cp android/app/build/outputs/apk/release/app-release.apk "staging/V-Tune-${{ github.ref_name }}.apk"
-          ls -la staging/
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: staging/*.apk
-          if-no-files-found: error
+          cp android/app/build/outputs/apk/release/app-release.apk "V-Tune-${GITHUB_REF_NAME}.apk"
+          gh release upload "$GITHUB_REF_NAME" "V-Tune-${GITHUB_REF_NAME}.apk" --clobber
 
   # ───────────────────────────────────────────────────────────────────
-  # Publish — collect every artifact, attach the PDF, create Release
+  # Publish — attach the user guide, then un-draft the release.
   # ───────────────────────────────────────────────────────────────────
   publish:
-    name: Publish GitHub Release
-    needs: [desktop, android]
+    name: Publish release
+    needs: [create-release, desktop, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout (for the user guide PDF)
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Flatten + add PDF
+      - name: Attach user guide + publish
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p release-assets
-          # Installers + the updater .sig files (the macOS .dmg, .app.tar.gz
-          # and its .sig are added later by the local publish-desktop-update
-          # step, since macOS builds outside CI).
-          find artifacts -type f \( -name '*.msi' -o -name '*-setup.exe' \
-            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.apk' \
-            -o -name '*.sig' \) \
-            -exec cp {} release-assets/ \;
-          cp docs/V-Tune-User-Guide.pdf release-assets/
-          echo "── Final release assets ──"
-          ls -la release-assets/
-
-      # Build the release body: the matching version's section from
-      # CHANGELOG.md (the "what's new") followed by the downloads table.
-      # The tag is vX.Y.Z; the changelog headings are "## [X.Y.Z]", so we
-      # strip the leading "v" and awk out everything between this version's
-      # heading and the next "## [" heading.
-      - name: Build release notes
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          {
-            echo "## What's new in ${GITHUB_REF_NAME}"
-            echo ""
-            awk -v v="$VERSION" '
-              $0 ~ "^## \\[" v "\\]" { grab=1; next }
-              grab && /^## \[/ { exit }
-              grab { print }
-            ' CHANGELOG.md | sed '/^\[/d'
-            cat <<'EOF'
-
-          ### Downloads
-
-          | Platform | File |
-          |---|---|
-          | macOS | `V-Tune_*_universal.dmg` — universal (Intel + Apple Silicon), notarized |
-          | Windows | `V-Tune_*_x64-setup.exe` (recommended) or `V-Tune_*_x64_en-US.msi` |
-          | Linux | `V-Tune_*_amd64.deb` (Debian/Ubuntu) or `V-Tune_*_amd64.AppImage` (universal) |
-          | Android | `V-Tune-*.apk` (sideload — enable "Install unknown apps" for your browser) |
-          | iOS | TestFlight beta: https://testflight.apple.com/join/b6pCcWQ7 |
-
-          The full [User Guide](V-Tune-User-Guide.pdf) is attached to this release.
-
-          - Web app: https://v-tune-handpan.vercel.app
-          - Full changelog: https://github.com/simonbaronti/V-Tune/blob/main/CHANGELOG.md
-          EOF
-          } > release-notes.md
-          echo "── Generated release notes ──"
-          cat release-notes.md
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: V-Tune ${{ github.ref_name }}
-          body_path: release-notes.md
-          files: release-assets/*
-          draft: false
-          prerelease: false
+          gh release upload "$GITHUB_REF_NAME" docs/V-Tune-User-Guide.pdf --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+          echo "── published assets ──"
+          gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name'
