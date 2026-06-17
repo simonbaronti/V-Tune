@@ -94,57 +94,64 @@ export function DesktopUpdater() {
 
   if (phase.kind === 'idle') return null;
 
+  // Backdrop click dismisses only on the non-blocking states.
+  const dismissable = phase.kind === 'available' || phase.kind === 'error';
+
   return (
     <div
-      role="alert"
-      className="fixed z-[100] flex flex-col gap-2 p-4 rounded-lg"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(2px)' }}
+      onClick={dismissable ? () => setPhase({ kind: 'idle' }) : undefined}
+    >
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      className="flex flex-col gap-3 p-6 rounded-xl"
+      onClick={(e) => e.stopPropagation()}
       style={{
-        right: '20px',
-        bottom: 'max(20px, env(safe-area-inset-bottom))',
-        width: 'min(360px, calc(100vw - 40px))',
-        background: 'rgba(10, 16, 22, 0.98)',
+        width: 'min(480px, calc(100vw - 48px))',
+        background: 'rgba(12, 16, 22, 0.99)',
         border: '1px solid var(--accent-cyan, #06b6d4)',
-        boxShadow: '0 10px 32px rgba(0, 0, 0, 0.55)',
-        backdropFilter: 'blur(8px)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
       }}
     >
       {phase.kind === 'available' && (
         <>
           <div className="flex items-start gap-3">
             <svg
-              width="20" height="20" viewBox="0 0 24 24" fill="none"
+              width="24" height="24" viewBox="0 0 24 24" fill="none"
               stroke="var(--accent-cyan, #06b6d4)" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true"
+              style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true"
             >
               <path d="M21 12a9 9 0 1 1-3-6.7" />
               <polyline points="21 3 21 9 15 9" />
             </svg>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
                 V-Tune {phase.version} is available
               </div>
               {phase.notes && (
                 <div
-                  className="text-xs mt-1 leading-snug whitespace-pre-line"
-                  style={{ color: 'var(--text-dim)', maxHeight: '7.5em', overflowY: 'auto' }}
+                  className="text-xs mt-2 leading-relaxed whitespace-pre-line pr-1"
+                  style={{ color: 'var(--text-dim)', maxHeight: '16em', overflowY: 'auto' }}
                 >
                   {phase.notes}
                 </div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 justify-end">
+          <div className="flex items-center gap-2 justify-end mt-1">
             <button
               onClick={() => setPhase({ kind: 'idle' })}
-              className="text-xs font-medium px-3 py-1.5 rounded"
+              className="text-sm font-medium px-4 py-2 rounded"
               style={{ color: 'var(--text-dim)', background: 'transparent' }}
             >
               Later
             </button>
             <button
               onClick={install}
-              className="text-xs font-bold px-3 py-1.5 rounded"
+              className="text-sm font-bold px-4 py-2 rounded"
               style={{ background: 'var(--accent-cyan, #06b6d4)', color: '#05222a' }}
             >
               Install &amp; Restart
@@ -155,10 +162,10 @@ export function DesktopUpdater() {
 
       {phase.kind === 'downloading' && (
         <>
-          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
             Downloading V-Tune {phase.version}… {phase.pct}%
           </div>
-          <div style={{ height: 6, borderRadius: 999, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+          <div style={{ height: 8, borderRadius: 999, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
             <div
               style={{
                 height: '100%',
@@ -172,7 +179,7 @@ export function DesktopUpdater() {
       )}
 
       {phase.kind === 'installing' && (
-        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
           Installing V-Tune {phase.version} — restarting…
         </div>
       )}
@@ -192,6 +199,7 @@ export function DesktopUpdater() {
           </button>
         </div>
       )}
+    </div>
     </div>
   );
 }
