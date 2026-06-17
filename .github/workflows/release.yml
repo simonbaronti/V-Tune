@@ -93,14 +93,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Idempotent: create the draft if it doesn't exist, then read its id.
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" \
-              --draft \
-              --title "V-Tune $GITHUB_REF_NAME" \
-              --notes-file release-notes.md
+          # Look up an existing release for this tag (drafts included — they
+          # aren't tag-associated until published, so we can't query by tag;
+          # we filter the full list by tag_name). Create one via the API if
+          # absent. The API returns the numeric id directly, which the matrix
+          # build jobs need (gh release create on a draft can't give us that).
+          id=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq ".[] | select(.tag_name==\"$GITHUB_REF_NAME\") | .id" | head -1)
+          if [ -z "$id" ]; then
+            id=$(gh api "repos/${{ github.repository }}/releases" \
+              -f tag_name="$GITHUB_REF_NAME" \
+              -F draft=true \
+              -f name="V-Tune $GITHUB_REF_NAME" \
+              -f body="$(cat release-notes.md)" \
+              --jq .id)
           fi
-          id=$(gh api "repos/${{ github.repository }}/releases/tags/$GITHUB_REF_NAME" --jq .id)
           echo "release_id=$id" >> "$GITHUB_OUTPUT"
           echo "Draft release id: $id"
 
