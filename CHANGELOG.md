@@ -174,6 +174,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.0.9]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.9
 [1.0.8]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.8
 [1.0.7]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.7
 [1.0.6]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.6
