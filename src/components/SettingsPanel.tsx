@@ -1,7 +1,24 @@
 import { useEffect } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
-import { isTauri } from '../audio/alwaysOnTop';
+
+/** Full-width labelled divider for the sub-sections inside Settings. The
+ *  -mx-3 pulls it to the panel edges past the body's horizontal padding. */
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <div
+      className="-mx-3 px-3 py-1.5 text-xs font-bold tracking-wider uppercase text-center"
+      style={{
+        background: 'rgba(6, 182, 212, 0.12)',
+        color: 'var(--text-secondary)',
+        borderTop: '1px solid rgba(6, 182, 212, 0.25)',
+        borderBottom: '1px solid rgba(6, 182, 212, 0.25)',
+      }}
+    >
+      {title}
+    </div>
+  );
+}
 
 export function SettingsPanel() {
   const open = useTunerStore((s) => s.openAccordion === 'settings');
@@ -9,14 +26,11 @@ export function SettingsPanel() {
   const isRunning = useTunerStore((s) => s.isRunning);
   const availableDevices = useTunerStore((s) => s.availableDevices);
   const inputDeviceId = useTunerStore((s) => s.inputDeviceId);
-  const displaySmoothing = useTunerStore((s) => s.displaySmoothing);
   const strobeSpeed = useTunerStore((s) => s.strobeSpeed);
-  const readoutSmoothing = useTunerStore((s) => s.readoutSmoothing);
   const micGainDb = useTunerStore((s) => s.micGainDb);
   const strobeIntensity = useTunerStore((s) => s.strobeIntensity);
   const strobeSoftness = useTunerStore((s) => s.strobeSoftness);
   const humFilter = useTunerStore((s) => s.humFilter);
-  const alwaysOnTop = useTunerStore((s) => s.alwaysOnTop);
   const highContrast = useTunerStore((s) => s.highContrast);
   const largeText = useTunerStore((s) => s.largeText);
 
@@ -86,26 +100,27 @@ export function SettingsPanel() {
       </button>
 
       {open && (
-        <div className="px-3 py-3 flex flex-col gap-3" style={{ borderTop: '1px solid var(--border)' }}>
-          <label data-tour="settings-input" className="flex items-center gap-2 text-sm min-w-0" style={{ color: 'var(--text-secondary)' }}>
-            <span className="shrink-0">Input:</span>
-            <select
-              value={inputDeviceId}
-              onChange={handleDeviceChange}
-              className="rounded px-2 py-1 text-sm flex-1 min-w-0 max-w-full truncate"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-            >
-              <option value="default">Default</option>
-              {availableDevices.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `Input ${d.deviceId.slice(0, 8)}`}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="px-3 pb-3 flex flex-col gap-3">
+          {/* ── Input ─────────────────────────────────────────────────── */}
+          <SectionHeading title="Input" />
+
+          <select
+            data-tour="settings-input"
+            value={inputDeviceId}
+            onChange={handleDeviceChange}
+            className="w-full rounded px-2 py-1.5 text-sm truncate"
+            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+          >
+            <option value="default">Default</option>
+            {availableDevices.map((d) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Input ${d.deviceId.slice(0, 8)}`}
+              </option>
+            ))}
+          </select>
 
           <div data-tour="settings-mic" className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }} title="Input gain in decibels — 0 dB is unmodified, positive lifts a quiet mic">MIC</span>
+            <span className="text-sm shrink-0" style={{ color: 'var(--text-dim)' }} title="Input gain in decibels — 0 dB is unmodified, positive lifts a quiet mic">MIC +/−</span>
             <input
               type="range"
               min="-12"
@@ -124,6 +139,34 @@ export function SettingsPanel() {
               {micGainDb > 0 ? '+' : ''}{micGainDb} dB
             </span>
           </div>
+
+          {/* Mains-hum notch filter — lives in Input since it cleans the mic
+              signal. Region: UK/EU = 50 Hz, US/CA/JP-east = 60 Hz. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>HUM</span>
+              {(['off', '50', '60'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => useTunerStore.getState().setHumFilter(m)}
+                  className="px-2.5 py-1 rounded text-sm transition-all"
+                  style={{
+                    background: humFilter === m ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
+                    color: humFilter === m ? '#a855f7' : 'var(--text-dim)',
+                    border: humFilter === m ? '1px solid #a855f7' : '1px solid transparent',
+                  }}
+                >
+                  {m === 'off' ? 'Off' : `${m} Hz`}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
+              Notches out mains hum from nearby power. UK/EU = 50, US = 60.
+            </p>
+          </div>
+
+          {/* ── Strobe Preferences ────────────────────────────────────── */}
+          <SectionHeading title="Strobe Preferences" />
 
           <div data-tour="settings-brightness" className="flex items-center gap-2">
             <span className="text-sm" style={{ color: 'var(--text-dim)' }} title="Brightness of the strobe — higher = more vivid red/green bars">BRIGHTNESS</span>
@@ -177,116 +220,30 @@ export function SettingsPanel() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>SMOOTH</span>
-              <input
-                type="range"
-                min="0"
-                max="0.95"
-                step="0.05"
-                value={displaySmoothing}
-                onChange={(e) => useTunerStore.getState().setDisplaySmoothing(parseFloat(e.target.value))}
-                className="flex-1 h-1"
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
-                {Math.round(displaySmoothing * 100)}%
-              </span>
-            </div>
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
-              How calm the moving bars &amp; colour are. Higher = smoother but slightly slower to react.
-            </p>
-          </div>
 
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>READOUT</span>
-              <input
-                type="range"
-                min="0"
-                max="0.99"
-                step="0.01"
-                value={readoutSmoothing}
-                onChange={(e) => useTunerStore.getState().setReadoutSmoothing(parseFloat(e.target.value))}
-                className="flex-1 h-1"
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              <span className="text-sm w-10 text-right" style={{ color: 'var(--text-secondary)' }}>
-                {Math.round(readoutSmoothing * 100)}%
-              </span>
-            </div>
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
-              How steady the cents number is. Higher = the number holds still; lower = it updates in real time.
-            </p>
-          </div>
+          {/* ── Accessibility Options ─────────────────────────────────── */}
+          <SectionHeading title="Accessibility Options" />
 
-          {/* Mains-hum notch filter — quick switch between off / 50 / 60 Hz.
-              Region: UK/EU = 50 Hz, US/CA/JP-east = 60 Hz. Cascaded biquad
-              notches in the worklet at f0 + 3 harmonics. */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>HUM</span>
-              {(['off', '50', '60'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => useTunerStore.getState().setHumFilter(m)}
-                  className="px-2.5 py-1 rounded text-sm transition-all"
-                  style={{
-                    background: humFilter === m ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
-                    color: humFilter === m ? '#a855f7' : 'var(--text-dim)',
-                    border: humFilter === m ? '1px solid #a855f7' : '1px solid transparent',
-                  }}
-                >
-                  {m === 'off' ? 'Off' : `${m} Hz`}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-dim)' }}>
-              Notches out mains hum from nearby power. UK/EU = 50, US = 60.
-            </p>
-          </div>
-
-          {/* Desktop-only: always-on-top toggle (Tauri runtime check). */}
-          {isTauri() && (
-            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <span>Always on top</span>
-              <input
-                type="checkbox"
-                checked={alwaysOnTop}
-                onChange={(e) => useTunerStore.getState().setAlwaysOnTop(e.target.checked)}
-                className="w-5 h-5 cursor-pointer"
-                style={{ accentColor: 'var(--accent-cyan)' }}
-              />
-            </label>
-          )}
-
-          {/* Accessibility options */}
-          <div className="flex flex-col gap-2 pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
-            <span className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-              ACCESSIBILITY OPTIONS
-            </span>
-            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <span>High contrast</span>
-              <input
-                type="checkbox"
-                checked={highContrast}
-                onChange={(e) => useTunerStore.getState().setHighContrast(e.target.checked)}
-                className="w-5 h-5 cursor-pointer"
-                style={{ accentColor: 'var(--accent-cyan)' }}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <span>Larger text</span>
-              <input
-                type="checkbox"
-                checked={largeText}
-                onChange={(e) => useTunerStore.getState().setLargeText(e.target.checked)}
-                className="w-5 h-5 cursor-pointer"
-                style={{ accentColor: 'var(--accent-cyan)' }}
-              />
-            </label>
-          </div>
+          <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <span>High contrast</span>
+            <input
+              type="checkbox"
+              checked={highContrast}
+              onChange={(e) => useTunerStore.getState().setHighContrast(e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+              style={{ accentColor: 'var(--accent-cyan)' }}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <span>Larger text</span>
+            <input
+              type="checkbox"
+              checked={largeText}
+              onChange={(e) => useTunerStore.getState().setLargeText(e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+              style={{ accentColor: 'var(--accent-cyan)' }}
+            />
+          </label>
 
           {/* Replay onboarding tour */}
           <button

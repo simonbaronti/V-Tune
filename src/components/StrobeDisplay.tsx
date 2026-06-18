@@ -30,6 +30,14 @@ export function StrobeDisplay() {
   const animFrameRef = useRef<number>(0);
   const accumulatedPhasesRef = useRef<Map<string, number>>(new Map());
   const smoothedCentsRef = useRef<Map<string, number>>(new Map());
+  // Eased 0..1 "locked" amount per band — fades the dark-green background
+  // wash in/out. Driven by the debounced isInTune state (not raw cents), so
+  // it never flickers; the easing just makes the green fade smoothly.
+  const smoothedGreenRef = useRef<Map<string, number>>(new Map());
+  // Eased 0..1 "gap-fill" amount — how far the live signal has decayed from
+  // its peak. Brightens the dark-green gaps toward the bar colour as a note
+  // rings down. Smoothed so the live amplitude's frame jitter doesn't flicker.
+  const smoothedFillRef = useRef<Map<string, number>>(new Map());
   const readoutCentsRef = useRef<Map<string, number>>(new Map());
   const medianBufferRef = useRef<Map<string, number[]>>(new Map());
   const lastSignalTimeRef = useRef<Map<string, number>>(new Map());
@@ -263,6 +271,8 @@ export function StrobeDisplay() {
       const isSignalLive = signalPresent && band.magnitude > magThreshold;
       if (isSignalLive && now - prevLastSignal > 250) {
         smoothedCentsRef.current.delete(band.id);
+        smoothedGreenRef.current.delete(band.id);
+        smoothedFillRef.current.delete(band.id);
         readoutCentsRef.current.delete(band.id);
         medianBufferRef.current.set(band.id, []);
         inTuneStateRef.current.set(band.id, false);
@@ -346,35 +356,70 @@ export function StrobeDisplay() {
         inTuneChangeStartRef.current.delete(band.id);
       }
       inTuneStateRef.current.set(band.id, isInTune);
+      // Bar colour is a clean binary green/red flip driven by the debounced
+      // isInTune state — stable, no per-frame flicker on jittery notes.
       const color = isInTune
         ? { h: 140, s: 100, l: 55 }
         : { h: 0, s: 90, l: 50 };
+      // Eased "locked" amount for the dark-green background wash. Target is
+      // the debounced isInTune (so it can't flicker); the EMA just fades the
+      // green in when a note locks and back out when it drifts/decays.
+      const GREEN_EASE = 0.85;
+      const greenTarget = (signalLive || holdActive) && isInTune ? 1 : 0;
+      const prevGreen = smoothedGreenRef.current.get(band.id) ?? greenTarget;
+      const greenTint = prevGreen * GREEN_EASE + greenTarget * (1 - GREEN_EASE);
+      smoothedGreenRef.current.set(band.id, greenTint);
+      // Gap-fill: how far the LIVE signal has decayed from its peak (0 = at
+      // peak → dark gaps; 1 = faded → gaps brightened to the bar colour).
+      // Tracks live amplitude, which falls faster than the bars' 4s hold, so
+      // the strobe pattern melts into a green field as the note rings down.
+      const peakAmp = peakAmpRef.current.get(band.id) ?? 0;
+      const rawFill = peakAmp > 0.01 ? Math.max(0, Math.min(1, 1 - amplitude / peakAmp)) : 0;
+      const FILL_SMOOTH = 0.8;
+      const prevFill = smoothedFillRef.current.get(band.id) ?? rawFill;
+      const fillT = (signalLive || holdActive) ? prevFill * FILL_SMOOTH + rawFill * (1 - FILL_SMOOTH) : 0;
+      smoothedFillRef.current.set(band.id, fillT);
 
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, y + 2, w, bandHeight - 4);
       ctx.clip();
 
-      // Solid black band background — the LinoTune look. Colour comes from
-      // the sliding red/green bars below, not from a tinted background.
+      // Black band background — the LinoTune look. The sliding bars supply
+      // the bright colour; the background (incl. the gaps between bars) is
+      // black when off-pitch and washes toward dark green as the band locks.
       ctx.fillStyle = isSelected ? 'rgba(14, 14, 22, 0.98)' : 'rgba(8, 8, 14, 0.98)';
       ctx.fillRect(0, y + 2, w, bandHeight - 4);
+      if (greenTint > 0.01) {
+        // Flat green wash over the whole band (incl. the gaps between bars).
+        // Starts dark green for contrast against the bright bars, then
+        // brightens toward the bar colour as the note rings down (fillT), so
+        // the strobe pattern melts into a near-solid green field before the
+        // lock finally drops back to red.
+        const wh = 150 - 10 * fillT;             // hue 150 → 140 (toward bars)
+        const ws = 60 + 35 * fillT;              // saturation 60% → 95%
+        const wl = 13 + 24 * fillT;              // lightness 13% → 37% (stays under bar's 55%)
+        const wa = greenTint * (0.85 + 0.15 * fillT);
+        ctx.fillStyle = `hsla(${wh.toFixed(0)}, ${ws.toFixed(0)}%, ${wl.toFixed(0)}%, ${wa.toFixed(3)})`;
+        ctx.fillRect(0, y + 2, w, bandHeight - 4);
+      }
 
       if (displayedAmp > 0.01) {
         // Alternating colored / black rectangles. Each "cycle" is barWidth
         // wide and split 50/50 between a coloured bar and a black gap.
-        // Edges feathered via canvas blur filter that fades down to ~5%
-        // as the note approaches the tolerance threshold — sharp bars
-        // when in tune, soft bars when way off.
+        // Edge blur scales with how far off pitch we are: a slight feather
+        // even when locked, ramping to a heavy wash that nearly merges
+        // adjacent bars when way out (LinoTune-style). The BLUR slider
+        // (strobeSoftness) scales the whole range, so BLUR=0 keeps bars crisp.
         const barAlpha = Math.min(1, displayedAmp * strobeIntensity);
         ctx.fillStyle = `hsla(${color.h}, ${color.s}%, ${color.l}%, ${barAlpha})`;
         const bw = barWidth * 0.5;
 
-        const FADE_RANGE = 50; // cents past tolerance over which blur reaches max
-        const minSoftness = Math.min(0.05, strobeSoftness);
+        const FADE_RANGE = 60; // cents past tolerance over which blur reaches max
         const fadeT = Math.max(0, Math.min(1, (Math.abs(smoothedCents) - tolerance) / FADE_RANGE));
-        const effectiveSoftness = minSoftness + (strobeSoftness - minSoftness) * fadeT;
-        const blurPx = effectiveSoftness * Math.min(10, barWidth * 0.25);
+        const minBlur = Math.min(1.8, barWidth * 0.05) * strobeSoftness; // slight feather in tune
+        const maxBlur = Math.min(40, barWidth * 0.6) * strobeSoftness;   // near-merge when way off
+        const blurPx = minBlur + (maxBlur - minBlur) * fadeT;
 
         if (blurPx > 0.1) ctx.filter = `blur(${blurPx.toFixed(2)}px)`;
         for (let j = -2; j < barCount + 2; j++) {

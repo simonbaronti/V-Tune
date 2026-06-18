@@ -849,10 +849,6 @@ def build(out_path: Path):
          'How close you have to be before V-Tune calls you in tune. Default is ±5 cents.'),
         ('Hysteresis',
          'Extra slack once you’re locked, so a tiny wobble doesn’t flicker back to red. Default 1.5 cents.'),
-        ('Readout smoothing',
-         'How much to smooth the cents number on the right. Higher = steadier digit, slower response. Default 75%.'),
-        ('Display smoothing',
-         'Smoothing applied to the strobe motion itself. Independent of readout smoothing. Default 75%.'),
     ], s))
 
     story.append(Paragraph('Analysis', s['h2']))
@@ -949,8 +945,7 @@ def build(out_path: Path):
     story.append(Paragraph(
         'Background noise is usually the culprit. Try (a) lowering mic '
         'sensitivity until just your strikes register, (b) enabling the '
-        'hum filter at your local mains frequency (50 Hz UK/EU, 60 Hz US), '
-        '(c) bumping readout smoothing up a notch.',
+        'hum filter at your local mains frequency (50 Hz UK/EU, 60 Hz US).',
         s['body'],
     ))
 
@@ -978,8 +973,7 @@ def build(out_path: Path):
     story.append(Paragraph('“The strobe is too lively / too sluggish.”', s['h3']))
     story.append(Paragraph(
         '<b>Settings → Speed</b> is your friend. Drop it for a calmer '
-        'reading, raise it for a more responsive one. Pair with display '
-        'smoothing for fine control.',
+        'reading, raise it for a more responsive one.',
         s['body'],
     ))
 

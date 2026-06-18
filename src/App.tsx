@@ -14,12 +14,10 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { DesktopUpdater } from './components/DesktopUpdater';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
-import { applyAlwaysOnTop, isTauri } from './audio/alwaysOnTop';
 
 function App() {
   useKeyboardShortcuts();
   const showSpectrum = useTunerStore((s) => s.showSpectrum);
-  const alwaysOnTop = useTunerStore((s) => s.alwaysOnTop);
   const theme = useTunerStore((s) => s.theme);
   const highContrast = useTunerStore((s) => s.highContrast);
   const largeText = useTunerStore((s) => s.largeText);
@@ -81,13 +79,6 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('large-text', largeText);
   }, [largeText]);
-
-  // Reflect the persisted always-on-top preference into the Tauri window on
-  // mount, and whenever it changes. No-op on web/mobile.
-  useEffect(() => {
-    if (!isTauri()) return;
-    applyAlwaysOnTop(alwaysOnTop);
-  }, [alwaysOnTop]);
 
   // First-run onboarding: kick off the tour once on mount if the user
   // hasn't dismissed it before. `tourActive` is also flipped by the

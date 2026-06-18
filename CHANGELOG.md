@@ -4,6 +4,30 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.0.9] — 2026-06-18
+
+### Changed
+- **Strobe display redesign for sharper at-a-glance tuning.** The bars now
+  blur progressively the further you are from pitch — crisp when locked,
+  smearing into a soft wash when way out — with a gentle feather even in
+  tune. When a note locks, the black gaps wash **dark green**; as the note
+  rings down the gaps brighten toward the bar colour, so the strobe melts
+  into a green field before fading back to red.
+- **Settings reorganised into labelled sections** — **Input**, **Strobe
+  Preferences** and **Accessibility Options**, each under its own heading
+  bar. The input-device picker is now full-width, mic sensitivity is
+  relabelled **MIC +/−**, and the **Hum filter** now sits under Input
+  alongside the mic.
+
+### Removed
+- **Always on top** (desktop) toggle — removed.
+- **Smooth** and **Readout** sliders — removed from Settings; both now use
+  fixed, tuned defaults under the hood.
+
+### Fixed
+- **Ayasa Elements – D Kurd 11** now shows the correct top note **D5**
+  (it was previously listed as E5).
+
 ## [1.0.8] — 2026-06-17
 
 ### Added

@@ -52,7 +52,7 @@ export const HANDPAN_SCALES: HandpanScale[] = [
       { name: 'G',  octave: 4 },
       { name: 'A',  octave: 4 },
       { name: 'C',  octave: 5 },
-      { name: 'E',  octave: 5 },
+      { name: 'D',  octave: 5 },
     ],
   },
   {

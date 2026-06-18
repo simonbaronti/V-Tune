@@ -130,8 +130,6 @@ export interface TunerState {
   // Mains-hum notch filter — cascaded biquad notches in the worklet at
   // f, 2f, 3f, 4f. 'off' bypasses; '50' / '60' picks the region's grid Hz.
   humFilter: 'off' | '50' | '60';
-  // Tauri-only: keep the desktop window above other windows.
-  alwaysOnTop: boolean;
   // Pre-saved handpan scale that filters the note picker. 'chromatic'
   // means "show the full piano keyboard"; any other value is the id of
   // an entry in src/data/scales.ts.
@@ -194,7 +192,6 @@ export interface TunerState {
   clearIsolations: () => void;
   resetIsolationsToDefault: () => void;
   setHumFilter: (mode: 'off' | '50' | '60') => void;
-  setAlwaysOnTop: (on: boolean) => void;
   setSelectedScale: (id: string) => void;
   setOnboardingDone: (done: boolean) => void;
   setTourActive: (active: boolean) => void;
@@ -354,10 +351,12 @@ export const useTunerStore = create<TunerState>()(
   openAccordion: null,
   noteNaming: 'sharp',
   harmonicMode: 'pure',
-  displaySmoothing: 0.75,
+  // No longer user-facing (no slider) — tweak these defaults here. Kept out
+  // of the persist whitelist so the value below is always authoritative.
+  displaySmoothing: 0.20,
   strobeSpeed: 1,
   showSpectrum: true,
-  readoutSmoothing: 0.75,
+  readoutSmoothing: 0.70,
   micGainDb: 0,
   inTuneHysteresis: 1.0,
   strobeIntensity: 0.9,
@@ -366,7 +365,6 @@ export const useTunerStore = create<TunerState>()(
   fftSmoothing: 0.80,
   isolations: defaultIsolations(),
   humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
-  alwaysOnTop: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-always-on-top') === '1'),
   // Default to chromatic on a fresh install. Once the user picks a scale
   // the persist middleware remembers it across sessions.
   selectedScaleId: 'chromatic',
@@ -520,7 +518,6 @@ export const useTunerStore = create<TunerState>()(
   // The persist middleware handles localStorage automatically for all
   // whitelisted fields below — setters just update state.
   setHumFilter: (mode) => set({ humFilter: mode }),
-  setAlwaysOnTop: (on) => set({ alwaysOnTop: on }),
   setSelectedScale: (id) => set({ selectedScaleId: id }),
   setOnboardingDone: (done) => set({ onboardingDone: done }),
   setTourActive: (active) => set({ tourActive: active }),
@@ -628,7 +625,7 @@ export const useTunerStore = create<TunerState>()(
       // flag, tour state, etc.) is excluded so it always starts fresh.
       //
       // Replaces the per-setting localStorage.setItem calls that only
-      // covered theme / hum / always-on-top / onboarding-done — now
+      // covered theme / hum / onboarding-done — now
       // every "wait, why did this reset?" setting is sticky.
       // ─────────────────────────────────────────────────────────────────
       name: 'v-tune-store',
@@ -636,15 +633,14 @@ export const useTunerStore = create<TunerState>()(
       storage: createJSONStorage(() => localStorage),
 
       // → v3: new default experience — Spectrum Analyser on with two
-      // colour-coded isolation windows (teal + purple), and gentler 75 %
-      // display + readout smoothing. Applied to any pre-v3 install; existing
-      // isolation windows keep their positions (only colorIndex is backfilled).
+      // colour-coded isolation windows (teal + purple). Applied to any pre-v3
+      // install; existing isolation windows keep their positions (only
+      // colorIndex is backfilled). (Display/readout smoothing are no longer
+      // persisted — their defaults live in the initializer.)
       migrate: (persisted, version) => {
         const s = persisted as Partial<TunerState>;
         if (version < 3) {
           s.showSpectrum = true;
-          s.displaySmoothing = 0.75;
-          s.readoutSmoothing = 0.75;
           if (!s.isolations || s.isolations.length === 0) {
             s.isolations = defaultIsolations();
           } else {
@@ -666,9 +662,7 @@ export const useTunerStore = create<TunerState>()(
         tolerance: state.tolerance,
         noteNaming: state.noteNaming,
         harmonicMode: state.harmonicMode,
-        displaySmoothing: state.displaySmoothing,
         strobeSpeed: state.strobeSpeed,
-        readoutSmoothing: state.readoutSmoothing,
         micGainDb: state.micGainDb,
         inTuneHysteresis: state.inTuneHysteresis,
         strobeIntensity: state.strobeIntensity,
@@ -676,7 +670,6 @@ export const useTunerStore = create<TunerState>()(
         fftSize: state.fftSize,
         fftSmoothing: state.fftSmoothing,
         humFilter: state.humFilter,
-        alwaysOnTop: state.alwaysOnTop,
         selectedScaleId: state.selectedScaleId,
         showSpectrum: state.showSpectrum,
         openAccordion: state.openAccordion,
