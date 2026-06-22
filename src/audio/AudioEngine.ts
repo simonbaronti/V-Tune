@@ -7,6 +7,11 @@ let workletNode: AudioWorkletNode | null = null;
 let sourceNode: MediaStreamAudioSourceNode | null = null;
 let gainNode: GainNode | null = null;
 let stream: MediaStream | null = null;
+// Safari/WKWebView pumps a capture MediaStream into the Web Audio graph only
+// while the stream is attached to a *playing* HTMLMediaElement — otherwise
+// the MediaStreamAudioSourceNode emits pure silence (RMS exactly 0). This
+// hidden muted sink keeps the stream live so audio actually flows.
+let keepAliveSink: HTMLAudioElement | null = null;
 let yinDetector: ((buffer: Float32Array) => number | null) | null = null;
 
 const ANALYSIS_BUFFER_SIZE = 4096;
@@ -40,7 +45,30 @@ export async function startAudio(deviceId?: string): Promise<void> {
     };
 
     stream = await navigator.mediaDevices.getUserMedia(constraints);
-    audioContext = new AudioContext();
+
+    // Keep the capture stream attached to a muted, playing <audio> element.
+    // Without this, WebKit leaves the MediaStreamAudioSourceNode silent.
+    keepAliveSink = new Audio();
+    keepAliveSink.muted = true;
+    keepAliveSink.setAttribute('playsinline', '');
+    keepAliveSink.srcObject = stream;
+    keepAliveSink.style.display = 'none';
+    document.body.appendChild(keepAliveSink);
+    void keepAliveSink.play().catch(() => {});
+
+    // WebKit/Safari bug: createMediaStreamSource yields SILENCE when the
+    // AudioContext sample rate differs from the capture device's actual rate
+    // (common with 48 kHz USB mics while the system output runs at 44.1 kHz)
+    // — the OS shows input level but the graph receives nothing. Build the
+    // context to match the track's real rate so audio actually flows.
+    const track0 = stream.getAudioTracks()[0];
+    const trackRate = track0?.getSettings?.().sampleRate;
+    try {
+      audioContext = trackRate ? new AudioContext({ sampleRate: trackRate }) : new AudioContext();
+    } catch {
+      // Older WebKit without the sampleRate constructor option.
+      audioContext = new AudioContext();
+    }
     const sampleRate = audioContext.sampleRate;
 
     await audioContext.audioWorklet.addModule('/audio-worklet-processor.js');
@@ -84,6 +112,16 @@ export async function startAudio(deviceId?: string): Promise<void> {
     gainNode.connect(workletNode);
     gainNode.connect(analyserNode);
 
+    // WebKit/WKWebView (and Safari) create the AudioContext in a 'suspended'
+    // state even inside a user gesture — without an explicit resume() the
+    // worklet's process() loop never runs, so the strobe gets no signal even
+    // though getUserMedia succeeded and the OS shows input level. Chrome
+    // auto-resumes on a gesture, which is why this only surfaced on macOS
+    // desktop (notably older WebKit, e.g. 2017 MacBooks).
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
     yinDetector = YIN({ sampleRate });
     liveDetectBuffer = new Float32Array(ANALYSIS_BUFFER_SIZE);
 
@@ -113,7 +151,12 @@ export async function startAudio(deviceId?: string): Promise<void> {
     const name =
       err && typeof err === 'object' && 'name' in err ? (err as DOMException).name : '';
     let msg = 'Couldn’t start audio. Check your microphone and try again.';
-    if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') {
+    if (name === 'OverconstrainedError') {
+      // The chosen device exists in the list but can't actually be opened —
+      // common in the macOS desktop WebView with USB mics, which it lists but
+      // won't capture from. Point the user back to a device that works.
+      msg = 'Couldn’t open that microphone. Pick “Default” in Settings, or use the web app for that device.';
+    } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
       msg = 'No microphone detected. Connect a microphone, then tap Let’s Go again.';
     } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
       msg = 'Microphone access is blocked. Allow microphone access in your system settings, then try again.';
@@ -311,6 +354,13 @@ export function stopAudio() {
     audioContext = null;
   }
 
+  if (keepAliveSink) {
+    keepAliveSink.pause();
+    keepAliveSink.srcObject = null;
+    keepAliveSink.remove();
+    keepAliveSink = null;
+  }
+
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -384,6 +434,23 @@ export async function enumerateDevices(probe = true): Promise<MediaDeviceInfo[]>
     }
   }
 
-  useTunerStore.getState().setAvailableDevices(audioInputs);
-  return audioInputs;
+  // WebKit/WKWebView exposes the *full* device list only momentarily (right
+  // after a getUserMedia probe), then collapses it to just default + built-in
+  // on the next passive enumerate / devicechange. A plain overwrite would
+  // therefore drop a USB mic the user already saw. Instead MERGE by deviceId,
+  // keeping previously-seen devices and preferring labelled entries, so once a
+  // device appears it stays selectable. (Ignore the blank-id placeholders some
+  // browsers return before permission.)
+  const merged = new Map<string, MediaDeviceInfo>();
+  for (const d of useTunerStore.getState().availableDevices) {
+    if (d.deviceId) merged.set(d.deviceId, d);
+  }
+  for (const d of audioInputs) {
+    if (!d.deviceId) continue;
+    const existing = merged.get(d.deviceId);
+    if (!existing || (!existing.label && d.label)) merged.set(d.deviceId, d);
+  }
+  const mergedList = merged.size ? Array.from(merged.values()) : audioInputs;
+  useTunerStore.getState().setAvailableDevices(mergedList);
+  return mergedList;
 }
