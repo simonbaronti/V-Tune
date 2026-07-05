@@ -1,0 +1,140 @@
+# V-Tune iOS → TestFlight lane, run by the `ios` job in
+# .github/workflows/release.yml on every v*.*.* tag.
+#
+# Assumes the web bundle is already built and synced into ios/
+# (npm run build && npx cap sync ios) before fastlane runs.
+#
+# Required environment (set from GitHub Secrets by the workflow):
+#   APP_STORE_CONNECT_API_KEY_ID       App Store Connect API key id
+#   APP_STORE_CONNECT_API_ISSUER_ID    issuer id (App Store Connect → Integrations)
+#   APP_STORE_CONNECT_API_KEY_CONTENT  base64 of the .p8 key file
+#   IOS_DIST_CERT_P12_PATH             path to the decoded Apple Distribution .p12
+#   IOS_DIST_CERT_PASSWORD             its export password
+# Optional:
+#   TESTFLIGHT_EXTERNAL_GROUP          external tester group name
+#                                      (default "External Testers")
+
+default_platform(:ios)
+
+PBXPROJ = File.expand_path("../ios/App/App.xcodeproj/project.pbxproj", __dir__)
+CHANGELOG = File.expand_path("../CHANGELOG.md", __dir__)
+BUNDLE_ID = "app.vtune.tuner"
+
+def pbx_marketing_version
+  File.read(PBXPROJ)[/MARKETING_VERSION = ([^;]+);/, 1]
+end
+
+def pbx_build_number
+  File.read(PBXPROJ)[/CURRENT_PROJECT_VERSION = (\d+);/, 1].to_i
+end
+
+def set_pbx_build_number(n)
+  content = File.read(PBXPROJ)
+  File.write(PBXPROJ, content.gsub(/CURRENT_PROJECT_VERSION = \d+;/, "CURRENT_PROJECT_VERSION = #{n};"))
+end
+
+# Same extraction as the release-notes step in release.yml: the `## [x.y.z]`
+# section of CHANGELOG.md, markdown flattened to plain text. Shown to testers
+# as TestFlight's "What to Test" (4000-char limit).
+def changelog_for(version)
+  grab = false
+  lines = []
+  File.foreach(CHANGELOG) do |line|
+    if line =~ /^## \[#{Regexp.escape(version)}\]/
+      grab = true
+      next
+    end
+    break if grab && line.start_with?("## [")
+    lines << line if grab
+  end
+  text = lines.join
+    .gsub(/^### (.*)$/, "\n\\1")
+    .gsub(/^- /, "• ")
+    .gsub("**", "")
+    .gsub(/^\[.*\]:.*$\n?/, "")
+    .strip
+  text.empty? ? "Bug fixes and improvements." : text[0, 3900]
+end
+
+platform :ios do
+  desc "Build the Capacitor iOS app and push it to TestFlight (external group + beta review)"
+  lane :beta do
+    setup_ci # temp keychain (fastlane_tmp_keychain) so signing works headless
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("APP_STORE_CONNECT_API_KEY_ID"),
+      issuer_id: ENV.fetch("APP_STORE_CONNECT_API_ISSUER_ID"),
+      key_content: ENV.fetch("APP_STORE_CONNECT_API_KEY_CONTENT"),
+      is_key_content_base64: true
+    )
+
+    version = pbx_marketing_version
+    UI.user_error!("Could not read MARKETING_VERSION from #{PBXPROJ}") unless version
+
+    # Honour the repo's CURRENT_PROJECT_VERSION, but never collide with a
+    # build already uploaded for this version (e.g. a re-run of the job).
+    latest = latest_testflight_build_number(
+      api_key: api_key,
+      version: version,
+      app_identifier: BUNDLE_ID,
+      initial_build_number: 0
+    )
+    repo_build = pbx_build_number
+    build_number = [repo_build, latest + 1].max
+    set_pbx_build_number(build_number)
+    UI.important("Building #{version} (#{build_number}) — repo had #{repo_build}, TestFlight latest for #{version} is #{latest}")
+
+    import_certificate(
+      certificate_path: ENV.fetch("IOS_DIST_CERT_P12_PATH"),
+      certificate_password: ENV.fetch("IOS_DIST_CERT_PASSWORD"),
+      keychain_name: "fastlane_tmp_keychain",
+      keychain_password: ""
+    )
+
+    # Fetch (or create on first run) the App Store provisioning profile for
+    # the bundle id via the API key — no profile stored in secrets.
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      readonly: false
+    )
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+
+    # The project is set up for automatic signing (fine in Xcode, flaky
+    # headless) — pin it to the imported cert + fetched profile for this build.
+    update_code_signing_settings(
+      path: "ios/App/App.xcodeproj",
+      use_automatic_signing: false,
+      team_id: "2875MDJLY2",
+      code_sign_identity: "Apple Distribution",
+      profile_name: profile_name,
+      bundle_identifier: BUNDLE_ID,
+      targets: ["App"]
+    )
+
+    build_app(
+      project: "ios/App/App.xcodeproj",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      output_name: "V-Tune.ipa",
+      export_options: {
+        provisioningProfiles: { BUNDLE_ID => profile_name }
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      ipa: "build/V-Tune.ipa",
+      changelog: changelog_for(version),
+      distribute_external: true,
+      groups: [ENV["TESTFLIGHT_EXTERNAL_GROUP"] || "External Testers"],
+      notify_external_testers: true,
+      submit_beta_review: true
+    )
+
+    UI.success("#{version} (#{build_number}) uploaded, submitted for beta review, and queued for the external group 🎉")
+  end
+end

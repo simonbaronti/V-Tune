@@ -55,3 +55,12 @@ src-tauri/.env.notarize
 # Tauri update-signing key — NEVER commit
 src-tauri/.tauri-signing.key
 src-tauri/.tauri-signing.key.pub
+
+# fastlane (iOS → TestFlight CI) — run artifacts, never commit
+build/
+fastlane/report.xml
+fastlane/README.md
+*.ipa
+*.mobileprovision
+*.p8
+*.p12

@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "generate-pwa-assets": "pwa-assets-generator --preset minimal-2023 public/icon.svg",
     "icons": "node scripts/generate-icons.mjs",
+    "bump": "node scripts/bump-version.mjs",
+    "check:versions": "node scripts/check-versions.mjs",
     "cap:sync": "npm run build && cap sync",
     "cap:ios": "npm run build && cap sync ios && cap open ios",
     "cap:android": "npm run build && cap sync android && cap open android",

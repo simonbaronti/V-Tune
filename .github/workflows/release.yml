@@ -8,6 +8,11 @@
 #                      via tauri-action: builds, signs the updater artifacts,
 #                      uploads installers + .sig, and merges latest.json
 #   android          → signed APK, uploaded to the draft release
+#   ios              → fastlane: builds the Capacitor app, uploads to
+#                      TestFlight, submits for beta review + external group.
+#                      Does NOT gate `publish` — an Apple-side hiccup must not
+#                      block the desktop/Android release. Re-run just this job
+#                      from the Actions UI if it fails.
 #   publish          → attaches the user-guide PDF, then publishes (un-drafts)
 #
 # The desktop apps poll
@@ -29,6 +34,13 @@
 #   APPLE_PASSWORD                     app-specific password
 #   APPLE_TEAM_ID                      10-char team id
 #   KEYCHAIN_PASSWORD                  any string (temp keychain in CI)
+#   # iOS → TestFlight (see RELEASING.md for how to create these)
+#   APP_STORE_CONNECT_API_KEY_ID       App Store Connect API key id
+#   APP_STORE_CONNECT_API_ISSUER_ID    issuer id (App Store Connect → Integrations)
+#   APP_STORE_CONNECT_API_KEY_CONTENT  base64 of the API key .p8 file
+#   IOS_DIST_CERT_P12_BASE64           base64 of the Apple Distribution .p12
+#                                      (NOT the Developer ID one — that's macOS)
+#   IOS_DIST_CERT_PASSWORD             its export password
 #
 # Required repo setting: Settings → Actions → General → Workflow permissions
 #   → "Read and write permissions".
@@ -56,6 +68,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Fail the whole release fast if any of the version sources (package
+      # json/lock, tauri, Cargo, iOS pbxproj, Android gradle, landing page,
+      # CHANGELOG section) disagrees with the tag. `npm run bump x.y.z`
+      # updates all of them together.
+      - name: Verify all version sources match the tag
+        if: github.ref_type == 'tag'
+        run: node scripts/check-versions.mjs "${GITHUB_REF_NAME#v}"
 
       - name: Build release notes from CHANGELOG
         run: |
@@ -259,6 +279,62 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk "V-Tune-${GITHUB_REF_NAME}.apk"
           gh release upload "$GITHUB_REF_NAME" "V-Tune-${GITHUB_REF_NAME}.apk" --clobber
+
+  # ───────────────────────────────────────────────────────────────────
+  # iOS — build the Capacitor app, upload to TestFlight, auto-submit for
+  # beta review and distribute to the external tester group (fastlane).
+  # Runs off the same tag as everything else so iOS can't fall behind.
+  # Deliberately NOT in publish's `needs`: the GitHub release ships even if
+  # Apple is having a bad day; re-run this job alone from the Actions UI.
+  # ───────────────────────────────────────────────────────────────────
+  ios:
+    name: iOS (TestFlight)
+    needs: create-release   # after the version-sources-vs-tag check
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Ruby + fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Capacitor sync into ios/
+        run: npx cap sync ios
+
+      - name: Decode Apple Distribution certificate
+        env:
+          CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+        run: |
+          printf '%s' "$CERT_B64" | base64 -d > "$RUNNER_TEMP/ios-dist.p12"
+
+      - name: Build + upload to TestFlight (fastlane)
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          # The external TestFlight group builds are pushed to. Override with
+          # a repo variable if the group is named differently in App Store
+          # Connect (TestFlight tab → sidebar, exact spelling matters).
+          TESTFLIGHT_EXTERNAL_GROUP: ${{ vars.TESTFLIGHT_EXTERNAL_GROUP || 'External Testers' }}
+        run: |
+          export IOS_DIST_CERT_P12_PATH="$RUNNER_TEMP/ios-dist.p12"
+          bundle exec fastlane ios beta
 
   # ───────────────────────────────────────────────────────────────────
   # Publish — attach the user guide, then un-draft the release.

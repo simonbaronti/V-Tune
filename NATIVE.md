@@ -119,7 +119,12 @@ npm run apk:debug
 ## iOS — TestFlight (needs the $99 Apple account, but minimal/no review)
 
 There's no free way to put it on *other people's* iPhones — Apple requires the
-Developer Program. But TestFlight avoids full App Store review:
+Developer Program. But TestFlight avoids full App Store review.
+
+> **This is automated.** Pushing a `vX.Y.Z` tag builds the iOS app in CI,
+> uploads it to TestFlight, submits it for beta review and distributes it to
+> the external tester group — see [RELEASING.md](RELEASING.md). The manual
+> flow below is only for one-off local testing/debugging.
 
 1. `npm run cap:ios` → Xcode opens.
 2. Select your Team under Signing & Capabilities, set a version + build number.
@@ -177,10 +182,16 @@ These need Xcode/Android Studio open and a version bump, but they're infrequent.
 
 ### Version bumping
 
-Each store upload needs a higher version number:
-- **iOS**: bump `MARKETING_VERSION` / build number in Xcode (or `Info.plist`).
-- **Android**: bump `versionCode` (must increase) and `versionName` in
-  `android/app/build.gradle`.
+Each store upload needs a higher version number. Don't do it by hand —
+
+```bash
+npm run bump X.Y.Z
+```
+
+bumps **every** source at once (package.json + lockfile, tauri.conf.json,
+Cargo.toml + lock, iOS `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION`, Android
+`versionName`/`versionCode`, landing page), and `npm run check:versions`
+verifies they all agree. See [RELEASING.md](RELEASING.md).
 
 ---
 
