@@ -142,6 +142,10 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
+      # Serialize the platforms: they all upload + merge the updater's
+      # latest.json into the same release, and concurrent uploads race with
+      # a GitHub "asset already_exists" error.
+      max-parallel: 1
       matrix:
         include:
           - platform: macos-latest
@@ -316,8 +320,10 @@ jobs:
       - name: Setup Ruby + fastlane
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
-          bundler: '2'   # Gemfile.lock's old 1.17.2 pin dies on Ruby 3.3 (untaint removed)
+          # Ruby 3.1: the locked fastlane deps (CFPropertyList 3.0.9) require
+          # Ruby < 3.2, so 3.3 breaks bundle install. 3.1 is compatible with
+          # the whole locked set.
+          ruby-version: '3.1'
           bundler-cache: true
 
       - name: Install npm deps
