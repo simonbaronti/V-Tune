@@ -91,6 +91,18 @@ platform :ios do
       keychain_password: ""
     )
 
+    # Install the Apple WWDR intermediate into the temp keychain. Without it
+    # the distribution cert doesn't chain to a trusted root, so it isn't a
+    # *valid* codesigning identity — and get_provisioning_profile then can't
+    # find a matching identity when it creates the App Store profile
+    # ("Could not find a matching code signing identity for type 'AppStore'").
+    sh(
+      'curl -fsSL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer ' \
+      '-o "$RUNNER_TEMP/AppleWWDRCAG3.cer" && ' \
+      'security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k fastlane_tmp_keychain ' \
+      '-T /usr/bin/codesign || true'
+    )
+
     # Fetch (or create on first run) the App Store provisioning profile for
     # the bundle id via the API key — no profile stored in secrets.
     get_provisioning_profile(
