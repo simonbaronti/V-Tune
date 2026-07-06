@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTunerStore, ISO_COLORS, type IsolationWindow } from '../store/tunerStore';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 import { getAudioContext } from '../audio/AudioEngine';
+import { micLiveness, mixRgba } from './bgSignal';
 
 // Must match the analysis hop in public/audio-worklet-processor.js so the
 // isolation band's strobe motion uses the exact same phase-rate physics as
@@ -116,8 +117,21 @@ function IsolationBandItem({
       const colorSat = isInTune ? 100 : 90;
       const colorLight = isInTune ? 55 : 50;
 
-      // Background — dark, like the strobe bands
-      ctx.fillStyle = 'rgba(8, 8, 14, 0.98)';
+      // Theme-aware neutrals that darken with the mic (in sync with the strobe
+      // via micLiveness): light grey resting → dark when signal is present.
+      const dark = state.theme === 'dark';
+      const d = micLiveness.value;
+      const PAL = {
+        bg:       dark ? mixRgba([26, 26, 35, 0.98], [16, 16, 22, 0.98], d)      : mixRgba([212, 215, 221, 0.98], [22, 22, 30, 0.98], d),
+        labelOn:  dark ? 'rgba(245, 245, 250, 0.95)'                             : mixRgba([25, 27, 36, 0.9], [242, 242, 248, 0.95], d),
+        labelOff: dark ? 'rgba(200, 200, 215, 0.45)'                            : mixRgba([30, 32, 42, 0.6], [200, 200, 215, 0.55], d),
+        noPeak:   dark ? 'rgba(180, 180, 200, 0.5)'                             : mixRgba([30, 32, 42, 0.55], [180, 180, 200, 0.5], d),
+        centsOut: 'rgba(190, 190, 205, 0.95)',
+        hzOff:    'rgba(120, 122, 140, 0.85)',
+      };
+
+      // Background — resting neutral, like the strobe bands
+      ctx.fillStyle = PAL.bg;
       ctx.fillRect(0, 0, w, h);
 
       // Phase animation — IDENTICAL physics to the main strobe bands.
@@ -162,7 +176,7 @@ function IsolationBandItem({
 
       // Label — nearest note (left). Scale font down when two bandlets
       // share the row so the label still fits.
-      ctx.fillStyle = active ? 'rgba(245,245,250,0.95)' : 'rgba(200,200,215,0.45)';
+      ctx.fillStyle = active ? PAL.labelOn : PAL.labelOff;
       const labelSize = Math.min(total > 1 ? 30 : 40, Math.max(20, h * (total > 1 ? 0.4 : 0.5)));
       ctx.font = `bold ${labelSize}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'left';
@@ -171,7 +185,7 @@ function IsolationBandItem({
 
       // Peak Hz under the note label
       const hzFontSize = w < 500 ? 12 : 14;
-      ctx.fillStyle = 'rgba(180,180,200,0.5)';
+      ctx.fillStyle = PAL.noPeak;
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
       ctx.fillText(
         peakFreq !== null ? `${peakFreq.toFixed(1)} Hz` : 'no peak in window',
@@ -185,12 +199,12 @@ function IsolationBandItem({
         const sign = cents >= 0 ? '+' : '';
         ctx.font = `bold ${cs}px "JetBrains Mono", monospace`;
         // White when in tune so the digits stay legible over the green bar.
-        ctx.fillStyle = isInTune ? '#ffffff' : '#a0a0b8';
+        ctx.fillStyle = isInTune ? '#ffffff' : PAL.centsOut;
         ctx.textAlign = 'right';
         ctx.fillText(`${sign}${Math.round(cents)}`, w - 10, h / 2 - cs * 0.2);
 
         ctx.font = '11px "JetBrains Mono", monospace';
-        ctx.fillStyle = '#6a6a80';
+        ctx.fillStyle = PAL.hzOff;
         ctx.fillText('¢', w - 10, h / 2 + cs * 0.55);
       }
 

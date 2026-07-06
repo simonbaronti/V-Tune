@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StrobeDisplay } from './components/StrobeDisplay';
 import { ControlBar } from './components/ControlBar';
 import { PitchDial } from './components/PitchDial';
-import { SettingsPanel } from './components/SettingsPanel';
+import { ReferenceBar } from './components/ReferenceBar';
 import { Stopwatch } from './components/Stopwatch';
 import { SpectrumAnalyzer } from './components/SpectrumAnalyzer';
 import { IsolationBand } from './components/IsolationBand';
-import { ReferenceBar } from './components/ReferenceBar';
 import { QuickPitchBar } from './components/QuickPitchBar';
+import { TealIconRow } from './components/TealIconRow';
+import { StopwatchChip } from './components/StopwatchChip';
+import { SettingsModal } from './components/SettingsModal';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AudioErrorToast } from './components/AudioErrorToast';
 import { UpdateBanner } from './components/UpdateBanner';
@@ -15,58 +17,38 @@ import { DesktopUpdater } from './components/DesktopUpdater';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
 
+/** Width of the desktop / landscape-tablet slide-out menu. */
+const MENU_WIDTH = 380;
+
 function App() {
   useKeyboardShortcuts();
   const showSpectrum = useTunerStore((s) => s.showSpectrum);
   const theme = useTunerStore((s) => s.theme);
   const highContrast = useTunerStore((s) => s.highContrast);
   const largeText = useTunerStore((s) => s.largeText);
-  const tuningOpen = useTunerStore((s) => s.openAccordion === 'tuning');
-  const panelOpen = useTunerStore((s) => s.panelOpen);
-  const setPanelOpen = useTunerStore((s) => s.setPanelOpen);
-  const sidebarCollapsed = useTunerStore((s) => s.sidebarCollapsed);
-  const setSidebarCollapsed = useTunerStore((s) => s.setSidebarCollapsed);
+  const menuOpen = useTunerStore((s) => s.menuOpen);
+  const setMenuOpen = useTunerStore((s) => s.setMenuOpen);
+  const menuPinned = useTunerStore((s) => s.menuPinned);
+  const tourActive = useTunerStore((s) => s.tourActive);
+  const stopwatchOn = useTunerStore((s) => s.stopwatchOn);
 
-  // True desktop only — min 1024px AND a fine pointer with hover. This
-  // deliberately excludes touch tablets in landscape (which are ≥1024px
-  // but coarse-pointer), so the collapsible-sidebar control is desktop-only
-  // as requested.
-  const [isDesktop, setIsDesktop] = useState(false);
+  // Layout mode: ≥1024px is the "wide" layout (desktop + landscape tablet)
+  // with the right slide-out menu. Below that (phone + portrait tablet) the
+  // controls live in the bottom slide-up quick-pick instead. This width
+  // breakpoint doubles as the tablet orientation switch (iPad portrait is
+  // <1024, landscape ≥1024).
+  const [isWide, setIsWide] = useState(
+    typeof window !== 'undefined'
+      ? window.matchMedia('(min-width: 1024px)').matches
+      : false,
+  );
   useEffect(() => {
-    const mq = window.matchMedia(
-      '(min-width: 1024px) and (hover: hover) and (pointer: fine)',
-    );
-    const update = () => setIsDesktop(mq.matches);
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsWide(mq.matches);
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
-  // Collapse only takes effect on true desktop.
-  const collapsed = isDesktop && sidebarCollapsed;
-
-  // Swipe-to-close: a rightward swipe (the way the drawer exits) closes it.
-  const swipeRef = useRef<{ x: number; y: number } | null>(null);
-  const onDrawerTouchStart = (e: React.TouchEvent) => {
-    const t = e.target as HTMLElement;
-    // Don't hijack swipes that start on a control (sliders drag horizontally)
-    if (t.closest('input, select, button')) {
-      swipeRef.current = null;
-      return;
-    }
-    swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  };
-  const onDrawerTouchMove = (e: React.TouchEvent) => {
-    if (!swipeRef.current) return;
-    const dx = e.touches[0].clientX - swipeRef.current.x;
-    const dy = e.touches[0].clientY - swipeRef.current.y;
-    if (dx > 70 && Math.abs(dx) > Math.abs(dy)) {
-      setPanelOpen(false);
-      swipeRef.current = null;
-    }
-  };
-  const onDrawerTouchEnd = () => {
-    swipeRef.current = null;
-  };
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
@@ -92,48 +74,39 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-close any open accordion after 10s of no interaction inside the
-  // side panel. Activity in the main strobe area doesn't count — only
-  // pointer / keyboard / wheel events whose target sits inside the
-  // [data-side-panel] subtree reset the timer. Disabled while the tour
-  // is running so it can't fight the orchestration.
-  const openAccordion = useTunerStore((s) => s.openAccordion);
-  const tourActive = useTunerStore((s) => s.tourActive);
+  // Auto-hide the wide-layout menu after 10s of no interaction inside it, to
+  // free up strobe width while tuning. Any pointer / key / wheel / input
+  // event within the menu re-arms the timer. Paused while the Settings modal
+  // is open (its interactions live outside the panel). Mirrors the mobile
+  // slide-up's auto-hide.
   useEffect(() => {
-    if (!openAccordion || tourActive) return;
-    // Stopwatch stays open until the user explicitly closes it — running
-    // timers shouldn't disappear behind your back.
-    if (openAccordion === 'stopwatch') return;
-    // Desktop has plenty of room for an open accordion alongside the
-    // strobe, so the auto-close is just annoying there. Restrict to
-    // mobile/tablet, where the panel covers content and users open it
-    // via the burger anyway — a closed default makes sense.
-    if (window.matchMedia('(min-width: 1024px)').matches) return;
-    const TIMEOUT_MS = 10_000;
+    // Pause auto-hide while pinned or during the onboarding tour (so the menu
+    // can't vanish mid-tour).
+    if (!isWide || !menuOpen || menuPinned || tourActive) return;
+    const TIMEOUT_MS = 20_000;
     let t: ReturnType<typeof setTimeout> | null = null;
     const arm = () => {
       if (t !== null) clearTimeout(t);
       t = setTimeout(() => {
-        // Re-read fresh in case the accordion changed since arm()
-        const cur = useTunerStore.getState().openAccordion;
-        if (cur) useTunerStore.getState().toggleAccordion(cur);
+        // Don't yank the menu out from behind an open modal, or when the
+        // user has pinned it open — reschedule instead.
+        if (useTunerStore.getState().settingsOpen || useTunerStore.getState().menuPinned) arm();
+        else useTunerStore.getState().setMenuOpen(false);
       }, TIMEOUT_MS);
     };
-    const inPanel = (target: EventTarget | null): boolean => {
-      if (!(target instanceof Element)) return false;
-      return target.closest('[data-side-panel]') !== null;
-    };
+    const inPanel = (target: EventTarget | null): boolean =>
+      target instanceof Element && target.closest('[data-side-panel]') !== null;
     const onEvent = (e: Event) => {
       if (inPanel(e.target)) arm();
     };
-    arm(); // start the clock the moment the accordion opens
-    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+    arm();
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'input', 'change'] as const;
     for (const ev of events) document.addEventListener(ev, onEvent, true);
     return () => {
       if (t !== null) clearTimeout(t);
       for (const ev of events) document.removeEventListener(ev, onEvent, true);
     };
-  }, [openAccordion, tourActive]);
+  }, [isWide, menuOpen, menuPinned, tourActive]);
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative">
@@ -141,10 +114,11 @@ function App() {
       <AudioErrorToast />
       <UpdateBanner />
       <DesktopUpdater />
+      <SettingsModal />
+
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status
-          bar), so we pad the top + sides with the safe-area insets so the
-          burger / theme toggle never end up behind the wifi/battery icons. */}
+          bar), so pad the top + sides with the safe-area insets. */}
       <header
         className="flex items-center justify-between pb-2 shrink-0 relative z-50"
         style={{
@@ -164,274 +138,118 @@ function App() {
             V-TUNE
           </span>
           <span className="text-sm hidden sm:inline" style={{ color: 'var(--text-dim)' }}>
-            HANDPAN STROBE TUNER
+            STROBE TUNER
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            data-tour="theme-toggle"
-            onClick={() => useTunerStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-9 h-9 rounded flex items-center justify-center transition-colors"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-            }}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? (
-              // Sun icon
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-              </svg>
-            ) : (
-              // Moon icon
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-          <button
-            data-tour="burger"
-            onClick={() => setPanelOpen(!panelOpen)}
-            className="lg:hidden w-9 h-9 rounded flex items-center justify-center"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--accent-cyan)',
-              border: '1px solid var(--border)',
-            }}
-            aria-label="Toggle settings"
-          >
-            {panelOpen ? (
-              <span className="text-base leading-none">✕</span>
-            ) : (
+          {/* Compact stopwatch — surfaces in the header on the wide layout
+              when the menu is hidden but a stopwatch session is active, so
+              it stays visible. */}
+          {isWide && !menuOpen && stopwatchOn && <StopwatchChip />}
+          {/* Burger — toggles the slide-out menu. Wide layout only; on
+              narrow layouts the controls live in the bottom slide-up. */}
+          {isWide && (
+            <button
+              data-tour="burger"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-9 h-9 rounded flex items-center justify-center"
+              style={{
+                background: 'var(--bg-tertiary)',
+                color: 'var(--accent-cyan)',
+                border: '1px solid var(--border)',
+              }}
+              aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <line x1="3" y1="12" x2="21" y2="12" />
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Main row */}
       <div className="flex-1 min-h-0 flex relative">
-        {/* Canvas column — strobe on top, spectrum analyser (when toggled)
-            below it, quick pitch bar pinned at the bottom on mobile. */}
+        {/* Canvas column — strobe, spectrum (when toggled), then on narrow
+            layouts the stopwatch + slide-up quick-pick pinned at the bottom. */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0">
             <StrobeDisplay />
           </div>
           {showSpectrum && (
-            <>
+            <div data-tour="tour-spectrum-panel" className="shrink-0 flex flex-col min-h-0">
               <SpectrumAnalyzer />
               <IsolationBand />
-            </>
+            </div>
           )}
-          <QuickPitchBar />
+          {!isWide && stopwatchOn && <Stopwatch />}
+          {!isWide && <QuickPitchBar />}
         </div>
 
-        {/* Backdrop — only on small viewports (drawer is overlay there) */}
-        {panelOpen && (
+        {/* Wide-layout slide-out menu — pushes the canvas (width animates,
+            giving the shrink/grow effect). Fully hidden when closed. */}
+        {isWide && (
           <div
-            className="lg:hidden absolute inset-0 z-40"
-            style={{ background: 'rgba(0, 0, 0, 0.6)' }}
-            onClick={() => setPanelOpen(false)}
-          />
-        )}
-
-        {/* Settings panel — slide-out on small viewports, always-visible
-            sidebar at lg+ (desktop & tablet landscape). */}
-        <div
-          data-side-panel
-          className={`flex flex-col transition-[transform,width] duration-200
-            absolute inset-y-0 right-0 z-50 w-[88%] max-w-[420px]
-            lg:static lg:z-auto lg:max-w-none lg:translate-x-0
-            ${collapsed ? 'lg:w-12' : 'lg:w-[420px]'}
-            ${panelOpen ? 'translate-x-0' : 'translate-x-full'}`}
-          style={{
-            background: 'var(--bg-secondary)',
-            borderLeft: '1px solid var(--border)',
-            // Safe-area padding for the bottom (home indicator, under the
-            // SA toggle) and right (landscape notch). NOT the top: the
-            // drawer sits below the header, which already pads the top
-            // safe-area inset — adding it here too pushed the "Let's Go"
-            // button down by a second notch-height of empty space.
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingRight: 'env(safe-area-inset-right)',
-          }}
-          onTouchStart={onDrawerTouchStart}
-          onTouchMove={onDrawerTouchMove}
-          onTouchEnd={onDrawerTouchEnd}
-        >
-          {/* Full panel content — hidden on desktop when collapsed. */}
-          <div className={`flex-1 min-h-0 flex flex-col ${collapsed ? 'lg:hidden' : ''}`}>
-            {/* Pinned top — Let's Go / Stop */}
-            <div className="shrink-0">
-              <ControlBar />
-            </div>
-
-            {/* Scrollable region — accordions + SA toggle */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              {/* Tuning / Scale accordion */}
-              <div
-                className="shrink-0"
-                style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}
-              >
+            data-side-panel
+            className="shrink-0 flex flex-col"
+            style={{
+              width: menuOpen ? MENU_WIDTH : 0,
+              overflow: 'hidden',
+              transition: 'width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+              background: 'var(--bg-secondary)',
+              borderLeft: menuOpen ? '1px solid var(--border)' : 'none',
+              paddingRight: 'env(safe-area-inset-right)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
+          >
+            {/* Fixed-width inner so content doesn't reflow while the outer
+                width animates. */}
+            <div className="flex flex-col h-full" style={{ width: MENU_WIDTH }}>
+              <TealIconRow>
                 <button
-                  data-tour="tuning-header"
-                  onClick={() => useTunerStore.getState().toggleAccordion('tuning')}
-                  className="w-full flex items-center justify-between px-4 py-3 transition-colors"
-                  style={{ background: 'transparent', color: 'var(--text-secondary)' }}
-                  aria-expanded={tuningOpen}
+                  data-tour="tour-pin"
+                  onClick={() => useTunerStore.getState().setMenuPinned(!menuPinned)}
+                  aria-label={menuPinned ? 'Unpin menu' : 'Keep menu open'}
+                  aria-pressed={menuPinned}
+                  title={menuPinned ? 'Unpin menu' : 'Keep menu open'}
+                  className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  style={{
+                    color: menuPinned ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                    background: menuPinned ? 'rgba(6, 182, 212, 0.18)' : 'transparent',
+                    border: `1px solid ${menuPinned ? 'var(--accent-cyan)' : 'transparent'}`,
+                  }}
                 >
-                  <span className="text-lg font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    TUNING / SCALE
-                  </span>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      color: 'var(--text-dim)',
-                      transform: tuningOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 150ms ease',
-                    }}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
+                  {/* Pin icon */}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 17v5" />
+                    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
                   </svg>
                 </button>
-                {tuningOpen && (
-                  <>
-                    <ReferenceBar />
-                    <PitchDial />
-                  </>
-                )}
-              </div>
-              <SettingsPanel />
-              {/* Spectrum Analyser toggle — now directly under Settings */}
-              <FooterToggle
-                dataTour="sa-toggle"
-                label="SPECTRUM ANALYSER"
-                value={showSpectrum}
-                onChange={(v) => useTunerStore.getState().setShowSpectrum(v)}
-              />
-            </div>
+              </TealIconRow>
 
-            {/* Pinned footer — stopwatch, plus the desktop-only collapse
-                control beneath it (bottom-right). */}
-            <div className="shrink-0">
-              <Stopwatch />
-              {isDesktop && (
-                <div
-                  className="hidden lg:flex justify-end px-3 py-2"
-                  style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
-                >
-                  <button
-                    onClick={() => setSidebarCollapsed(true)}
-                    aria-label="Collapse sidebar"
-                    title="Collapse sidebar"
-                    className="w-8 h-8 rounded flex items-center justify-center transition-colors"
-                    style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m6 17 5-5-5-5" />
-                      <path d="m13 17 5-5-5-5" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              {/* Scrollable: tuning/scale content (no accordion). The SA
+                  toggle now lives as an icon in the teal row above. */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <ReferenceBar />
+                <PitchDial />
+              </div>
+
+              {/* Pinned bottom — stopwatch (when on) above Let's Go. */}
+              {stopwatchOn && <Stopwatch />}
+              <ControlBar />
             </div>
           </div>
-
-          {/* Skinny strip — desktop-only, shown when collapsed: just the
-              expand control pinned to the bottom. */}
-          {collapsed && (
-            <div className="hidden lg:flex flex-1 flex-col items-center justify-end pb-3">
-              <button
-                onClick={() => setSidebarCollapsed(false)}
-                aria-label="Expand sidebar"
-                title="Expand sidebar"
-                className="w-8 h-8 rounded flex items-center justify-center transition-colors"
-                style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m11 17-5-5 5-5" />
-                  <path d="m18 17-5-5 5-5" />
-                </svg>
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Reusable iOS-style toggle row used in the pinned footer for the two
- * canvas-area panels (spectrum analyser, pitch graph). Same look as the
- * old inline button so the visual rhythm doesn't change.
+ * Reusable iOS-style toggle row used in the wide menu for the Spectrum
+ * Analyser switch.
  */
-function FooterToggle({
-  label,
-  value,
-  onChange,
-  dataTour,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  dataTour?: string;
-}) {
-  return (
-    <button
-      data-tour={dataTour}
-      onClick={() => onChange(!value)}
-      className="w-full flex items-center justify-between px-4 py-3 transition-colors"
-      style={{
-        background: 'var(--bg-panel)',
-        color: 'var(--text-secondary)',
-        borderTop: '1px solid var(--border)',
-      }}
-      aria-pressed={value}
-    >
-      <span className="text-lg font-semibold tracking-wide">{label}</span>
-      <span
-        style={{
-          position: 'relative',
-          width: 38,
-          height: 22,
-          borderRadius: 999,
-          background: value ? 'var(--accent-blue)' : 'var(--bg-tertiary)',
-          border: '1px solid var(--border)',
-          transition: 'background 150ms ease',
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: 2,
-            left: value ? 18 : 2,
-            width: 16,
-            height: 16,
-            borderRadius: 999,
-            background: value ? '#fff' : 'var(--text-dim)',
-            transition: 'left 150ms ease, background 150ms ease',
-          }}
-        />
-      </span>
-    </button>
-  );
-}
-
 export default App;

@@ -4,6 +4,45 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.0] — 2026-07-06
+
+### Added
+- **Redesigned controls.** Everything now lives in one menu: on desktop a
+  full-height panel slides out from the right (open it with the burger
+  button); on phones a bottom **quick-pick** panel slides up. Both carry a
+  **teal utility bar** — Settings, Stopwatch and the Spectrum Analyser on the
+  left, light/dark and (on mobile) a pin on the right.
+- **Pin the menu open.** By default the menu **auto-hides after 20 seconds**
+  of no interaction to give the strobe more room; pin it to keep it put.
+- **Header stopwatch readout.** On desktop, if the menu hides while a
+  stopwatch session is running, a compact timer stays visible in the header.
+- **Interactive onboarding tour, rebuilt** — a learn-by-doing walkthrough
+  that spotlights each control and waits for you to try it, with full
+  desktop and mobile flows. Re-run it any time from Settings → Accessibility.
+
+### Changed
+- **Settings is now a modal**, opened with the gear icon — laid out in two
+  columns with clear sections: Input, Strobe Preferences and Accessibility
+  (plus Tuning on mobile).
+- **Strobe display is theme-aware.** It rests at a light grey (light mode) or
+  soft charcoal (dark mode) and darkens as soon as the mic picks up, for
+  maximum bar contrast — then eases back when you stop. A locked band gets a
+  dark-green wash that brightens as the note rings out.
+- **Light mode is now the default** for new installs.
+- **Spectrum Analyser** is toggled from the utility bar and now always
+  reveals its two isolation strobes — even if you'd cleared them.
+- Title trimmed to **"Strobe Tuner"**.
+
+### Fixed
+- **Desktop audio robustness.** Resume a suspended audio context, match the
+  capture device's sample rate, keep the mic stream alive, and keep USB mics
+  from vanishing off the input list — fixing "Let's Go does nothing" cases in
+  the desktop WebView, and a clearer message when a device can't be opened.
+
+### Removed
+- The desktop "collapse sidebar" strip — superseded by the burger + auto-hide
+  + pin.
+
 ## [1.0.9] — 2026-06-18
 
 ### Changed
@@ -174,6 +213,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.0]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.0
 [1.0.9]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.9
 [1.0.8]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.8
 [1.0.7]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.7

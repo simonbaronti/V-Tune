@@ -146,6 +146,31 @@ export interface TunerState {
    *  the strobe display more width. Ignored on tablet/mobile (where the
    *  panel is the slide-out drawer). Persisted. */
   sidebarCollapsed: boolean;
+  /** Wide layout (≥1024px, desktop + landscape tablet): is the right
+   *  slide-out menu open? Pushes the canvas (shrink/grow). Persisted so it
+   *  remembers, defaulting open on first run. */
+  menuOpen: boolean;
+  /** Keep the desktop slide-out menu open (disables the 20s auto-hide).
+   *  User preference — persisted. The desktop counterpart to
+   *  quickPickPinned. */
+  menuPinned: boolean;
+  /** Settings modal open (all viewports). Transient. */
+  settingsOpen: boolean;
+  /** Stopwatch panel visible — toggled by the ⏱ icon in the teal row.
+   *  Transient; a running timer shouldn't vanish behind a reload. */
+  stopwatchOn: boolean;
+  /** Narrow layout (<1024px, phone + portrait tablet): is the bottom
+   *  slide-up quick-pick expanded? Transient (auto-hide manages it). */
+  quickPickOpen: boolean;
+  /** Keep the mobile slide-up quick-pick open (disables the 10s auto-hide).
+   *  User preference — persisted. */
+  quickPickPinned: boolean;
+  /** Stopwatch timer — lifted into the store so it keeps counting when the
+   *  panel is toggled off/on or the layout switches (component unmount).
+   *  Timestamps are performance.now() ms. Transient. */
+  swRunning: boolean;
+  swAccumulatedMs: number;
+  swStartedAt: number | null;
   theme: 'dark' | 'light';
   highContrast: boolean;
   largeText: boolean;
@@ -197,6 +222,14 @@ export interface TunerState {
   setTourActive: (active: boolean) => void;
   setPanelOpen: (open: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setMenuOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setStopwatchOn: (on: boolean) => void;
+  setQuickPickOpen: (open: boolean) => void;
+  setQuickPickPinned: (pinned: boolean) => void;
+  setMenuPinned: (pinned: boolean) => void;
+  swToggle: () => void;
+  swReset: () => void;
   setTheme: (theme: 'dark' | 'light') => void;
   setHighContrast: (on: boolean) => void;
   setLargeText: (on: boolean) => void;
@@ -372,7 +405,18 @@ export const useTunerStore = create<TunerState>()(
   tourActive: false,
   panelOpen: false,
   sidebarCollapsed: false,
-  theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'light' ? 'light' : 'dark'),
+  menuOpen: true,
+  menuPinned: false,
+  settingsOpen: false,
+  stopwatchOn: false,
+  quickPickOpen: false,
+  quickPickPinned: false,
+  swRunning: false,
+  swAccumulatedMs: 0,
+  swStartedAt: null,
+  // Default to light mode for fresh installs; a persisted choice (or the
+  // legacy 'v-tune-theme' key set to 'dark') overrides.
+  theme: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-theme') === 'dark' ? 'dark' : 'light'),
   highContrast: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-high-contrast') === '1'),
   largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
 
@@ -529,6 +573,25 @@ export const useTunerStore = create<TunerState>()(
       // expanding the sidebar again starts from a clean, all-closed state.
       openAccordion: collapsed ? null : s.openAccordion,
     })),
+  setMenuOpen: (open) => set({ menuOpen: open }),
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setStopwatchOn: (on) => set({ stopwatchOn: on }),
+  setQuickPickOpen: (open) => set({ quickPickOpen: open }),
+  setQuickPickPinned: (pinned) => set({ quickPickPinned: pinned }),
+  setMenuPinned: (pinned) => set({ menuPinned: pinned }),
+  swToggle: () =>
+    set((s) => {
+      if (s.swRunning) {
+        const now = performance.now();
+        return {
+          swRunning: false,
+          swAccumulatedMs: s.swAccumulatedMs + (now - (s.swStartedAt ?? now)),
+          swStartedAt: null,
+        };
+      }
+      return { swRunning: true, swStartedAt: performance.now() };
+    }),
+  swReset: () => set({ swRunning: false, swAccumulatedMs: 0, swStartedAt: null }),
   setTheme: (theme) => set({ theme }),
   setHighContrast: (on) => set({ highContrast: on }),
   setLargeText: (on) => set({ largeText: on }),
@@ -673,6 +736,12 @@ export const useTunerStore = create<TunerState>()(
         selectedScaleId: state.selectedScaleId,
         showSpectrum: state.showSpectrum,
         openAccordion: state.openAccordion,
+        // menuOpen is intentionally NOT persisted — the menu always loads
+        // open (so the controls are visible on launch) and the 10s auto-hide
+        // manages it per-session. Persisting it would make an auto-hide stick
+        // "closed" across reloads.
+        quickPickPinned: state.quickPickPinned,
+        menuPinned: state.menuPinned,
         sidebarCollapsed: state.sidebarCollapsed,
         inputDeviceId: state.inputDeviceId,
         // Last-tuned note + custom band setup

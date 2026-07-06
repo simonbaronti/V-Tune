@@ -443,15 +443,16 @@ def build(out_path: Path):
     toc = [
         ('1.  Welcome', 'What V-Tune is and who it’s for'),
         ('2.  Quick start', 'Strike a note. Watch it lock in. Done.'),
-        ('3.  The strobe display', 'Bands, bars, colours, cents readout'),
-        ('4.  The pitch pipe (♪)', 'Per-band reference tones, three click states'),
-        ('5.  The pitch selector', 'Chromatic and scale modes'),
-        ('6.  Mobile Quick-Pitch bar', 'The pitch selector on phones / tablets'),
-        ('7.  Spectrum Analyser + ISO', 'See the full spectrum, isolate frequencies'),
-        ('8.  Settings', 'Every knob, what it does'),
-        ('9.  Stopwatch', 'Time your tuning sessions'),
-        ('10. Theme, notation, tour', f'Light/dark, {SHARP}/{FLAT}/Do/DE, re-run onboarding'),
-        ('11. Tips & troubleshooting', 'Things to try if something feels off'),
+        ('3.  The menu & utility bar', 'The slide-out menu, teal icons, auto-hide'),
+        ('4.  The strobe display', 'Bands, bars, colours, cents readout'),
+        ('5.  The pitch pipe (♪)', 'Per-band reference tones, three click states'),
+        ('6.  The tuning & scale controls', 'Chromatic and scale modes, PURE vs EQUAL'),
+        ('7.  Mobile quick-pick panel', 'The slide-up controls on phones / tablets'),
+        ('8.  Spectrum Analyser + ISO', 'See the full spectrum, isolate frequencies'),
+        ('9.  Settings', 'Every knob, what it does'),
+        ('10. Stopwatch', 'Time your tuning sessions'),
+        ('11. Theme, notation, tour', f'Light/dark, {SHARP}/{FLAT}/Do/DE, re-run onboarding'),
+        ('12. Tips & troubleshooting', 'Things to try if something feels off'),
     ]
     for left, right in toc:
         row = Table(
@@ -511,10 +512,10 @@ def build(out_path: Path):
     story.append(HRule(50, length=36))
 
     qs = [
-        ('Grant microphone access', 'On first launch V-Tune asks for the mic. Allow it. You can change device later in Settings → Input.'),
-        ('Pick a note', 'In <font color="#22d3ee">Tuning / Scale</font> tap the note layout to choose your fundamental. Use <font color="#22d3ee">OCT −</font> / <font color="#22d3ee">OCT +</font> to set the octave. The three foundation strobe bands (1×, 2×, 3×) update instantly.'),
-        ('Press <font color="#00e878">Let’s Go</font>', 'Audio starts. Strike your instrument. The bars freeze when you’re in tune; they drift <i>left</i> when you’re flat, <i>right</i> when you’re sharp.'),
-        ('Read the cents number on the right of each band', 'White digits = in tune (within ±5¢ by default). Grey digits = out of tune. The big number is exactly how many cents off you are.'),
+        ('Grant microphone access', 'On first launch V-Tune asks for the mic. Allow it. You can change device later in Settings → Input (open Settings with the ⚙ gear in the teal icon bar).'),
+        ('Pick a note', 'The menu loads open. In the <font color="#22d3ee">Tuning / Scale</font> controls pick a scale from the <font color="#22d3ee">SCALE</font> dropdown and tap a note, or stay on Chromatic and use <font color="#22d3ee">OCT −</font> / <font color="#22d3ee">OCT +</font> to set the octave. The three foundation strobe bands (1×, 2×, 3×) update instantly.'),
+        ('Press <font color="#00e878">Let’s Go</font>', 'The green button lives at the bottom of the menu (or the bottom of the mobile slide-up). Audio starts. Strike your instrument. The bars freeze when you’re in tune; they drift <i>left</i> when you’re flat, <i>right</i> when you’re sharp.'),
+        ('Read the cents number on the right of each band', 'It reads 0 (and the band washes green) when you’re in tune, within ±5¢ by default. The signed number is exactly how many cents off you are.'),
     ]
     for i, (head, txt) in enumerate(qs, 1):
         story.append(Paragraph(f'<b><font color="#06b6d4">{i}.</font>  {head}</b>',
@@ -530,15 +531,97 @@ def build(out_path: Path):
 
     story.append(PageBreak())
 
-    # ── 3. The strobe display ─────────────────────────────────────────
-    story.append(Paragraph('3. The strobe display', s['h1']))
-    story.append(Paragraph('The big black panel — where you actually read the tune', s['h1_sub']))
+    # ── 3. The menu & utility bar ─────────────────────────────────────
+    story.append(Paragraph('3. The menu & utility bar', s['h1']))
+    story.append(Paragraph('Where every control lives — and how it gets out of your way', s['h1_sub']))
+    story.append(HRule(50, length=36))
+
+    story.append(Paragraph(
+        'All of V-Tune’s controls live in one place: the <b>menu</b>. It '
+        'looks different on a wide screen versus a phone, but the contents '
+        'are the same — a teal utility bar up top, the tuning / scale '
+        'controls, and <font color="#00e878">Let’s Go</font> pinned to the '
+        'bottom.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('On desktop & landscape tablet', s['h2']))
+    story.append(Paragraph(
+        'A full-height panel slides out from the <b>right</b> edge. Open and '
+        'close it with the <b>burger button</b> (three lines in a rounded '
+        'square) at the top-right of the header. The menu always loads '
+        '<b>open</b> on launch so everything is to hand.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'To give the strobe more room while you tune, the menu '
+        '<b>auto-hides after 20 seconds</b> of no interaction with it. Any '
+        'tap, drag or scroll inside the menu resets the timer. If you want '
+        'it to stay put, hit the <b>pin</b> — that disables auto-hide until '
+        'you unpin.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'If the menu hides while a stopwatch session is running, a compact '
+        'stopwatch readout appears in the header next to the burger, so your '
+        'timing stays visible. Tap it to reopen the menu.',
+        s['body_secondary'],
+    ))
+
+    story.append(Paragraph('On phone & portrait tablet', s['h2']))
+    story.append(Paragraph(
+        'There’s no burger or side panel. Instead the controls live in a '
+        'bottom <b>quick-pick</b> panel that slides up. Collapsed, it’s a '
+        'single bar with a soft <font color="#a855f7">purple glow</font> '
+        'showing the currently-selected note (e.g. “D3”), centred. Tap it to '
+        'slide the panel up — this pushes the canvas up, which shrinks '
+        'responsively to make room. It also auto-hides after 20 seconds of '
+        'no interaction, and has its own pin to keep it open. Full details '
+        'in section 7.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('The teal utility bar', s['h2']))
+    story.append(Paragraph(
+        'A slim teal-tinted row of icon buttons sits at the top of the menu '
+        '(and inside the mobile slide-up). The left group, in order:',
+        s['body'],
+    ))
+    story += bullets([
+        '<b>⚙ Settings</b> — opens the Settings modal (section 9).',
+        '<b>⏱ Stopwatch</b> — reveals or hides the stopwatch (section 10).',
+        '<b>Spectrum Analyser</b> (equaliser-bars icon) — reveals or hides '
+        'the Spectrum Analyser (section 8).',
+    ], s)
+    story.append(Paragraph(
+        'On the right sits the <b>light / dark theme toggle</b> (sun / moon). '
+        'On mobile the <b>pin</b> icon also lives on the right, just left of '
+        'the theme toggle. Any active toggle — stopwatch on, spectrum on, '
+        'pinned — gets a teal highlight so you can see its state at a glance.',
+        s['body'],
+    ))
+
+    story.append(PageBreak())
+
+    # ── 4. The strobe display ─────────────────────────────────────────
+    story.append(Paragraph('4. The strobe display', s['h1']))
+    story.append(Paragraph('Where you actually read the tune', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
         'The strobe display is the centre of V-Tune. Each horizontal stripe '
         'is one <b>band</b> — a frequency the app is tracking. By default '
         'you get three foundation bands stacked top-to-bottom:',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'The display is <b>theme-aware</b>. At rest — when the mic is quiet — '
+        'the background is a light grey in light mode, or a soft charcoal '
+        '(not pure black) in dark mode. The moment the mic picks up signal, '
+        'the background darkens toward a deep near-black for maximum bar '
+        'contrast, then eases back to its resting tone when you stop. The '
+        'neutral text (note names, cents) flips light or dark to stay legible '
+        'against whichever background is showing.',
         s['body'],
     ))
     story += bullets([
@@ -558,11 +641,11 @@ def build(out_path: Path):
         s['body'],
     ))
     story += bullets([
-        '<b>♪ icon (far left)</b> — the per-band pitch pipe. See section 4.',
+        '<b>♪ icon (far left)</b> — the per-band pitch pipe. See section 5.',
         '<b>Note label</b> — e.g. “D3”. The note this band is tuned to.',
         '<b>Frequency</b> — the exact target in Hz, under the note label.',
         '<b>Strobe bars</b> — the moving red/green pattern. Motion direction tells you sharp vs flat.',
-        '<b>Cents readout (far right)</b> — the deviation in cents, signed. White when in tune, grey otherwise.',
+        '<b>Cents readout (far right)</b> — the deviation in cents, signed. Reads 0 (and the band washes green) when in tune.',
     ], s)
 
     story.append(Paragraph('Colours, and what they mean', s['h2']))
@@ -590,15 +673,16 @@ def build(out_path: Path):
         '<b>Bars moving left</b> → your input is <i>flat</i> (pitch too low). '
         'Tune up. <b>Bars moving right</b> → your input is <i>sharp</i> '
         '(pitch too high). Tune down. <b>Bars holding still</b> → you’re '
-        'locked. The whole band turns green and the cents readout goes '
-        'white.',
+        'locked. When a band is in tune it gets a <font color="#00e878">dark-'
+        'green wash</font> and its cents readout settles on 0.',
         s['body'],
     ))
     story.append(Paragraph(
-        'Bar sharpness also matters: when the pitch is unstable (during the '
-        'attack transient of a strike, or with very noisy input), the bars '
-        'feather and blur. As the note settles they sharpen up. This is '
-        'configurable via Settings → Softness.',
+        'The bars are green in tune and red out of tune, and their '
+        '<i>blur</i> tracks how far off you are: crisp and sharp when locked, '
+        'blurring more the further out of tune you drift (and during the '
+        'unstable attack transient of a fresh strike). Settings → Blur sets '
+        'the ceiling on that softness.',
         s['body_secondary'],
     ))
 
@@ -613,8 +697,8 @@ def build(out_path: Path):
 
     story.append(PageBreak())
 
-    # ── 4. Pitch pipe ─────────────────────────────────────────────────
-    story.append(Paragraph('4. The pitch pipe (♪)', s['h1']))
+    # ── 5. Pitch pipe ─────────────────────────────────────────────────
+    story.append(Paragraph('5. The pitch pipe (♪)', s['h1']))
     story.append(Paragraph('A reference tone for every band, three clicks deep', s['h1_sub']))
     story.append(HRule(50, length=36))
 
@@ -670,16 +754,26 @@ def build(out_path: Path):
 
     story.append(Spacer(1, 40))
 
-    # ── 5. The pitch selector ─────────────────────────────────────────
-    story.append(Paragraph('5. The pitch selector', s['h1']))
+    # ── 6. The tuning & scale controls ────────────────────────────────
+    story.append(Paragraph('6. The tuning & scale controls', s['h1']))
     story.append(Paragraph('Where you tell V-Tune which note to listen for', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'On desktop and tablet the pitch selector lives inside the '
-        '<b>Tuning / Scale</b> accordion in the side panel. On phones it '
-        'becomes the Quick-Pitch bar at the bottom of the screen (see '
-        'section 6). It has two modes:',
+        'On desktop the tuning and scale controls sit directly in the menu, '
+        'below the teal bar. On phones and portrait tablets they split: the '
+        'scale picker, note grid and <font color="#00e878">Let’s Go</font> '
+        'live in the slide-up quick-pick panel (section 7), while Reference '
+        'A4 and Tolerance move into Settings → Tuning. Either way the picker '
+        'has two modes:',
+        s['body'],
+    ))
+
+    story.append(Paragraph('AUTO', s['h2']))
+    story.append(Paragraph(
+        'Tap <b>AUTO</b> to let V-Tune auto-detect whichever note you play, '
+        'rather than pinning it to a note you’ve chosen. Handy when you’re '
+        'sweeping across an instrument and don’t want to keep re-selecting.',
         s['body'],
     ))
 
@@ -742,56 +836,73 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Paragraph('Collapsing the panel (desktop)', s['h2']))
+    story.append(Paragraph('Reference A4, Tolerance & Let’s Go', s['h2']))
     story.append(Paragraph(
-        'On desktop you can collapse the whole side panel to a slim strip — '
-        'use the control beneath the stopwatch — to give the strobe display '
-        'more width. Click the matching control on the strip to bring it '
-        'back; collapsing also closes any open section so it reopens tidy.',
+        '<b>Reference A4</b> sets concert pitch (default 440 Hz) and '
+        '<b>Tolerance</b> sets how close counts as in tune (default ±5 '
+        'cents). On desktop these sit in the menu alongside the picker; on '
+        'mobile they move into Settings → Tuning. <font color="#00e878">Let’s '
+        'Go</font> — which starts and stops audio — is pinned to the '
+        '<b>bottom</b> of the menu on desktop, and the bottom of the slide-up '
+        'on mobile.',
         s['body'],
     ))
 
     story.append(Spacer(1, 40))
 
-    # ── 6. Mobile Quick-Pitch bar ─────────────────────────────────────
-    story.append(Paragraph('6. Mobile Quick-Pitch bar', s['h1']))
-    story.append(Paragraph('The pitch selector, condensed for thumbs', s['h1_sub']))
+    # ── 7. Mobile quick-pick panel ────────────────────────────────────
+    story.append(Paragraph('7. Mobile quick-pick panel', s['h1']))
+    story.append(Paragraph('The controls, condensed for thumbs', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'On phones and narrow tablets the pitch selector collapses into a '
-        'sticky bar at the bottom of the screen. It does everything the '
-        'desktop pitch selector does — scale dropdown, note selection, octave '
-        '+/−, start/stop — in a touch-friendly layout that respects the '
-        'iPhone home-indicator strip.',
+        'On phones and portrait tablets there’s no burger or side panel. The '
+        'controls live in a bottom <b>quick-pick</b> panel that slides up. '
+        'Collapsed, it’s a single bar with a soft <font color="#a855f7">'
+        'purple glow</font> showing the currently-selected note (e.g. “D3”), '
+        'centred. Tap the bar to slide the panel up — this pushes the canvas '
+        'up, which shrinks responsively to make room.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'Opened, it carries the same teal utility bar (settings, stopwatch, '
+        'spectrum, pin, theme) and the scale / note controls:',
         s['body'],
     ))
     story += bullets([
-        '<b>SCALE</b> dropdown — same scales as desktop, sits above the note grid.',
-        '<b>Chromatic mode</b> — 3 rows of 4 notes, plus an OCT/Start-Stop row.',
-        '<b>Scale mode</b> — responsive grid of scale notes, each labelled with its octave.',
-        '<b>Let’s Go</b> — fills whatever width remains in the bottom row.',
+        '<b>SCALE</b> dropdown — same scales as desktop, above the note grid.',
+        '<b>Chromatic / Scale note grid</b> — a responsive grid of notes, '
+        'each labelled with its octave; OCT −/+ in chromatic mode.',
+        '<b>Let’s Go</b> — pinned to the bottom of the slide-up.',
     ], s)
-
     story.append(Paragraph(
-        'Tip: the side menu (burger icon) on mobile hides everything else '
-        '— accordions, spectrum analyser, settings. Open it when you need '
-        'them, close it when you want to see the strobe full-screen.',
+        'Like the desktop menu, the slide-up <b>auto-hides after 20 seconds</b> '
+        'of no interaction so the strobe gets full width, and it has its own '
+        '<b>pin</b> (in the teal bar) to keep it open. When it re-collapses '
+        'it just shows the selected note, centred, ready to tap again. '
+        'Reference A4 and Tolerance live in Settings → Tuning on mobile.',
         s['body_secondary'],
     ))
 
     story.append(Spacer(1, 40))
 
-    # ── 7. Spectrum Analyser + ISO ────────────────────────────────────
-    story.append(Paragraph('7. Spectrum Analyser & Isolation windows', s['h1']))
+    # ── 8. Spectrum Analyser + ISO ────────────────────────────────────
+    story.append(Paragraph('8. Spectrum Analyser & Isolation windows', s['h1']))
     story.append(Paragraph('See the full frequency content, then isolate the bits you care about', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'The <b>Spectrum Analyser</b> is on by default (toggle it under '
-        '<i>Settings</i> if you want it off). It opens a frequency-domain '
-        'view across the audible range — a real-time picture of every '
-        'harmonic your instrument is producing.',
+        'Toggle the <b>Spectrum Analyser</b> with its icon (equaliser bars) '
+        'in the teal utility bar. It appears under the strobes as a '
+        'frequency-domain view across the audible range — a real-time '
+        'picture of every harmonic your instrument is producing, with two '
+        'isolation strobe bands beneath it for fine-tuning partials.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'Turning the Spectrum Analyser <b>on always restores the two default '
+        'isolation windows</b> — the teal and purple ones — every time, even '
+        'if you previously cleared them. So it’s never revealed empty.',
         s['body'],
     ))
 
@@ -820,81 +931,100 @@ def build(out_path: Path):
 
     story.append(Spacer(1, 40))
 
-    # ── 8. Settings ───────────────────────────────────────────────────
-    story.append(Paragraph('8. Settings', s['h1']))
+    # ── 9. Settings ───────────────────────────────────────────────────
+    story.append(Paragraph('9. Settings', s['h1']))
     story.append(Paragraph('Every knob, what it does', s['h1_sub']))
     story.append(HRule(50, length=36))
 
+    story.append(Paragraph(
+        'Settings is a <b>modal</b>, opened by the ⚙ gear in the teal '
+        'utility bar. It’s organised into labelled teal-header sections, each '
+        'laid out in two columns — the setting’s name and a short description '
+        'on the left, its control on the right.',
+        s['body'],
+    ))
+
     story.append(Paragraph('Input', s['h2']))
     story.append(settings_table([
-        ('Input device',
-         'Which microphone V-Tune listens to. Default uses the system mic.'),
-        ('Mic sensitivity',
-         'Gain in dB applied before analysis. Bump it up if your input is quiet, drop it if you’re clipping.'),
+        ('Microphone',
+         'Which audio input device V-Tune listens to. Default uses the system mic.'),
+        ('Microphone Sensitivity',
+         'Input gain in dB (MIC +/−). Bump it up if your input is quiet, drop it if you’re clipping.'),
+        ('Hum',
+         'Mains-hum notch filter: Off / 50 Hz (UK/EU) / 60 Hz (US). Notches out mains hum plus its harmonics.'),
     ], s))
 
-    story.append(Paragraph('Strobe feel', s['h2']))
-    story.append(settings_table([
-        ('Brightness',
-         'How bright the red/green strobe bars are. Lower for ambient lighting, higher for stage / sunlight.'),
-        ('Softness',
-         'Edge feather on the strobe bars. Sharp when locked, automatically soft when way out of tune. This slider sets the upper bound.'),
-        ('Speed',
-         'How fast the strobe pattern reacts. Higher = livelier, lower = calmer / easier to read.'),
-    ], s))
-
-    story.append(Paragraph('Reading the frequencies', s['h2']))
-    story.append(settings_table([
-        ('Tolerance (±cents)',
-         'How close you have to be before V-Tune calls you in tune. Default is ±5 cents.'),
-        ('Hysteresis',
-         'Extra slack once you’re locked, so a tiny wobble doesn’t flicker back to red. Default 1.5 cents.'),
-    ], s))
-
-    story.append(Paragraph('Analysis', s['h2']))
+    story.append(Paragraph('Tuning (mobile only)', s['h2']))
+    story.append(Paragraph(
+        'On phones and portrait tablets, Reference A4 and Tolerance live '
+        'here. On desktop these controls sit directly in the menu instead, '
+        'so this section only appears on mobile.',
+        s['body_secondary'],
+    ))
     story.append(settings_table([
         ('Reference A4',
          'Concert pitch. Default 440 Hz. Set to 442 for some orchestral work, 432 if you’re into that.'),
-        ('Hum filter',
-         'Notches out mains hum at 50 Hz (UK/EU) or 60 Hz (US), plus harmonics. Off by default.'),
+        ('Tolerance (±cents)',
+         'How close you have to be before V-Tune calls you in tune. Default is ±5 cents.'),
+    ], s))
+
+    story.append(Paragraph('Strobe Preferences', s['h2']))
+    story.append(settings_table([
+        ('Brightness',
+         'How vivid the red/green strobe bars are. Lower for ambient lighting, higher for stage / sunlight.'),
+        ('Blur',
+         'Edge softness of the bars — sharp when locked, automatically softer when way out of tune. This sets the ceiling on that softness.'),
+        ('Speed',
+         'How fast the strobe reacts: 0.5× / 1× / 2× / 3× / 5×. Higher = livelier, lower = calmer / easier to read.'),
+    ], s))
+
+    story.append(Paragraph('Accessibility Options', s['h2']))
+    story.append(settings_table([
+        ('High contrast',
+         'Boosts contrast throughout the UI for easier reading.'),
+        ('Larger text',
+         'Scales up the interface text.'),
+        ('Show tour again',
+         'Re-runs the interactive onboarding tour from the start (section 11).'),
     ], s))
 
     story.append(Spacer(1, 40))
 
-    # ── 9. Stopwatch ──────────────────────────────────────────────────
-    story.append(Paragraph('9. Stopwatch', s['h1']))
+    # ── 10. Stopwatch ─────────────────────────────────────────────────
+    story.append(Paragraph('10. Stopwatch', s['h1']))
     story.append(Paragraph('Time your tuning sessions', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'Open the <b>Stopwatch</b> accordion from the side panel for a '
-        'simple running timer. Start, pause, reset. Unlike the other '
-        'accordions, the stopwatch does <i>not</i> auto-close after 10 '
-        'seconds of non-interaction — a running timer disappearing would '
-        'be rude.',
+        'Toggle the <b>stopwatch</b> on and off with the ⏱ icon in the teal '
+        'utility bar. When on, its panel appears pinned at the <b>bottom</b> '
+        'of the menu, just above <font color="#00e878">Let’s Go</font> (on '
+        'mobile, just above the slide-up). Start, stop and reset controls sit '
+        'on the panel. It counts continuously even if you toggle the panel '
+        'off and back on.',
         s['body'],
     ))
 
     story.append(Paragraph(
-        'On desktop, no accordion auto-closes at all (you have the screen '
-        'real estate, no reason to hide them). The 10-second auto-close '
-        'only applies on mobile and tablet, where the side panel covers '
-        'the strobe.',
+        'On desktop, if the menu auto-hides while a session is running, a '
+        'compact stopwatch readout appears in the header next to the burger '
+        'so your timing stays visible. Tap it to reopen the menu.',
         s['body_secondary'],
     ))
 
     story.append(Spacer(1, 40))
 
-    # ── 10. Theme / notation / tour ───────────────────────────────────
-    story.append(Paragraph('10. Theme, notation, and the onboarding tour', s['h1']))
+    # ── 11. Theme / notation / tour ───────────────────────────────────
+    story.append(Paragraph('11. Theme, notation, and the onboarding tour', s['h1']))
     story.append(Paragraph('A few preferences worth knowing about', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph('Light / dark theme', s['h2']))
     story.append(Paragraph(
-        'Toggle from the header. Dark is the default and what this guide '
-        'matches; light is well-tested but mostly useful in very bright '
-        'environments.',
+        'Flip between light and dark with the sun / moon icon on the right of '
+        'the teal utility bar. Fresh installs default to <b>light</b> mode; '
+        'switch to dark whenever you prefer. The strobe display follows the '
+        'theme too — see section 4.',
         s['body'],
     ))
 
@@ -906,21 +1036,20 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Paragraph('Re-running the onboarding tour', s['h2']))
+    story.append(Paragraph('The onboarding tour', s['h2']))
     story.append(Paragraph(
-        'The first-launch tour walks you through every UI element by '
-        'spotlighting it and asking you to interact. If you skipped it or '
-        'just want a refresher, hit <b>Show tour again</b> at the bottom '
-        'of the Settings accordion.',
+        'V-Tune ships with an interactive, learn-by-doing tour. It spotlights '
+        'each part of the UI and <i>waits for you to actually perform the '
+        'action</i> before moving on — open the menu, open Settings and walk '
+        'its sections, reveal the stopwatch and the Spectrum Analyser, pin '
+        'the menu, pick a scale, then <font color="#00e878">Let’s Go</font>. '
+        'It runs automatically on first launch.',
         s['body'],
     ))
     story.append(Paragraph(
-        'Press <font name="Courier">Esc</font> or click the × to skip at '
-        'any time — your scale and selection get restored. Complete the '
-        'tour by pressing <font color="#00e878">Let’s Go</font> on the '
-        'last step and V-Tune leaves you on the default working layout: '
-        'spectrum analyser on with its two isolation windows, accordions '
-        'closed.',
+        'Want it again? Open Settings and hit <b>Show tour again</b> under '
+        'Accessibility Options — it restarts the whole guided tour from the '
+        'top, any time.',
         s['body_secondary'],
     ))
 
@@ -936,16 +1065,17 @@ def build(out_path: Path):
 
     story.append(Spacer(1, 40))
 
-    # ── 11. Tips & troubleshooting ────────────────────────────────────
-    story.append(Paragraph('11. Tips & troubleshooting', s['h1']))
+    # ── 12. Tips & troubleshooting ────────────────────────────────────
+    story.append(Paragraph('12. Tips & troubleshooting', s['h1']))
     story.append(Paragraph('Things to try if something feels off', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph('“The bars are jittery / never lock.”', s['h3']))
     story.append(Paragraph(
-        'Background noise is usually the culprit. Try (a) lowering mic '
-        'sensitivity until just your strikes register, (b) enabling the '
-        'hum filter at your local mains frequency (50 Hz UK/EU, 60 Hz US).',
+        'Background noise is usually the culprit. Open Settings with the ⚙ '
+        'gear, then (a) lower Microphone Sensitivity until just your strikes '
+        'register, and (b) set Hum to your local mains frequency (50 Hz '
+        'UK/EU, 60 Hz US).',
         s['body'],
     ))
 
@@ -961,12 +1091,12 @@ def build(out_path: Path):
 
     story.append(Paragraph('“It’s telling me I’m in tune but I’m clearly not.”', s['h3']))
     story.append(Paragraph(
-        'Check Settings → Reference A4. If it’s set to something exotic '
-        '(442, 432) you’ll be tuning against a different concert pitch. '
-        'Also check you’re on the right note — handpans have rich '
-        'overtones, and it’s easy to accidentally lock onto a partial '
-        'that isn’t the fundamental. The live note indicator on the pitch '
-        'selector (cyan glow) helps catch this.',
+        'Check Reference A4. If it’s set to something exotic (442, 432) '
+        'you’ll be tuning against a different concert pitch — it’s in the '
+        'menu on desktop, or Settings → Tuning on mobile. Also check you’re '
+        'on the right note: handpans have rich overtones, and it’s easy to '
+        'accidentally lock onto a partial that isn’t the fundamental. The '
+        'live note indicator on the note grid (cyan glow) helps catch this.',
         s['body'],
     ))
 
@@ -988,8 +1118,8 @@ def build(out_path: Path):
     story.append(Paragraph('“My phone screen has a notch / home indicator.”', s['h3']))
     story.append(Paragraph(
         'Handled — V-Tune respects iOS safe-area insets on the header, the '
-        'Quick-Pitch bar, and the side drawer. The strobe never hides '
-        'behind the notch or the home-indicator strip.',
+        'quick-pick slide-up, and the menu. The strobe never hides behind '
+        'the notch or the home-indicator strip.',
         s['body'],
     ))
 

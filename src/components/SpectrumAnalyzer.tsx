@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useTunerStore, MAX_ISOLATIONS, ISO_COLORS } from '../store/tunerStore';
 import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
+import { micLiveness, mixRgba } from './bgSignal';
 
 // How long the finger has to sit still before a touch-drag becomes an
 // iso-create gesture (ms). Anything shorter is treated as a pan.
@@ -137,12 +138,20 @@ export function SpectrumAnalyzer() {
     const currentNaming = store.noteNaming;
     const refFreq = store.referenceFreq;
 
+    // Theme-aware neutrals that darken with the mic (in sync with the strobe
+    // via micLiveness): light grey resting → dark when signal is present.
+    const dark = store.theme === 'dark';
+    const d = micLiveness.value;
+    const specBg =        dark ? mixRgba([26, 26, 35, 1], [16, 16, 22, 1], d)     : mixRgba([212, 215, 221, 1], [22, 22, 30, 1], d);
+    const specGrid =      dark ? mixRgba([40, 40, 54, 1], [30, 30, 42, 1], d)     : mixRgba([150, 152, 162, 0.55], [60, 62, 78, 0.5], d);
+    const specGridLabel = dark ? 'rgba(140, 140, 155, 0.9)'                       : mixRgba([40, 42, 52, 0.85], [200, 200, 215, 0.85], d);
+
     // Background
-    ctx.fillStyle = '#08080e';
+    ctx.fillStyle = specBg;
     ctx.fillRect(0, 0, w, h);
 
     // Grid lines
-    ctx.strokeStyle = '#1a1a2e';
+    ctx.strokeStyle = specGrid;
     ctx.lineWidth = 0.5;
     const gridFreqs = [20, 50, 100, 200, 500, 1000, 2000, 5000];
     for (const gf of gridFreqs) {
@@ -152,7 +161,7 @@ export function SpectrumAnalyzer() {
       ctx.moveTo(gx, 0);
       ctx.lineTo(gx, h);
       ctx.stroke();
-      ctx.fillStyle = '#787878';
+      ctx.fillStyle = specGridLabel;
       ctx.font = '12px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText(`${formatFreq(gf)}`, gx, h - 4);
@@ -165,7 +174,7 @@ export function SpectrumAnalyzer() {
       ctx.moveTo(0, gy);
       ctx.lineTo(w, gy);
       ctx.stroke();
-      ctx.fillStyle = '#787878';
+      ctx.fillStyle = specGridLabel;
       ctx.font = '10px "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
       ctx.fillText(`${db}`, 2, gy - 2);

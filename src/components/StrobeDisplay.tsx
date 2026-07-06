@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { getDisplayName } from '../utils/notes';
 import { playTone, stopTone, playBeep } from '../audio/PitchPipe';
+import { micLiveness, mixRgba, type Rgba } from './bgSignal';
 
 // How long the colour + cents readout stays on screen after signal drops
 const HOLD_MS = 3500;
@@ -39,6 +40,11 @@ export function StrobeDisplay() {
   // rings down. Smoothed so the live amplitude's frame jitter doesn't flicker.
   const smoothedFillRef = useRef<Map<string, number>>(new Map());
   const readoutCentsRef = useRef<Map<string, number>>(new Map());
+  // Global 0..1 "how live is the mic" value, eased, driving the resting→active
+  // background darkening. 0 = quiet (light-grey resting bg), 1 = signal present
+  // (dark bg for strobe contrast). Fed by the previous frame's loudest band.
+  const bgDarkRef = useRef(0);
+  const frameMaxAmpRef = useRef(0);
   const medianBufferRef = useRef<Map<string, number[]>>(new Map());
   const lastSignalTimeRef = useRef<Map<string, number>>(new Map());
   const inTuneStateRef = useRef<Map<string, boolean>>(new Map());
@@ -196,17 +202,52 @@ export function StrobeDisplay() {
     const w = rect.width;
     const h = rect.height;
     ctx.clearRect(0, 0, w, h);
-    // Fill the whole canvas with the same dark colour the bands use, so
-    // the 2 px inset around each band slot doesn't reveal the parent's
-    // background as a stray line above the top note (or below the bottom
-    // one) — particularly visible in light mode.
-    ctx.fillStyle = 'rgba(8, 8, 14, 0.98)';
-    ctx.fillRect(0, 0, w, h);
 
     const state = useTunerStore.getState();
     const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness, pipeBandId, pipeMode } = state;
     const bands = state.bands;
     const numBands = bands.length;
+
+    // Signal-driven background darkening: the display rests at a light grey
+    // (light mode) / soft charcoal (dark mode) and darkens toward the dark
+    // strobe background as soon as the mic picks up, giving max bar contrast
+    // while playing. `d` is eased off the previous frame's loudest band so it
+    // glides rather than snaps, and relaxes back to the resting tone when quiet.
+    const dark = state.theme === 'dark';
+    const targetDark = Math.min(1, frameMaxAmpRef.current * 1.6);
+    bgDarkRef.current = bgDarkRef.current * 0.85 + targetDark * 0.15;
+    const d = bgDarkRef.current;
+    // Publish for the spectrum + isolation canvases so they darken in sync.
+    micLiveness.value = d;
+
+    // Resting → active colour pairs. The bars (red/green) and green in-tune
+    // wash stay vivid in both themes; only the neutral bg + text interpolate.
+    const RB: Rgba = dark ? [26, 26, 35, 0.98] : [212, 215, 221, 0.98];   // resting bg
+    const AB: Rgba = dark ? [16, 16, 22, 0.98] : [22, 22, 30, 0.98];      // active bg
+    const RL: Rgba = dark ? [200, 200, 215, 0.55] : [30, 32, 42, 0.65];   // resting label
+    const AL: Rgba = dark ? [245, 245, 250, 0.95] : [242, 242, 248, 0.95]; // active label
+    const RH: Rgba = dark ? [255, 255, 255, 0.5] : [30, 32, 42, 0.5];     // resting hz
+    const AH: Rgba = [255, 255, 255, 0.5];                                 // active hz
+    const RS: Rgba = dark ? [40, 40, 54, 1] : [150, 152, 162, 0.7];       // resting separator
+    const AS: Rgba = dark ? [30, 30, 42, 1] : [42, 42, 56, 0.85];         // active separator
+    const PAL = {
+      bandBg:    mixRgba(RB, AB, d),
+      bandBgSel: mixRgba([RB[0] + 12, RB[1] + 12, RB[2] + 14, RB[3]], [AB[0] + 12, AB[1] + 12, AB[2] + 14, AB[3]], d),
+      label:     mixRgba(RL, AL, d),
+      hz:        mixRgba(RH, AH, d),
+      sep:       mixRgba(RS, AS, d),
+      // Cents + Hz-off only render while a signal is present (dark bg), so
+      // they stay light in both themes.
+      centsOut:  'rgba(190, 190, 205, 0.95)',
+      hzOff:     'rgba(120, 122, 140, 0.85)',
+    };
+
+    // Base fill so the 2 px inset around each band slot doesn't reveal the
+    // parent background as a stray line above the top / below the bottom band.
+    ctx.fillStyle = PAL.bandBg;
+    ctx.fillRect(0, 0, w, h);
+
+    let frameMaxAmp = 0;
 
     if (numBands === 0) {
       animFrameRef.current = requestAnimationFrame(draw);
@@ -257,6 +298,7 @@ export function StrobeDisplay() {
         // Never drop below the current live amplitude (e.g. sustained note)
         if (amplitude > displayedAmp) displayedAmp = amplitude;
       }
+      if (displayedAmp > frameMaxAmp) frameMaxAmp = displayedAmp;
       const barCount = Math.max(3, Math.round(band.frequency / 80));
       const barWidth = w / barCount;
 
@@ -388,7 +430,7 @@ export function StrobeDisplay() {
       // Black band background — the LinoTune look. The sliding bars supply
       // the bright colour; the background (incl. the gaps between bars) is
       // black when off-pitch and washes toward dark green as the band locks.
-      ctx.fillStyle = isSelected ? 'rgba(14, 14, 22, 0.98)' : 'rgba(8, 8, 14, 0.98)';
+      ctx.fillStyle = isSelected ? PAL.bandBgSel : PAL.bandBg;
       ctx.fillRect(0, y + 2, w, bandHeight - 4);
       if (greenTint > 0.01) {
         // Flat green wash over the whole band (incl. the gaps between bars).
@@ -468,9 +510,7 @@ export function StrobeDisplay() {
       ctx.fillText('♪', PIPE_ICON_W / 2, y + bandHeight / 2);
 
       // Band note name — shifted right of the icon strip
-      const labelColor = holdActive
-        ? 'rgba(245, 245, 250, 0.95)'
-        : isSelected ? '#06b6d4' : 'rgba(200, 200, 215, 0.55)';
+      const labelColor = isSelected ? '#06b6d4' : PAL.label;
       ctx.fillStyle = labelColor;
       const labelSize = Math.min(56, Math.max(32, bandHeight * 0.7));
       ctx.font = `bold ${labelSize}px "JetBrains Mono", monospace`;
@@ -482,7 +522,7 @@ export function StrobeDisplay() {
       // 8px of breathing room between it and the note label above
       const isNarrow = w < 500;
       const hzFontSize = isNarrow ? 13 : 16;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillStyle = PAL.hz;
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
       ctx.fillText(`${band.frequency.toFixed(1)} Hz`, PIPE_ICON_W + 6, y + bandHeight / 2 + labelSize * 0.35 + 8);
 
@@ -497,13 +537,13 @@ export function StrobeDisplay() {
         ctx.font = `bold ${centsSize}px "JetBrains Mono", monospace`;
         // Keep cents white when in tune so the digits stay legible on top
         // of the green in-tune bar (green-on-green was unreadable).
-        ctx.fillStyle = isInTune ? '#ffffff' : '#8888a0';
+        ctx.fillStyle = isInTune ? '#ffffff' : PAL.centsOut;
         ctx.fillText(`${sign}${roundedCents}`, w - 10, y + bandHeight / 2 - centsSize * 0.2);
 
         // Hz deviation
         const hzOff = band.frequency * (Math.pow(2, readoutCents / 1200) - 1);
         ctx.font = '10px "JetBrains Mono", monospace';
-        ctx.fillStyle = '#44445a';
+        ctx.fillStyle = PAL.hzOff;
         ctx.fillText(`${hzOff >= 0 ? '+' : ''}${hzOff.toFixed(1)} Hz`, w - 10, y + bandHeight / 2 + centsSize * 0.55);
       }
 
@@ -511,7 +551,7 @@ export function StrobeDisplay() {
       if (i < numBands - 1) {
         const next = bands[i + 1];
         const isBoundary = !band.isFoundation && next.isFoundation;
-        ctx.strokeStyle = isBoundary ? 'rgba(6, 182, 212, 0.55)' : '#1e1e2a';
+        ctx.strokeStyle = isBoundary ? 'rgba(6, 182, 212, 0.55)' : PAL.sep;
         ctx.lineWidth = isBoundary ? 4 : 1;
         ctx.beginPath();
         ctx.moveTo(0, y + bandHeight);
@@ -519,6 +559,9 @@ export function StrobeDisplay() {
         ctx.stroke();
       }
     }
+    // Remember this frame's loudest band so next frame can ease the bg toward
+    // its resting/active tone.
+    frameMaxAmpRef.current = frameMaxAmp;
 
     // Drag-active overlay — "lifts" the dragged band visually and shows the
     // drop position with a glowing insert line. Only fires for non-foundation

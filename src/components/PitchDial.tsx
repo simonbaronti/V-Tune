@@ -185,7 +185,7 @@ export function PitchDial() {
 
   return (
     <div
-      data-tour="pitch-dial"
+      data-tour="tour-scale"
       className="flex flex-col gap-2 px-3 py-3 shrink-0"
       style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}
     >

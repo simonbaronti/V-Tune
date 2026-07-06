@@ -48,103 +48,160 @@ interface TourStep {
   skipOnMedia?: string;
   /** Side effects to run when entering this step. */
   onEnter?: () => void;
-  /** Where the drawer should be when this step is active (mobile only). */
-  drawer?: 'open' | 'closed';
 }
 
-const LG_MEDIA = '(min-width: 1024px)';
+const LG_MEDIA = '(min-width: 1024px)';   // desktop
+const NARROW_MEDIA = '(max-width: 1023px)'; // phone + portrait tablet
 
 const STEPS: TourStep[] = [
   {
     id: 'welcome',
     targets: ['welcome'],
     title: 'Welcome to V-Tune',
-    body: 'A quick guided tour to get familiar with the layout. Tap Next to begin.',
+    body: 'A quick guided tour of the layout — learn by doing. Tap Next to begin.',
     manualAdvance: true,
   },
+
+  // ── Open the controls (platform-specific) ──────────────────────────
   {
-    id: 'theme',
-    targets: ['theme-toggle'],
-    title: 'Light / dark',
-    body: 'Tap the icon to flip between light and dark mode.',
-    advanceWhen: (s, snap) => s.theme !== snap.theme,
-  },
-  {
-    id: 'burger',
+    id: 'open-desktop',
     targets: ['burger'],
     title: 'Open the menu',
-    body: 'Tap the menu icon to slide the side panel out.',
-    advanceWhen: (s, snap) => s.panelOpen && !snap.panelOpen,
-    skipOnMedia: LG_MEDIA, // on desktop the panel is always visible
+    body: 'Tap the menu button to slide out your controls.',
+    advanceWhen: (s, snap) => s.menuOpen && !snap.menuOpen,
+    skipOnMedia: NARROW_MEDIA,
   },
   {
-    id: 'tuning-header',
-    targets: ['tuning-header'],
-    title: 'Tuning / Scale',
-    body: 'Open the Tuning / Scale section to pick a note.',
-    advanceWhen: (s, snap) =>
-      s.openAccordion === 'tuning' && snap.openAccordion !== 'tuning',
+    id: 'open-mobile',
+    targets: ['tour-notebar'],
+    title: 'Open the menu',
+    body: 'Tap here to slide up your controls.',
+    advanceWhen: (s, snap) => s.quickPickOpen && !snap.quickPickOpen,
+    skipOnMedia: LG_MEDIA,
+  },
+
+  // ── Utility (teal) icon bar ────────────────────────────────────────
+  {
+    id: 'utility',
+    targets: ['tour-utility'],
+    title: 'Your utility menu',
+    body: 'This teal bar is where you reach Settings, the Stopwatch, the Spectrum Analyser, light / dark mode, and pinning the menu open. Let’s try each — tap Next.',
+    manualAdvance: true,
   },
   {
-    id: 'pick-d3',
-    targets: ['pitch-dial'],
-    title: 'Pick D3',
-    body: 'Tap D on the note layout below, then use the OCT − button to drop to octave 3.',
-    advanceWhen: (s, snap) => {
-      const isD3 =
-        s.currentNote !== null &&
-        s.currentNote.name === 'D' &&
-        s.currentNote.octave === 3;
-      const wasD3 =
-        snap.currentNote !== null &&
-        snap.currentNote.name === 'D' &&
-        snap.currentNote.octave === 3;
-      return isD3 && !wasD3;
-    },
-  },
-  {
-    id: 'settings-header',
-    targets: ['settings-header'],
+    id: 'settings-open',
+    targets: ['tour-settings'],
     title: 'Settings',
-    body: 'Open Settings to tune the strobe itself.',
-    advanceWhen: (s, snap) =>
-      s.openAccordion === 'settings' && snap.openAccordion !== 'settings',
+    body: 'Tap the gear to open your settings.',
+    advanceWhen: (s, snap) => s.settingsOpen && !snap.settingsOpen,
+  },
+
+  // ── Inside the Settings modal ──────────────────────────────────────
+  {
+    id: 'modal-input',
+    targets: ['modal-input'],
+    title: 'Input',
+    body: 'Your input settings live here — microphone, sensitivity and hum. Go ahead and pick your microphone from the dropdown.',
+    advanceWhen: (s, snap) => s.inputDeviceId !== snap.inputDeviceId,
   },
   {
-    id: 'settings-input-mic',
-    targets: ['settings-input', 'settings-mic'],
-    title: 'Microphone',
-    body: 'Here you can pick your input device and adjust the microphone sensitivity.',
+    id: 'modal-tuning',
+    targets: ['modal-tuning'],
+    title: 'Tuning',
+    body: 'This is where your tuning options live — reference pitch (A4), tolerance and auto-detect.',
+    manualAdvance: true,
+    skipOnMedia: LG_MEDIA, // desktop shows tuning in the menu instead
+  },
+  {
+    id: 'modal-strobe',
+    targets: ['modal-strobe'],
+    title: 'Strobe preferences',
+    body: 'Tweak how the strobe looks and behaves — brightness, blur, speed and more.',
     manualAdvance: true,
   },
   {
-    id: 'settings-strobe-feel',
-    targets: ['settings-brightness', 'settings-blur', 'settings-speed'],
-    title: 'Strobe feel',
-    body: 'Set the brightness of the strobe, the softness of the red / green bar edges, and the tracking speed.',
+    id: 'modal-accessibility',
+    targets: ['modal-accessibility'],
+    title: 'Accessibility',
+    body: 'High-contrast and larger-text options for easier reading.',
     manualAdvance: true,
   },
   {
-    id: 'sa-toggle',
+    id: 'modal-close',
+    targets: ['modal-close'],
+    title: 'Close settings',
+    body: 'Tap the ✕ to close settings and carry on.',
+    advanceWhen: (s, snap) => !s.settingsOpen && snap.settingsOpen,
+  },
+
+  // ── Back to the utility bar ────────────────────────────────────────
+  {
+    id: 'stopwatch-icon',
+    targets: ['tour-stopwatch'],
+    title: 'Stopwatch',
+    body: 'Tap to reveal a timing aid that tracks how long you’ve been tuning.',
+    advanceWhen: (s, snap) => s.stopwatchOn && !snap.stopwatchOn,
+  },
+  {
+    id: 'stopwatch-panel',
+    targets: ['tour-stopwatch-panel'],
+    title: 'Your stopwatch',
+    body: 'Here it is — start, stop and reset it here. Tap Next to carry on.',
+    manualAdvance: true,
+  },
+  {
+    id: 'spectrum-icon',
     targets: ['sa-toggle'],
-    title: 'Spectrum Analyser',
-    body: 'Turn on the Spectrum Analyser to see the full frequency content of your handpan.',
+    title: 'Spectrum analyser',
+    body: 'Tap to reveal the analyser — with two isolation strobes for fine-tuning partials.',
     advanceWhen: (s, snap) => s.showSpectrum && !snap.showSpectrum,
   },
   {
-    id: 'spectrum-iso',
-    targets: ['spectrum-canvas'],
-    title: 'Isolate a frequency',
-    body:
-      'Shift + drag (or touch-hold then drag on mobile) across the spectrum to draw an isolation window. The loudest peak inside it becomes a dedicated tuning band.',
-    advanceWhen: (s, snap) => s.isolations.length > snap.isolations.length,
-    drawer: 'closed', // canvas lives in the main column, drawer would cover it on mobile
+    id: 'spectrum-panel',
+    targets: ['tour-spectrum-panel'],
+    title: 'The analyser',
+    body: 'It appears under the strobes, with two isolation strobes ready to fine-tune partials. Tap Next.',
+    manualAdvance: true,
+  },
+  {
+    id: 'pin',
+    targets: ['tour-pin'],
+    title: 'Pin it open',
+    body: 'Tap the pin to keep the menu open (no auto-hide) — try it, or tap Next.',
+    manualAdvance: true,
+    advanceWhen: (s, snap) =>
+      (s.menuPinned && !snap.menuPinned) || (s.quickPickPinned && !snap.quickPickPinned),
+  },
+  {
+    id: 'theme',
+    targets: ['tour-theme'],
+    title: 'Light / dark',
+    body: 'This toggles light and dark mode — try it, or tap Next to continue.',
+    manualAdvance: true,
+    advanceWhen: (s, snap) => s.theme !== snap.theme,
+  },
+
+  // ── Tuning (desktop lives in the menu) + scale + go ────────────────
+  {
+    id: 'tuning-desktop',
+    targets: ['tour-tuning'],
+    title: 'Tuning',
+    body: 'This is where your tuning options live — reference pitch (A4), tolerance and auto-detect.',
+    manualAdvance: true,
+    skipOnMedia: NARROW_MEDIA, // mobile already covered tuning in the modal
+  },
+  {
+    id: 'scale',
+    targets: ['tour-scale'],
+    title: 'Choose a scale',
+    body: 'This is where you pick the scale you’re tuning. Go ahead and choose one from the dropdown.',
+    advanceWhen: (s, snap) => s.selectedScaleId !== snap.selectedScaleId,
   },
   {
     id: 'lets-go',
     targets: ['lets-go'],
-    title: "Let's Go",
-    body: 'Tap to start listening. From here, just strike the note and watch the strobe lock in.',
+    title: "Let's go!",
+    body: 'That’s it — all that’s left is to start tuning. Tap Let’s Go!',
     advanceWhen: (s, snap) => s.isRunning && !snap.isRunning,
   },
 ];
@@ -209,6 +266,9 @@ export function OnboardingTour() {
   // true (refs don't trigger re-renders), so the tour only became visible
   // after some other store change caused a re-render — by which point
   // the user had already opened the panel and step 3 could never advance.
+  // Recompute on viewport width too, so the desktop/mobile step forks stay
+  // correct if the window crosses the breakpoint (or the initial size settles
+  // after mount).
   const effectiveSteps = useMemo(
     () =>
       tourActive
@@ -216,7 +276,8 @@ export function OnboardingTour() {
             (s) => !s.skipOnMedia || !window.matchMedia(s.skipOnMedia).matches,
           )
         : [],
-    [tourActive],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tourActive, viewport.w],
   );
 
   // Reset step index whenever the tour (re-)activates so "Show tour again"
@@ -236,38 +297,24 @@ export function OnboardingTour() {
     if (!tourActive) return;
     const s = useTunerStore.getState();
     savedScaleRef.current = s.selectedScaleId;
-    // Force chromatic so step "Pick D3" is reachable with the same
-    // keyboard everyone sees.
+    // Force chromatic so the "choose a scale" step is a genuine change.
     if (s.selectedScaleId !== 'chromatic') s.setSelectedScale('chromatic');
-    // Close any open accordion (so the "open this" steps require action).
-    if (s.openAccordion !== null) s.toggleAccordion(s.openAccordion);
-    // Close the mobile drawer so step 3 (burger) is a genuine open.
-    if (s.panelOpen) s.setPanelOpen(false);
-    // Turn off the SA + clear iso windows so steps 9/10 are real actions.
+    // Collapse the menu / slide-up so the "open the menu" step is a real
+    // open action; unpin both so the "pin it" step is a genuine toggle.
+    s.setMenuOpen(false);
+    s.setMenuPinned(false);
+    s.setQuickPickOpen(false);
+    s.setQuickPickPinned(false);
+    // Close the settings modal so opening it is a genuine action.
+    s.setSettingsOpen(false);
+    // Turn off stopwatch + SA (and clear iso windows) so those "tap to
+    // reveal" steps are real actions.
+    s.setStopwatchOn(false);
     if (s.showSpectrum) s.setShowSpectrum(false);
     if (s.isolations.length > 0) s.clearIsolations();
-    // Stop audio so step 11 ("Let's Go") starts in the off state.
+    // Stop audio so the "Let's Go" step starts in the off state.
     if (s.isRunning) stopAudio();
-    return () => {
-      // Restore the user's scale on tour exit.
-      const cur = useTunerStore.getState();
-      if (savedScaleRef.current && cur.selectedScaleId !== savedScaleRef.current) {
-        cur.setSelectedScale(savedScaleRef.current);
-      }
-    };
   }, [tourActive]);
-
-  // ── Drawer orchestration: open/close per step on mobile ─────────────
-  useEffect(() => {
-    if (!tourActive || !step) return;
-    const isMobile = !window.matchMedia(LG_MEDIA).matches;
-    if (!isMobile) return;
-    if (step.drawer === 'closed' && useTunerStore.getState().panelOpen) {
-      useTunerStore.getState().setPanelOpen(false);
-    } else if (step.drawer === 'open' && !useTunerStore.getState().panelOpen) {
-      useTunerStore.getState().setPanelOpen(true);
-    }
-  }, [tourActive, step]);
 
   // ── Per-step onEnter hook ───────────────────────────────────────────
   useEffect(() => {
@@ -324,6 +371,7 @@ export function OnboardingTour() {
   useEffect(() => {
     if (!tourActive) return;
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    onResize(); // sync to the real size at tour start (initial state may be stale)
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [tourActive]);
@@ -350,24 +398,33 @@ export function OnboardingTour() {
     });
   };
 
-  /** Natural completion — leave the app's default working layout: the
-   *  Spectrum Analyser on with its two colour-coded isolation windows (teal
-   *  + purple), and any open accordion closed. The tour itself cleared
-   *  these on entry so its "turn on SA" / "draw an isolation" steps were
-   *  genuine; here we restore the standard default so the user lands on the
-   *  full experience rather than a blank canvas. */
+  /** Land on the standard default working layout: Spectrum Analyser on with
+   *  its two colour-coded isolation windows, and the tour's demo toggles
+   *  (stopwatch, pin) returned to their calm defaults. The scale is left as
+   *  the user chose in the "choose a scale" step. */
   const completeTour = () => {
     const s = useTunerStore.getState();
     s.setShowSpectrum(true);
     s.resetIsolationsToDefault();
-    if (s.openAccordion !== null) s.toggleAccordion(s.openAccordion);
+    s.setStopwatchOn(false);
+    s.setMenuPinned(false);
+    s.setQuickPickPinned(false);
     s.setOnboardingDone(true);
     s.setTourActive(false);
   };
 
-  /** Skip / dismiss — don't touch the user's layout, just close the tour. */
+  /** Skip / dismiss — restore the default working layout (the entry reset
+   *  turned SA off etc.) and the user's pre-tour scale, then close. */
   const endTour = () => {
     const s = useTunerStore.getState();
+    s.setShowSpectrum(true);
+    s.resetIsolationsToDefault();
+    s.setStopwatchOn(false);
+    s.setMenuPinned(false);
+    s.setQuickPickPinned(false);
+    if (savedScaleRef.current && s.selectedScaleId !== savedScaleRef.current) {
+      s.setSelectedScale(savedScaleRef.current);
+    }
     s.setOnboardingDone(true);
     s.setTourActive(false);
   };
@@ -503,7 +560,11 @@ export function OnboardingTour() {
           />
         ))}
 
-      {/* Tooltip card */}
+      {/* Tooltip card. Hidden while the current target is momentarily
+          unmeasurable (e.g. the settings modal animating closed) so it
+          doesn't flash to the default top-left "welcome" position before the
+          next step's spotlight resolves. */}
+      {spotlight && (
       <div
         role="dialog"
         aria-label="Onboarding tour"
@@ -623,6 +684,7 @@ export function OnboardingTour() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
