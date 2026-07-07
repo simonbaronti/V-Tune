@@ -41,6 +41,13 @@ export default defineConfig({
     // Skip the PWA/service worker entirely for Tauri desktop builds.
     ...(isTauriBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
+      // Don't auto-inject the SW registration into index.html. We register
+      // manually in main.tsx so we can skip it inside the iOS Capacitor
+      // WebView: there the worker precaches the app shell cache-first and
+      // then shadows native app updates — the app reports the new version
+      // but the WebView keeps serving the old, cached UI. The native app
+      // already ships the bundle, so it needs no service worker.
+      injectRegister: false,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
       manifest: {
         name: 'V-Tune — Handpan Strobe Tuner',

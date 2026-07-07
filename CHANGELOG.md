@@ -4,6 +4,17 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.1] — 2026-07-07
+
+### Fixed
+- **iOS could report a new version while still showing the previous
+  release's interface.** A cached service worker inside the app's WebView
+  was serving the old, pre-cached screen even after the update installed —
+  so the version read as new but the UI hadn't changed. The service worker
+  is now disabled inside the native iOS app (it stays on the web app for
+  offline use) and any leftover cache is cleared on launch, so updates take
+  effect immediately.
+
 ## [1.1.0] — 2026-07-06
 
 ### Added
@@ -213,6 +224,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.1]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.1
 [1.1.0]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.0
 [1.0.9]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.9
 [1.0.8]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.8
