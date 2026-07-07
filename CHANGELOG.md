@@ -7,76 +7,41 @@ All notable changes to V-Tune are documented here. The format is based on
 ## [1.1.1] — 2026-07-07
 
 ### Fixed
-- **iOS could report a new version while still showing the previous
-  release's interface.** A cached service worker inside the app's WebView
-  was serving the old, pre-cached screen even after the update installed —
-  so the version read as new but the UI hadn't changed. The service worker
-  is now disabled inside the native iOS app (it stays on the web app for
-  offline use) and any leftover cache is cleared on launch, so updates take
-  effect immediately.
+- **iOS could report a new version while still showing the previous release's interface.** A cached service worker inside the app's WebView was serving the old, pre-cached screen even after the update installed — so the version read as new but the UI hadn't changed. The service worker is now disabled inside the native iOS app (it stays on the web app for offline use) and any leftover cache is cleared on launch, so updates take effect immediately.
 
 ## [1.1.0] — 2026-07-06
 
 ### Added
-- **Redesigned controls.** Everything now lives in one menu: on desktop a
-  full-height panel slides out from the right (open it with the burger
-  button); on phones a bottom **quick-pick** panel slides up. Both carry a
-  **teal utility bar** — Settings, Stopwatch and the Spectrum Analyser on the
-  left, light/dark and (on mobile) a pin on the right.
-- **Pin the menu open.** By default the menu **auto-hides after 20 seconds**
-  of no interaction to give the strobe more room; pin it to keep it put.
-- **Header stopwatch readout.** On desktop, if the menu hides while a
-  stopwatch session is running, a compact timer stays visible in the header.
-- **Interactive onboarding tour, rebuilt** — a learn-by-doing walkthrough
-  that spotlights each control and waits for you to try it, with full
-  desktop and mobile flows. Re-run it any time from Settings → Accessibility.
+- **Redesigned controls.** Everything now lives in one menu: on desktop a full-height panel slides out from the right (open it with the burger button); on phones a bottom **quick-pick** panel slides up. Both carry a **teal utility bar** — Settings, Stopwatch and the Spectrum Analyser on the left, light/dark and (on mobile) a pin on the right.
+- **Pin the menu open.** By default the menu **auto-hides after 20 seconds** of no interaction to give the strobe more room; pin it to keep it put.
+- **Header stopwatch readout.** On desktop, if the menu hides while a stopwatch session is running, a compact timer stays visible in the header.
+- **Interactive onboarding tour, rebuilt** — a learn-by-doing walkthrough that spotlights each control and waits for you to try it, with full desktop and mobile flows. Re-run it any time from Settings → Accessibility.
 
 ### Changed
-- **Settings is now a modal**, opened with the gear icon — laid out in two
-  columns with clear sections: Input, Strobe Preferences and Accessibility
-  (plus Tuning on mobile).
-- **Strobe display is theme-aware.** It rests at a light grey (light mode) or
-  soft charcoal (dark mode) and darkens as soon as the mic picks up, for
-  maximum bar contrast — then eases back when you stop. A locked band gets a
-  dark-green wash that brightens as the note rings out.
+- **Settings is now a modal**, opened with the gear icon — laid out in two columns with clear sections: Input, Strobe Preferences and Accessibility (plus Tuning on mobile).
+- **Strobe display is theme-aware.** It rests at a light grey (light mode) or soft charcoal (dark mode) and darkens as soon as the mic picks up, for maximum bar contrast — then eases back when you stop. A locked band gets a dark-green wash that brightens as the note rings out.
 - **Light mode is now the default** for new installs.
-- **Spectrum Analyser** is toggled from the utility bar and now always
-  reveals its two isolation strobes — even if you'd cleared them.
+- **Spectrum Analyser** is toggled from the utility bar and now always reveals its two isolation strobes — even if you'd cleared them.
 - Title trimmed to **"Strobe Tuner"**.
 
 ### Fixed
-- **Desktop audio robustness.** Resume a suspended audio context, match the
-  capture device's sample rate, keep the mic stream alive, and keep USB mics
-  from vanishing off the input list — fixing "Let's Go does nothing" cases in
-  the desktop WebView, and a clearer message when a device can't be opened.
+- **Desktop audio robustness.** Resume a suspended audio context, match the capture device's sample rate, keep the mic stream alive, and keep USB mics from vanishing off the input list — fixing "Let's Go does nothing" cases in the desktop WebView, and a clearer message when a device can't be opened.
 
 ### Removed
-- The desktop "collapse sidebar" strip — superseded by the burger + auto-hide
-  + pin.
+- The desktop "collapse sidebar" strip — superseded by the burger + auto-hide + pin.
 
 ## [1.0.9] — 2026-06-18
 
 ### Changed
-- **Strobe display redesign for sharper at-a-glance tuning.** The bars now
-  blur progressively the further you are from pitch — crisp when locked,
-  smearing into a soft wash when way out — with a gentle feather even in
-  tune. When a note locks, the black gaps wash **dark green**; as the note
-  rings down the gaps brighten toward the bar colour, so the strobe melts
-  into a green field before fading back to red.
-- **Settings reorganised into labelled sections** — **Input**, **Strobe
-  Preferences** and **Accessibility Options**, each under its own heading
-  bar. The input-device picker is now full-width, mic sensitivity is
-  relabelled **MIC +/−**, and the **Hum filter** now sits under Input
-  alongside the mic.
+- **Strobe display redesign for sharper at-a-glance tuning.** The bars now blur progressively the further you are from pitch — crisp when locked, smearing into a soft wash when way out — with a gentle feather even in tune. When a note locks, the black gaps wash **dark green**; as the note rings down the gaps brighten toward the bar colour, so the strobe melts into a green field before fading back to red.
+- **Settings reorganised into labelled sections** — **Input**, **Strobe Preferences** and **Accessibility Options**, each under its own heading bar. The input-device picker is now full-width, mic sensitivity is relabelled **MIC +/−**, and the **Hum filter** now sits under Input alongside the mic.
 
 ### Removed
 - **Always on top** (desktop) toggle — removed.
-- **Smooth** and **Readout** sliders — removed from Settings; both now use
-  fixed, tuned defaults under the hood.
+- **Smooth** and **Readout** sliders — removed from Settings; both now use fixed, tuned defaults under the hood.
 
 ### Fixed
-- **Ayasa Elements – D Kurd 11** now shows the correct top note **D5**
-  (it was previously listed as E5).
+- **Ayasa Elements – D Kurd 11** now shows the correct top note **D5** (it was previously listed as E5).
 
 ## [1.0.8] — 2026-06-17
 
