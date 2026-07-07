@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { useTunerStore } from '../store/tunerStore';
 import { frequencyToNote } from '../utils/notes';
 import { YIN } from 'pitchfinder';
@@ -56,15 +57,22 @@ export async function startAudio(deviceId?: string): Promise<void> {
     document.body.appendChild(keepAliveSink);
     void keepAliveSink.play().catch(() => {});
 
-    // WebKit/Safari bug: createMediaStreamSource yields SILENCE when the
+    // Desktop WebKit/Safari bug: createMediaStreamSource yields SILENCE when the
     // AudioContext sample rate differs from the capture device's actual rate
     // (common with 48 kHz USB mics while the system output runs at 44.1 kHz)
     // — the OS shows input level but the graph receives nothing. Build the
     // context to match the track's real rate so audio actually flows.
+    //
+    // BUT only off native: on iOS/Capacitor forcing the rate can leave
+    // audioContext.sampleRate reporting a value the mic doesn't actually
+    // deliver, which scales every detected frequency (an iPad read every note
+    // ~a semitone sharp while an iPhone was fine). Native iOS ran the plain
+    // context correctly pre-1.1.0, so there we let the OS pick the rate.
     const track0 = stream.getAudioTracks()[0];
     const trackRate = track0?.getSettings?.().sampleRate;
+    const forceTrackRate = !!trackRate && !Capacitor.isNativePlatform();
     try {
-      audioContext = trackRate ? new AudioContext({ sampleRate: trackRate }) : new AudioContext();
+      audioContext = forceTrackRate ? new AudioContext({ sampleRate: trackRate }) : new AudioContext();
     } catch {
       // Older WebKit without the sampleRate constructor option.
       audioContext = new AudioContext();
@@ -77,8 +85,8 @@ export async function startAudio(deviceId?: string): Promise<void> {
     gainNode = audioContext.createGain();
     gainNode.gain.value = dbToGain(store.micGainDb);
     workletNode = new AudioWorkletNode(audioContext, 'tuner-processor');
-
-    workletNode.port.postMessage({ type: 'setSampleRate', sampleRate });
+    // The worklet reads its own render-thread `sampleRate` global (the true
+    // rate), so we no longer message a rate in — see audio-worklet-processor.js.
 
     const freqs = store.getTargetFrequencies();
     workletNode.port.postMessage({

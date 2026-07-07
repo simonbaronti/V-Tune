@@ -4,6 +4,17 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.2] — 2026-07-07
+
+### Fixed
+- **Every note reading sharp on some devices (notably certain iPads).** The
+  tuner's pitch engine could be handed a sample rate that didn't match what
+  the microphone was actually delivering, which scaled every detected
+  frequency by a fixed amount — so a whole instrument read consistently sharp
+  versus reality. The engine now always uses the true audio render rate, and
+  on iOS lets the system pick the rate (the path that was already correct on
+  iPhone), so readings match across devices.
+
 ## [1.1.1] — 2026-07-07
 
 ### Fixed
@@ -189,6 +200,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.2
 [1.1.1]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.1
 [1.1.0]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.0
 [1.0.9]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.0.9

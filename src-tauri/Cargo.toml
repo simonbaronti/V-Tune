@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.1.1"
+version = "1.1.2"
 description = "Precision strobe tuner for handpans and other multi-modal instruments."
 authors = ["Simon Baronti"]
 license-file = "../LICENSE"

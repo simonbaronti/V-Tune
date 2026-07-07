@@ -26,7 +26,12 @@ class TunerProcessor extends AudioWorkletProcessor {
     this.errorHistory = new Map();
     this.targetFrequencies = [440];
     this.referenceFreq = 440;
-    this.sampleRate = 44100;
+    // Use the AudioWorkletGlobalScope global `sampleRate` — the actual rate at
+    // which process() is clocked — as the single source of truth. The main
+    // thread's audioContext.sampleRate can diverge from the true render rate on
+    // some WebKit/iPad audio configs, which scaled every detected frequency
+    // (an iPad read every note ~a semitone sharp). The render rate never lies.
+    this.sampleRate = sampleRate;
     this.rmsLevel = 0;
 
     // DC blocker state (one-pole high-pass, ~7Hz cutoff)
@@ -46,10 +51,8 @@ class TunerProcessor extends AudioWorkletProcessor {
         this.prevPhases.clear();
         this.errorHistory.clear();
       }
-      if (e.data.type === 'setSampleRate') {
-        this.sampleRate = e.data.sampleRate;
-        this.rebuildHumNotches();
-      }
+      // (Sample rate is taken from the render-thread global, never messaged in
+      // — see the constructor. The main thread no longer sends setSampleRate.)
       if (e.data.type === 'setHumFilter') {
         this.humFilterHz = e.data.hz | 0; // 0 / 50 / 60
         this.rebuildHumNotches();
