@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { useTunerStore } from '../store/tunerStore';
 import { frequencyToNote } from '../utils/notes';
+import { isoRefinedFreq } from '../components/bgSignal';
 import { YIN } from 'pitchfinder';
 
 let audioContext: AudioContext | null = null;
@@ -8,6 +9,26 @@ let workletNode: AudioWorkletNode | null = null;
 let sourceNode: MediaStreamAudioSourceNode | null = null;
 let gainNode: GainNode | null = null;
 let stream: MediaStream | null = null;
+let isoUnsub: (() => void) | null = null;
+let lastIsolations: unknown = null;
+
+/**
+ * Push the current isolation windows' rough peaks to the worklet so it can
+ * phase-rate-refine them, and drop any refined values for windows that no
+ * longer exist. Called on start and whenever the isolations array changes.
+ */
+function postIsoTargets(): void {
+  if (!workletNode) return;
+  const iso = useTunerStore.getState().isolations;
+  workletNode.port.postMessage({
+    type: 'setIsoTargets',
+    targets: iso.map((i) => ({ id: i.id, freq: i.peakFreq })),
+  });
+  const ids = new Set(iso.map((i) => i.id));
+  for (const k of Object.keys(isoRefinedFreq)) {
+    if (!ids.has(k)) delete isoRefinedFreq[k];
+  }
+}
 // Safari/WKWebView pumps a capture MediaStream into the Web Audio graph only
 // while the stream is attached to a *playing* HTMLMediaElement — otherwise
 // the MediaStreamAudioSourceNode emits pure silence (RMS exactly 0). This
@@ -108,8 +129,24 @@ export async function startAudio(deviceId?: string): Promise<void> {
         store.updateBands(e.data.bands);
         store.setRmsLevel(e.data.rmsLevel);
         store.setPeaks(e.data.peaks);
+        if (e.data.isoPeaks) {
+          for (const p of e.data.isoPeaks) isoRefinedFreq[p.id] = p.freq;
+        }
       }
     };
+
+    // Feed the worklet each isolation window's rough peak so it can refine it
+    // with phase-rate. The isolations array reference only changes when a peak
+    // meaningfully moves (SpectrumAnalyzer throttles it) or a window is added/
+    // removed, so the identity guard keeps this to a few posts per second.
+    isoUnsub?.();
+    lastIsolations = null;
+    postIsoTargets();
+    isoUnsub = useTunerStore.subscribe((s) => {
+      if (s.isolations === lastIsolations) return;
+      lastIsolations = s.isolations;
+      postIsoTargets();
+    });
 
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = store.fftSize;
@@ -336,6 +373,13 @@ export function stopAudio() {
   liveLastMidi = null;
   liveSilentFrames = 0;
   useTunerStore.getState().setDetectedMidi(null);
+
+  if (isoUnsub) {
+    isoUnsub();
+    isoUnsub = null;
+  }
+  lastIsolations = null;
+  for (const k of Object.keys(isoRefinedFreq)) delete isoRefinedFreq[k];
 
   if (workletNode) {
     workletNode.disconnect();

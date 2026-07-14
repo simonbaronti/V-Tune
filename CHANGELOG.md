@@ -4,6 +4,28 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.3] — 2026-07-08
+
+### Added
+- **Sixteen more handpan scales** across the Ayasa range — B2 Aavartan 17,
+  B3 Pygmy 20, C Ashakiran 17, D Kurd 12 / 13 / 14 / 19, D Ashakiran 19,
+  D Aegean 18 / 20, E Amara 20, F Equinox 17, F#2 Nordlys 16, F# Low Pygmy
+  12 / 21, and F# Kurd 20 / 22.
+
+### Changed
+- **Bottom notes** now appear in their true pitch position within a scale and
+  are marked with a **teal outline** to set them apart from the ding.
+- The three original **(Ayasa Elements)** scales now sit at the top of the
+  scale list, with the rest below.
+
+### Fixed
+- **Spectrum Analyser isolation bands now read frequency with the same
+  sub-cent precision as the main strobe.** They previously used a coarser
+  FFT-peak method that could read a couple of tenths of a hertz off (e.g.
+  739.8 Hz for a 740 Hz F#5); they now refine that peak with the same
+  phase-rate physics as the main bands.
+- Corrected the **E Amara 20** note layout.
+
 ## [1.1.2] — 2026-07-07
 
 ### Fixed
@@ -200,6 +222,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.3
 [1.1.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.2
 [1.1.1]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.1
 [1.1.0]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.0

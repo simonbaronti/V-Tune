@@ -8,6 +8,17 @@
  */
 export const micLiveness = { value: 0 };
 
+/**
+ * Phase-rate-refined peak frequency per isolation window, keyed by iso id.
+ * The Spectrum Analyser finds each window's rough (bin-limited) peak on the
+ * main thread; the audio worklet then refines it with the same Goertzel
+ * phase-rate physics the main strobe bands use and writes the sub-cent
+ * result here. IsolationBand reads it each frame (falling back to the rough
+ * peak until a refined value arrives) — kept off the reactive store so the
+ * per-hop updates don't churn React re-renders.
+ */
+export const isoRefinedFreq: Record<string, number | null> = {};
+
 export type Rgba = readonly [number, number, number, number];
 
 /** Linear-interpolate two rgba tuples → css string. t in [0,1]. */

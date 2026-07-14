@@ -143,24 +143,32 @@ export function PitchDial() {
       currentNote !== null &&
       currentNote.name === note.name &&
       currentNote.octave === note.octave;
+    const isBottom = !!note.bottom;
     const noteMidi = (note.octave + 1) * 12 + NOTE_NAMES.indexOf(note.name);
     const isDetected = detectedMidi !== null && detectedMidi === noteMidi && !isActive;
 
+    // Ding = purple; bottom note = teal outline; everything else neutral.
     const background = isActive
       ? 'var(--accent-blue)'
       : isDing
         ? 'rgba(168, 85, 247, 0.15)' // highlight the ding
-        : 'var(--bg-tertiary)';
+        : isBottom
+          ? 'rgba(6, 182, 212, 0.12)'
+          : 'var(--bg-tertiary)';
     const color = isActive
       ? '#fff'
       : isDing
         ? '#a855f7'
-        : 'var(--text-primary)';
+        : isBottom
+          ? '#06b6d4'
+          : 'var(--text-primary)';
     const borderColor = isActive
       ? 'var(--accent-blue)'
       : isDing
         ? '#a855f7'
-        : 'var(--border)';
+        : isBottom
+          ? '#06b6d4'
+          : 'var(--border)';
 
     return (
       <button
@@ -175,9 +183,9 @@ export function PitchDial() {
             ? '0 0 0 2px #22d3ee, 0 0 14px 2px rgba(34, 211, 238, 0.55)'
             : undefined,
         }}
-        title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''}`}
+        title={`${note.name}${note.octave}${isDing ? ' (ding)' : isBottom ? ' (bottom note)' : ''}`}
       >
-        <span className="font-bold">{getDisplayName(note.name, activeScale?.naming ?? noteNaming)}</span>
+        <span className="font-bold">{note.display ?? getDisplayName(note.name, activeScale?.naming ?? noteNaming)}</span>
         <span className="opacity-70 text-xs ml-0.5">{note.octave}</span>
       </button>
     );

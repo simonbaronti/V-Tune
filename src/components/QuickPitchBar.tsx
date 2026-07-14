@@ -126,9 +126,11 @@ export function QuickPitchBar() {
       currentNote !== null && currentNote.name === note.name && currentNote.octave === note.octave;
     const noteMidi = (note.octave + 1) * 12 + NOTE_NAMES.indexOf(note.name);
     const isDetected = !isActive && detectedMidi !== null && detectedMidi === noteMidi;
-    const background = isActive ? 'var(--accent-blue)' : isDing ? 'rgba(168, 85, 247, 0.15)' : 'var(--bg-tertiary)';
-    const color = isActive ? '#fff' : isDing ? '#a855f7' : 'var(--text-primary)';
-    const borderColor = isActive ? 'var(--accent-blue)' : isDing ? '#a855f7' : 'var(--border)';
+    const isBottom = !!note.bottom;
+    // Ding = purple; bottom note = teal outline; everything else neutral.
+    const background = isActive ? 'var(--accent-blue)' : isDing ? 'rgba(168, 85, 247, 0.15)' : isBottom ? 'rgba(6, 182, 212, 0.12)' : 'var(--bg-tertiary)';
+    const color = isActive ? '#fff' : isDing ? '#a855f7' : isBottom ? '#06b6d4' : 'var(--text-primary)';
+    const borderColor = isActive ? 'var(--accent-blue)' : isDing ? '#a855f7' : isBottom ? '#06b6d4' : 'var(--border)';
     return (
       <button
         onClick={() => selectNote(note.name, note.octave)}
@@ -139,9 +141,9 @@ export function QuickPitchBar() {
           border: `1px solid ${borderColor}`,
           boxShadow: isDetected ? '0 0 0 2px #22d3ee, 0 0 12px 2px rgba(34, 211, 238, 0.5)' : undefined,
         }}
-        title={`${note.name}${note.octave}${isDing ? ' (ding)' : ''}`}
+        title={`${note.name}${note.octave}${isDing ? ' (ding)' : isBottom ? ' (bottom note)' : ''}`}
       >
-        <span className="font-bold">{getDisplayName(note.name, scaleNaming)}</span>
+        <span className="font-bold">{note.display ?? getDisplayName(note.name, scaleNaming)}</span>
         <span className="opacity-70 text-xs ml-0.5">{note.octave}</span>
       </button>
     );

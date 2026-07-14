@@ -24,6 +24,12 @@ class TunerProcessor extends AudioWorkletProcessor {
     this.samplesSinceLastHop = 0;
     this.prevPhases = new Map();
     this.errorHistory = new Map();
+    // Isolation-window peak refinement (phase-rate, keyed by iso id). The main
+    // thread sends each window's rough FFT peak; we refine it here.
+    this.isoTargets = [];
+    this.isoPrevPhase = new Map();
+    this.isoPrevFreq = new Map();
+    this.isoHistory = new Map();
     this.targetFrequencies = [440];
     this.referenceFreq = 440;
     // Use the AudioWorkletGlobalScope global `sampleRate` — the actual rate at
@@ -53,6 +59,18 @@ class TunerProcessor extends AudioWorkletProcessor {
       }
       // (Sample rate is taken from the render-thread global, never messaged in
       // — see the constructor. The main thread no longer sends setSampleRate.)
+      if (e.data.type === 'setIsoTargets') {
+        // [{ id, freq }] — freq is the window's rough peak (or null).
+        this.isoTargets = e.data.targets || [];
+        const ids = new Set(this.isoTargets.map((t) => t.id));
+        for (const k of this.isoPrevFreq.keys()) {
+          if (!ids.has(k)) {
+            this.isoPrevFreq.delete(k);
+            this.isoPrevPhase.delete(k);
+            this.isoHistory.delete(k);
+          }
+        }
+      }
       if (e.data.type === 'setHumFilter') {
         this.humFilterHz = e.data.hz | 0; // 0 / 50 / 60
         this.rebuildHumNotches();
@@ -373,11 +391,85 @@ class TunerProcessor extends AudioWorkletProcessor {
       });
     }
 
+    // Isolation-window peaks: refine each rough FFT peak (found on the main
+    // thread inside the user-gated window) with the same phase-rate physics
+    // the main bands use, so the ISO Hz readout is sub-cent-accurate instead
+    // of bin-limited. this.isoTargets = [{ id, freq }] (freq = rough peak/null).
+    const isoPeaks = [];
+    const maxRefineHz = this.sampleRate / this.bufferSize; // ~one FFT bin
+    for (const t of this.isoTargets) {
+      const f = t.freq;
+      if (f == null || !(f > 0)) {
+        isoPeaks.push({ id: t.id, freq: null });
+        continue;
+      }
+      // Reset phase history when the rough peak jumps to a new frequency.
+      const prevF = this.isoPrevFreq.get(t.id);
+      if (prevF === undefined || Math.abs(prevF - f) > 1e-6) {
+        this.isoPrevPhase.delete(t.id);
+        this.isoHistory.set(t.id, []);
+        this.isoPrevFreq.set(t.id, f);
+      }
+
+      const g = this.goertzel(this.windowed, f, this.sampleRate);
+      let phaseDelta = 0;
+      const pp = this.isoPrevPhase.get(t.id);
+      if (pp !== undefined) {
+        phaseDelta = g.phase - pp;
+        while (phaseDelta > Math.PI) phaseDelta -= 2 * Math.PI;
+        while (phaseDelta < -Math.PI) phaseDelta += 2 * Math.PI;
+      }
+      this.isoPrevPhase.set(t.id, g.phase);
+
+      const expected = (2 * Math.PI * f * this.hopSize) / this.sampleRate;
+      let normExp = expected % (2 * Math.PI);
+      if (normExp > Math.PI) normExp -= 2 * Math.PI;
+      let err = phaseDelta - normExp;
+      while (err > Math.PI) err -= 2 * Math.PI;
+      while (err < -Math.PI) err += 2 * Math.PI;
+
+      const hist = this.isoHistory.get(t.id);
+      hist.push(err);
+      if (hist.length > PHASE_HISTORY) hist.shift();
+
+      // Least-squares slope of cumulative phase over the window — identical to
+      // the main band regression, cutting quantization noise by ~sqrt(N).
+      let slope = err;
+      const n = hist.length;
+      if (n >= 3) {
+        const xMean = (n - 1) / 2;
+        let cum = 0;
+        let yMean = 0;
+        for (let i = 0; i < n; i++) { cum += hist[i]; yMean += cum; }
+        yMean /= n;
+        let num = 0;
+        let den = 0;
+        cum = 0;
+        for (let i = 0; i < n; i++) {
+          cum += hist[i];
+          const dx = i - xMean;
+          num += dx * (cum - yMean);
+          den += dx * dx;
+        }
+        slope = den !== 0 ? num / den : err;
+      }
+
+      let refined = f;
+      if (n >= 3) {
+        const hzDelta = (slope * this.sampleRate) / (2 * Math.PI * this.hopSize);
+        // The rough peak is already within a bin of the true frequency, so a
+        // trustworthy correction is small; ignore larger deltas (transients).
+        if (Math.abs(hzDelta) < maxRefineHz) refined = f + hzDelta;
+      }
+      isoPeaks.push({ id: t.id, freq: refined });
+    }
+
     this.port.postMessage({
       type: 'analysis',
       bands: bandData,
       rmsLevel: this.rmsLevel,
       peaks,
+      isoPeaks,
     });
 
     return true;

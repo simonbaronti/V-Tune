@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTunerStore, ISO_COLORS, type IsolationWindow } from '../store/tunerStore';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 import { getAudioContext } from '../audio/AudioEngine';
-import { micLiveness, mixRgba } from './bgSignal';
+import { micLiveness, mixRgba, isoRefinedFreq } from './bgSignal';
 
 // Must match the analysis hop in public/audio-worklet-processor.js so the
 // isolation band's strobe motion uses the exact same phase-rate physics as
@@ -88,7 +88,9 @@ function IsolationBandItem({
         animRef.current = requestAnimationFrame(draw);
         return;
       }
-      const peakFreq = currentIso.peakFreq;
+      // Prefer the worklet's phase-rate-refined peak (sub-cent), falling back
+      // to the rough FFT-bin peak until a refined value arrives for this window.
+      const peakFreq = isoRefinedFreq[iso.id] ?? currentIso.peakFreq;
       const tolNow = state.tolerance;
       const hyst = state.inTuneHysteresis;
       const speed = state.strobeSpeed;
