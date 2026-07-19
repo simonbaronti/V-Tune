@@ -308,6 +308,18 @@ export function PitchDial() {
             ))}
           </div>
         )}
+
+        {/* Keyboard-shortcuts help — opens the map of piano-style note keys.
+            Styled like the PURE toggle: translucent purple tint + purple text. */}
+        <button
+          onClick={() => useTunerStore.getState().setKeyboardHelpOpen(true)}
+          className="ml-auto rounded text-xs font-semibold tracking-wide uppercase shrink-0 transition-colors"
+          style={{ padding: '7px 12px', background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', border: '1px solid var(--border)' }}
+          aria-label="Keyboard map"
+          title="Keyboard map"
+        >
+          Map
+        </button>
       </div>
 
     </div>

@@ -25,14 +25,32 @@ export function useKeyboardShortcuts() {
 
       const store = useTunerStore.getState();
 
-      // Space: toggle start/stop
-      if (e.code === 'Space') {
-        e.preventDefault();
+      const toggleAudio = () => {
         if (store.isRunning) {
           stopAudio();
         } else {
           startAudio(store.inputDeviceId !== 'default' ? store.inputDeviceId : undefined);
         }
+      };
+
+      // Space: on the desktop layout, slide the controls menu in/out — so you
+      // can jump to the next note without reaching for the burger (the menu
+      // only exists at ≥1024px). On narrow layouts, keep Space as start/stop.
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+          store.setMenuOpen(!store.menuOpen);
+        } else {
+          toggleAudio();
+        }
+        return;
+      }
+
+      // Enter: start/stop the tuner (its own key, so Space can drive the menu
+      // on desktop).
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        toggleAudio();
         return;
       }
 

@@ -156,6 +156,7 @@ export interface TunerState {
   menuPinned: boolean;
   /** Settings modal open (all viewports). Transient. */
   settingsOpen: boolean;
+  keyboardHelpOpen: boolean;
   /** Stopwatch panel visible — toggled by the ⏱ icon in the teal row.
    *  Transient; a running timer shouldn't vanish behind a reload. */
   stopwatchOn: boolean;
@@ -224,6 +225,7 @@ export interface TunerState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setMenuOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  setKeyboardHelpOpen: (open: boolean) => void;
   setStopwatchOn: (on: boolean) => void;
   setQuickPickOpen: (open: boolean) => void;
   setQuickPickPinned: (pinned: boolean) => void;
@@ -408,6 +410,7 @@ export const useTunerStore = create<TunerState>()(
   menuOpen: true,
   menuPinned: false,
   settingsOpen: false,
+  keyboardHelpOpen: false,
   stopwatchOn: false,
   quickPickOpen: false,
   quickPickPinned: false,
@@ -575,6 +578,7 @@ export const useTunerStore = create<TunerState>()(
     })),
   setMenuOpen: (open) => set({ menuOpen: open }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setKeyboardHelpOpen: (open) => set({ keyboardHelpOpen: open }),
   setStopwatchOn: (on) => set({ stopwatchOn: on }),
   setQuickPickOpen: (open) => set({ quickPickOpen: open }),
   setQuickPickPinned: (pinned) => set({ quickPickPinned: pinned }),

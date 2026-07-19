@@ -4,6 +4,21 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.4] — 2026-07-08
+
+### Added
+- **Keyboard map (desktop).** A new **MAP** button in the note picker opens a
+  visual guide to V-Tune's piano-style keyboard shortcuts — pick notes,
+  octaves, cents and the reference pitch straight from the keyboard.
+- **Space slides the controls menu in and out** on desktop, so you can jump
+  to the next note without reaching for the menu button. (Start/stop the
+  tuner moved to **Enter**.)
+
+### Fixed
+- **Android: the microphone now works.** The app was missing the record-audio
+  permission, so input wasn't detected on any Android device. It now requests
+  microphone access on launch.
+
 ## [1.1.3] — 2026-07-08
 
 ### Added
@@ -222,6 +237,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.4
 [1.1.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.3
 [1.1.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.2
 [1.1.1]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.1

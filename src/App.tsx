@@ -10,6 +10,7 @@ import { QuickPitchBar } from './components/QuickPitchBar';
 import { TealIconRow } from './components/TealIconRow';
 import { StopwatchChip } from './components/StopwatchChip';
 import { SettingsModal } from './components/SettingsModal';
+import { KeyboardHelpModal } from './components/KeyboardHelpModal';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AudioErrorToast } from './components/AudioErrorToast';
 import { UpdateBanner } from './components/UpdateBanner';
@@ -115,6 +116,7 @@ function App() {
       <UpdateBanner />
       <DesktopUpdater />
       <SettingsModal />
+      <KeyboardHelpModal />
 
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status

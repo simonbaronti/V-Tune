@@ -32,4 +32,13 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Microphone capture for the tuner. RECORD_AUDIO is required for any
+         getUserMedia audio in the WebView; without MODIFY_AUDIO_SETTINGS the
+         audio subsystem can still refuse to hand the mic to the WebView even
+         after the user grants permission. Capacitor's BridgeWebChromeClient
+         handles the WebView grant + runtime prompt once these are declared. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 </manifest>
