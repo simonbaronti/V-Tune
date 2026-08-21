@@ -1,0 +1,99 @@
+/* ──────────────────────────────────────────────────────────────────────
+   V-Tune site — shared styles.
+   Design tokens, base typography, and the header/footer that every page
+   shares (rendered by the <site-header>/<site-footer> elements in site.js).
+   Page-specific styling stays in each page's own <style> block.
+   ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #08080c;
+  --bg-panel: #101018;
+  --bg-card: #0d0d15;
+  --border: #1e1e2a;
+  --border-bright: #2a2a3a;
+  --text: #f5f5fa;
+  --text-dim: rgba(255, 255, 255, 0.75);
+  --text-faint: rgba(255, 255, 255, 0.55);
+  --cyan: #06b6d4;
+  --cyan-bright: #22d3ee;
+  --green: #00e878;
+  --red: #ff3b3b;
+  --yellow: #fbbf24;
+  --purple: #a855f7;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+a { color: var(--cyan-bright); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* One page width everywhere. */
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Header (rendered by <site-header>) ── */
+header.site {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(8, 8, 12, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.header-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px;
+}
+.logo {
+  font-family: 'JetBrains Mono', monospace; font-weight: 700;
+  font-size: 20px; letter-spacing: -0.5px; color: var(--text);
+}
+.logo span { color: var(--cyan); }
+a.logo:hover { text-decoration: none; }
+.header-links { display: flex; gap: 24px; align-items: center; }
+.header-links a { color: var(--text-dim); font-size: 14px; font-weight: 500; }
+.header-links a:hover { color: var(--text); text-decoration: none; }
+.header-links a[aria-current="page"] { color: var(--cyan-bright); }
+@media (max-width: 640px) { .header-links a.hide-sm { display: none; } }
+
+/* ── Footer (rendered by <site-footer>) ── */
+footer.site { border-top: 1px solid var(--border); padding: 40px 0; }
+.footer-inner {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 20px;
+}
+.footer-inner .col-links { display: flex; gap: 22px; flex-wrap: wrap; }
+.footer-inner a { color: var(--text-dim); font-size: 14px; }
+.footer-inner a:hover { color: var(--text); text-decoration: none; }
+.footer-inner .credit { color: var(--text-faint); font-size: 13px; }
+
+/* ── Long-form pages (pricing / terms / privacy / refunds) ──
+   The page container is the full 1040px like everywhere else; running text
+   sits in a readable column inside it so lines don't stretch unreadably. */
+main.prose { padding: 56px 0 80px; }
+.prose h1 { font-size: 36px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
+.prose .updated { color: var(--text-faint); font-size: 14px; margin-bottom: 36px; }
+.prose .sub { color: var(--text-dim); font-size: 17px; margin-bottom: 40px; max-width: 64ch; }
+.prose h2 { font-size: 20px; font-weight: 700; margin: 32px 0 10px; color: var(--cyan); }
+.prose h3 { font-size: 16px; font-weight: 700; margin: 20px 0 6px; }
+.prose p, .prose ul { max-width: 76ch; }
+.prose p { color: var(--text-dim); margin-bottom: 14px; }
+.prose ul { color: var(--text-dim); margin: 0 0 14px 22px; }
+.prose li { margin-bottom: 8px; }
+.prose strong { color: var(--text); }
+.prose .no { color: var(--red); font-weight: 700; }
+.prose .short {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px 26px; margin-bottom: 32px; max-width: 76ch;
+}
+.prose .short p { color: var(--text); margin: 0; font-size: 16px; max-width: none; }

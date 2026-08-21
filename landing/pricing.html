@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pricing — V-Tune</title>
+<meta name="description" content="V-Tune Pro: try free for 14 days, then one payment of £19.99 unlocks the precision handpan strobe tuner forever — on every platform. No subscription." />
+<meta name="theme-color" content="#08080c" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/site.css" />
+<script src="/site.js" defer></script>
+<style>
+  .card {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 34px 32px; max-width: 420px; margin-bottom: 12px;
+    box-shadow: 0 0 0 1px rgba(6,182,212,0.15), 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .tier { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--purple); margin-bottom: 10px; }
+  .price { font-size: 52px; font-weight: 700; letter-spacing: -2px; line-height: 1; }
+  .price small { font-size: 18px; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+  .trial { color: var(--green); font-weight: 600; margin: 14px 0 20px; }
+  .includes { list-style: none; margin: 0 0 24px !important; }
+  .includes li { padding-left: 26px; position: relative; }
+  .includes li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+  .buy {
+    display: block; text-align: center; background: var(--green); color: #04140a;
+    font-weight: 700; font-size: 17px; padding: 15px 20px; border-radius: 12px;
+    transition: transform .15s ease;
+  }
+  .buy:hover { transform: scale(1.02); text-decoration: none; }
+  .checkout-note { color: var(--text-faint); font-size: 13px; text-align: center; margin-top: 12px; }
+  .vat { color: var(--text-faint); font-size: 13px; margin-bottom: 32px; }
+</style>
+</head>
+<body>
+
+<site-header></site-header>
+
+<main class="prose">
+  <div class="wrap">
+    <h1>Pricing</h1>
+    <p class="sub">One price, one payment, every platform. Try the full app free for 14 days — no card, no account required — then unlock it forever.</p>
+
+    <div class="card">
+      <div class="tier">V-Tune Pro</div>
+      <div class="price">£19.99 <small>one-time</small></div>
+      <div class="trial">14-day free trial included</div>
+      <ul class="includes">
+        <li>Full precision strobe tuner — fundamental, octave &amp; compound-fifth bands</li>
+        <li>Spectrum analyser with isolation windows</li>
+        <li>20+ pre-loaded handpan scales</li>
+        <li>iOS, Android, macOS, Windows, Linux &amp; web</li>
+        <li>Buy once, unlocked on all your devices</li>
+        <li>All future updates — no subscription, ever</li>
+      </ul>
+      <a class="buy" href="#" aria-disabled="true" onclick="return false;">Buy V-Tune Pro — £19.99</a>
+      <div class="checkout-note">Secure checkout by Paddle — launching shortly.<br />Until then, <a href="/#download">download the free trial</a>.</div>
+    </div>
+    <p class="vat">Price shown in GBP. Local taxes (VAT/GST) are calculated at checkout where applicable. Payments are processed by Paddle as merchant of record.</p>
+
+    <h2>How the trial works</h2>
+    <p>Every download starts a <strong>14-day free trial of the complete app</strong> — nothing held back, no card details, no sign-up. When the trial ends, V-Tune locks until you unlock it with a single £19.99 purchase. Buy on this site (or in the iOS/Android app) and sign in on any other device to unlock it there too.</p>
+
+    <h2>On mobile</h2>
+    <p>On iPhone, iPad and Android the unlock is also available directly inside the app as a standard in-app purchase through the App Store or Google Play, at the same price.</p>
+
+    <h2>Questions</h2>
+    <ul>
+      <li><strong>Is it really one-time?</strong> Yes. £19.99 once, yours forever, including updates. No subscription.</li>
+      <li><strong>How many devices?</strong> All of your own devices — sign in with the same account and V-Tune unlocks everywhere.</li>
+      <li><strong>Refunds?</strong> 14-day money-back guarantee on web purchases — see the <a href="/refunds.html">refund policy</a>.</li>
+    </ul>
+  </div>
+</main>
+
+<site-footer></site-footer>
+
+</body>
+</html>
