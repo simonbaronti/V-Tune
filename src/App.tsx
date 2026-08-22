@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { StrobeDisplay } from './components/StrobeDisplay';
 import { ControlBar } from './components/ControlBar';
 import { PitchDial } from './components/PitchDial';
@@ -17,12 +17,23 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { DesktopUpdater } from './components/DesktopUpdater';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTunerStore } from './store/tunerStore';
+import { PRO_ENABLED } from './pro/config';
+
+// The Pro layer (accounts + entitlement + paywall) pulls in the Supabase and
+// RevenueCat SDKs (~1MB minified), so it is lazy-loaded as its own chunk and
+// only when PRO_ENABLED — with the flag off the free build pays zero bytes.
+const ProGate = lazy(() => import('./pro/Paywall').then((m) => ({ default: m.ProGate })));
+const TrialBanner = lazy(() => import('./pro/Paywall').then((m) => ({ default: m.TrialBanner })));
 
 /** Width of the desktop / landscape-tablet slide-out menu. */
 const MENU_WIDTH = 380;
 
 function App() {
   useKeyboardShortcuts();
+  // Pro layer (trial / unlock). Inert until PRO_ENABLED is flipped on.
+  useEffect(() => {
+    if (PRO_ENABLED) void import('./pro/entitlement').then((m) => m.initPro());
+  }, []);
   const showSpectrum = useTunerStore((s) => s.showSpectrum);
   const theme = useTunerStore((s) => s.theme);
   const highContrast = useTunerStore((s) => s.highContrast);
@@ -117,6 +128,12 @@ function App() {
       <DesktopUpdater />
       <SettingsModal />
       <KeyboardHelpModal />
+      {PRO_ENABLED && (
+        <Suspense fallback={null}>
+          <ProGate />
+          <TrialBanner />
+        </Suspense>
+      )}
 
       {/* Top header — always above the strobe. iOS PWA runs in
           black-translucent mode (content extends under the notch / status
@@ -132,13 +149,14 @@ function App() {
         }}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <span
+          {/* Brand wordmark (teal/purple SVG, reads on both themes). */}
+          <img
             data-tour="welcome"
-            className="text-lg font-bold tracking-wider"
-            style={{ color: 'var(--accent-cyan)' }}
-          >
-            V-TUNE
-          </span>
+            src="/wordmark.svg"
+            alt="V-Tune"
+            className="h-7 w-auto shrink-0"
+            draggable={false}
+          />
           <span className="text-sm hidden sm:inline" style={{ color: 'var(--text-dim)' }}>
             STROBE TUNER
           </span>

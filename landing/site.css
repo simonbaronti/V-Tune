@@ -54,11 +54,8 @@ header.site {
   display: flex; align-items: center; justify-content: space-between;
   height: 60px;
 }
-.logo {
-  font-family: 'JetBrains Mono', monospace; font-weight: 700;
-  font-size: 20px; letter-spacing: -0.5px; color: var(--text);
-}
-.logo span { color: var(--cyan); }
+.logo { display: flex; align-items: center; }
+.logo img { height: 30px; width: auto; display: block; }
 a.logo:hover { text-decoration: none; }
 .header-links { display: flex; gap: 24px; align-items: center; }
 .header-links a { color: var(--text-dim); font-size: 14px; font-weight: 500; }

@@ -234,6 +234,16 @@ export function PitchDial() {
               isDing={i === activeScale!.dingIndex}
             />
           ))}
+          {/* Gu port notes — display-only reference, not selectable targets. */}
+          {activeScale!.guPort && (
+            <div
+              className="text-[11px] font-semibold tracking-wider"
+              style={{ gridColumn: '1 / -1', color: '#fbbf24', textAlign: 'center', paddingTop: 2 }}
+              title="Notes sometimes tuned into the Gu opening on the underside"
+            >
+              GU PORT · {activeScale!.guPort.join(' · ')}
+            </div>
+          )}
         </div>
       ) : (
         <div

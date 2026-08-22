@@ -22,7 +22,7 @@
     connectedCallback() {
       this.innerHTML =
         '<header class="site"><div class="wrap header-inner">' +
-        '<a href="/" class="logo">V<span>-</span>Tune</a>' +
+        '<a href="/" class="logo"><img src="/wordmark.svg" alt="V-Tune" /></a>' +
         '<nav class="header-links">' +
         link('/#download', 'Download') +
         link('/pricing.html', 'Pricing') +

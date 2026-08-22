@@ -16,7 +16,9 @@ if (Capacitor.isNativePlatform()) {
   window.caches?.keys?.().then((keys) => {
     keys.forEach((key) => window.caches.delete(key));
   });
-} else if ('serviceWorker' in navigator) {
+} else if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  // Register only in production builds — sw.js is generated at build time,
+  // so registering in dev just logs a fetch error to the console.
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' });
   });

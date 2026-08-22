@@ -1,29 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background with rounded corners (safe area: ~80% for maskable icons) -->
-  <rect width="512" height="512" rx="100" ry="100" fill="#08080c"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024">
+  <defs>
+    <style>
+      .cls-1 {
+        filter: url(#drop-shadow-1);
+      }
 
-  <!-- Strobe bar accent strip across the bottom -->
-  <g fill="#06b6d4" opacity="0.55">
-    <rect x="80"  y="392" width="22" height="28" rx="3"/>
-    <rect x="118" y="392" width="22" height="28" rx="3"/>
-    <rect x="156" y="392" width="22" height="28" rx="3"/>
-    <rect x="194" y="392" width="22" height="28" rx="3"/>
-    <rect x="232" y="392" width="22" height="28" rx="3"/>
-    <rect x="270" y="392" width="22" height="28" rx="3"/>
-    <rect x="308" y="392" width="22" height="28" rx="3"/>
-    <rect x="346" y="392" width="22" height="28" rx="3"/>
-    <rect x="384" y="392" width="22" height="28" rx="3"/>
-    <rect x="422" y="392" width="22" height="28" rx="3"/>
+      .cls-2, .cls-3 {
+        fill: #00bbd4;
+      }
+
+      .cls-3 {
+        font-family: Montserrat-Regular, Montserrat;
+        font-size: 265.5px;
+        letter-spacing: .07em;
+      }
+
+      .cls-4 {
+        fill: #1a1a1a;
+      }
+    </style>
+    <filter id="drop-shadow-1" x="111.4" y="77.83" width="635.4" height="630.29" filterUnits="userSpaceOnUse">
+      <feOffset dx="2" dy="2"/>
+      <feGaussianBlur result="blur" stdDeviation="3"/>
+      <feFlood flood-color="#000" flood-opacity=".75"/>
+      <feComposite in2="blur" operator="in"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <rect class="cls-4" width="1024" height="1024"/>
+    <g class="cls-1">
+      <path class="cls-2" d="M544.26,708.12l-168.85-400.37c-43.1-94.74-77.59-192.34-168.85-213.87-44.68-10.54-95.16,7.26-95.16,7.26,0,0,34.28-23.42,110.92-23.3,57.15.09,130.86,25.33,190.8,155.34,40.11,87,144.76,348,144.76,348l113.48-270.71c13.6-42.68,24.58-65.48-28.61-72.23l-.86-14.11,104.91-.66-202.54,484.66Z"/>
+    </g>
+    <text class="cls-3" transform="translate(104.2 947.29)"><tspan x="0" y="0">TUNE</tspan></text>
   </g>
-
-  <!-- V mark — bold monospace -->
-  <text
-    x="256"
-    y="330"
-    text-anchor="middle"
-    font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace"
-    font-weight="900"
-    font-size="320"
-    fill="#06b6d4"
-  >V</text>
 </svg>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTunerStore } from '../store/tunerStore';
+import { useProStore } from '../pro/proStore';
 
 /**
  * First-launch interactive tour. Spotlights one (or more) UI targets at a
@@ -243,6 +244,7 @@ function findVisibleByDataTour(id: string): Element | null {
 
 export function OnboardingTour() {
   const tourActive = useTunerStore((s) => s.tourActive);
+  const proStatus = useProStore((s) => s.status);
   const [stepIdx, setStepIdx] = useState(0);
   const [boxes, setBoxes] = useState<DOMRect[]>([]);
   // The frame we'd ideally place the tooltip near.
@@ -430,6 +432,9 @@ export function OnboardingTour() {
   };
 
   if (!tourActive || !step) return null;
+  // Never run the tour over the Pro lock screen — its click-blockers would
+  // sit above the paywall and swallow the unlock/sign-in buttons.
+  if (proStatus === 'locked') return null;
 
   // ── Spotlight rect (with padding & viewport clamping) ──────────────
   const u = unionBox;

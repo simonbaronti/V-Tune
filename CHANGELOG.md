@@ -4,6 +4,19 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.1.5] — 2026-08-22
+
+### Added
+- **Two more Ayasa Elements scales** — **D Kurd 15** and **E Amara 15**, each
+  with their bottom notes marked in pitch order.
+- **Gu port note references.** Scales whose instruments are sometimes tuned
+  with Gu port notes now show them as an amber text note beneath the scale —
+  D Kurd 13/15 (E5 · A5) and E Amara 13/15 (D6 · Bb5).
+
+### Changed
+- **New V-Tune brand.** A redesigned app icon and wordmark roll out across
+  the app header, splash screens, home-screen icons and the website.
+
 ## [1.1.4] — 2026-07-08
 
 ### Added
@@ -237,6 +250,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.1.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.5
 [1.1.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.4
 [1.1.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.3
 [1.1.2]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.2

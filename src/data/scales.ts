@@ -38,6 +38,11 @@ export interface HandpanScale {
    * sharps). When set, the scale-mode buttons use this instead of the
    * user's global note-naming preference. */
   naming?: 'sharp' | 'flat';
+  /** Gu port notes — the (usually two) notes sometimes tuned into the Gu
+   * opening on the underside. Display-only text shown after the note
+   * buttons in the picker (amber, non-interactive); they are not part of
+   * `notes` and are never selectable targets. Strings are shown verbatim. */
+  guPort?: string[];
 }
 
 /** Sentinel id meaning "show the full chromatic keyboard". */
@@ -167,6 +172,7 @@ const RAW_SCALES: HandpanScale[] = [
     name: 'D Kurd 13',
     dingIndex: 0, // D3 ding; F3/G3 bottom notes in pitch order
     naming: 'flat',
+    guPort: ['E5', 'A5'],
     notes: [
       { name: 'D',  octave: 3 }, // ding
       { name: 'F',  octave: 3, bottom: true },
@@ -189,6 +195,7 @@ const RAW_SCALES: HandpanScale[] = [
     dingIndex: 0, // D3 ding. F3/G3 are bottom notes but sit in pitch order
                   // (above the ding), flagged with `bottom` for the teal outline.
     naming: 'flat',
+    guPort: ['E5', 'A5'],
     notes: [
       { name: 'D',  octave: 3 }, // ding
       { name: 'F',  octave: 3, bottom: true }, // F3 bottom
@@ -203,6 +210,30 @@ const RAW_SCALES: HandpanScale[] = [
       { name: 'A',  octave: 4 },
       { name: 'C',  octave: 5 },
       { name: 'D',  octave: 5 },
+    ],
+  },
+  {
+    id: 'd-kurd-15-elements',
+    name: 'D Kurd 15 (Ayasa Elements)',
+    dingIndex: 0, // D3 ding; F3/G3 bottom notes in pitch order
+    naming: 'flat',
+    guPort: ['E5', 'A5'],
+    notes: [
+      { name: 'D',  octave: 3 }, // ding
+      { name: 'F',  octave: 3, bottom: true }, // F3 bottom
+      { name: 'G',  octave: 3, bottom: true }, // G3 bottom
+      { name: 'A',  octave: 3 },
+      { name: 'A#', octave: 3 }, // Bb3
+      { name: 'C',  octave: 4 },
+      { name: 'D',  octave: 4 },
+      { name: 'E',  octave: 4 },
+      { name: 'F',  octave: 4 },
+      { name: 'G',  octave: 4 },
+      { name: 'A',  octave: 4 },
+      { name: 'C',  octave: 5 },
+      { name: 'D',  octave: 5 },
+      { name: 'E',  octave: 5 },
+      { name: 'F',  octave: 5 },
     ],
   },
   {
@@ -340,6 +371,7 @@ const RAW_SCALES: HandpanScale[] = [
     name: 'E Amara 13 (Ayasa Elements)',
     dingIndex: 0,
     naming: 'sharp',
+    guPort: ['D6', 'Bb5'],
     notes: [
       { name: 'E',  octave: 3 }, // ding
       { name: 'B',  octave: 3 },
@@ -354,6 +386,30 @@ const RAW_SCALES: HandpanScale[] = [
       { name: 'F#', octave: 5 },
       { name: 'G',  octave: 5 },
       { name: 'A',  octave: 5 },
+    ],
+  },
+  {
+    id: 'e-amara-15-elements',
+    name: 'E Amara 15 (Ayasa Elements)',
+    dingIndex: 2, // E3 ding, above the C3/D3 bottom notes
+    naming: 'sharp',
+    guPort: ['D6', 'Bb5'],
+    notes: [
+      { name: 'C',  octave: 3, bottom: true },
+      { name: 'D',  octave: 3, bottom: true },
+      { name: 'E',  octave: 3 }, // ding
+      { name: 'G',  octave: 3 },
+      { name: 'A',  octave: 3 },
+      { name: 'B',  octave: 3 },
+      { name: 'D',  octave: 4 },
+      { name: 'E',  octave: 4 },
+      { name: 'F#', octave: 4 },
+      { name: 'G',  octave: 4 },
+      { name: 'A',  octave: 4 },
+      { name: 'B',  octave: 4 },
+      { name: 'D',  octave: 5 },
+      { name: 'E',  octave: 5 },
+      { name: 'G',  octave: 5 },
     ],
   },
   {
