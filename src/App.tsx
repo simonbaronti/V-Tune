@@ -157,9 +157,6 @@ function App() {
             className="h-7 w-auto shrink-0"
             draggable={false}
           />
-          <span className="text-sm hidden sm:inline" style={{ color: 'var(--text-dim)' }}>
-            STROBE TUNER
-          </span>
         </div>
         <div className="flex items-center gap-2">
           {/* Compact stopwatch — surfaces in the header on the wide layout

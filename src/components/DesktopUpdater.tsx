@@ -128,13 +128,13 @@ export function DesktopUpdater() {
               <polyline points="21 3 21 9 15 9" />
             </svg>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div className="text-base font-semibold" style={{ color: '#f5f5fa' }}>
                 V-Tune {phase.version} is available
               </div>
               {phase.notes && (
                 <div
                   className="text-xs mt-2 leading-relaxed whitespace-pre-line pr-1"
-                  style={{ color: 'var(--text-dim)', maxHeight: '16em', overflowY: 'auto' }}
+                  style={{ color: 'rgba(255, 255, 255, 0.65)', maxHeight: '16em', overflowY: 'auto' }}
                 >
                   {phase.notes}
                 </div>
@@ -145,7 +145,7 @@ export function DesktopUpdater() {
             <button
               onClick={() => setPhase({ kind: 'idle' })}
               className="text-sm font-medium px-4 py-2 rounded"
-              style={{ color: 'var(--text-dim)', background: 'transparent' }}
+              style={{ color: 'rgba(255, 255, 255, 0.65)', background: 'transparent' }}
             >
               Later
             </button>
@@ -162,10 +162,10 @@ export function DesktopUpdater() {
 
       {phase.kind === 'downloading' && (
         <>
-          <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-base font-semibold" style={{ color: '#f5f5fa' }}>
             Downloading V-Tune {phase.version}… {phase.pct}%
           </div>
-          <div style={{ height: 8, borderRadius: 999, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255, 255, 255, 0.12)', overflow: 'hidden' }}>
             <div
               style={{
                 height: '100%',
@@ -179,21 +179,21 @@ export function DesktopUpdater() {
       )}
 
       {phase.kind === 'installing' && (
-        <div className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="text-base font-semibold" style={{ color: '#f5f5fa' }}>
           Installing V-Tune {phase.version} — restarting…
         </div>
       )}
 
       {phase.kind === 'error' && (
         <div className="flex items-start gap-3">
-          <div className="text-sm" style={{ color: 'var(--text-primary)', flex: 1 }}>
+          <div className="text-sm" style={{ color: '#f5f5fa', flex: 1 }}>
             {phase.message}
           </div>
           <button
             onClick={() => setPhase({ kind: 'idle' })}
             aria-label="Dismiss"
             className="text-lg leading-none px-1"
-            style={{ color: 'var(--text-dim)' }}
+            style={{ color: 'rgba(255, 255, 255, 0.65)' }}
           >
             ×
           </button>

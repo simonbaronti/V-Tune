@@ -24,17 +24,20 @@ export const PRICE_DISPLAY = '£49.99';
 /** Where the web purchase happens (Paddle checkout on the storefront). */
 export const STORE_URL = 'https://vtune-app.com';
 
+// Real project values (safe to commit — the anon key is a public client key,
+// protected by Supabase Row Level Security, and designed to ship in apps).
 export const SUPABASE_URL: string =
-  import.meta.env.VITE_SUPABASE_URL ?? 'PLACEHOLDER.supabase.co';
+  import.meta.env.VITE_SUPABASE_URL ?? 'https://dthbxiyxbhypsoyfrrgi.supabase.co';
 export const SUPABASE_ANON_KEY: string =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'PLACEHOLDER_ANON_KEY';
+  import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0aGJ4aXl4Ymh5cHNveWZycmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyNjA4NjQsImV4cCI6MjEwMjgzNjg2NH0.R5RNDy575b2hIe0-YAlY7yOAo5gvsFVqYXh-8uHItEw';
 
 /**
  * RevenueCat public SDK keys. Apple/Google keys go to the Capacitor SDK on
  * native; the Web Billing key goes to purchases-js on web + Tauri desktop.
  */
 export const RC_API_KEY_APPLE: string =
-  import.meta.env.VITE_RC_KEY_APPLE ?? 'PLACEHOLDER_appl_KEY';
+  import.meta.env.VITE_RC_KEY_APPLE ?? 'appl_OJBpZwCvBqMtHeRoXKOVpOtPimD';
 export const RC_API_KEY_GOOGLE: string =
   import.meta.env.VITE_RC_KEY_GOOGLE ?? 'PLACEHOLDER_goog_KEY';
 export const RC_API_KEY_WEB: string =

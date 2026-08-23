@@ -49,7 +49,7 @@ export async function signInWithEmail(email: string): Promise<{ error: string | 
     options: {
       // TODO(live): switch to the app deep link (app.vtune.tuner://auth) on
       // native once the custom URL scheme is registered; storefront for web.
-      emailRedirectTo: 'https://vtune-app.com/auth/callback',
+      emailRedirectTo: 'https://vtune-app.com/auth-callback.html',
     },
   });
   return { error: error?.message ?? null };
