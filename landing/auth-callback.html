@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Signing you in — V-Tune</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#08080c" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/site.css" />
+<script src="/site.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/store.js"></script>
+<style>
+  .panel {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 34px 32px; max-width: 460px; margin: 0 auto; text-align: center;
+  }
+  .status { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+  .detail { color: var(--text-dim); font-size: 14px; }
+  .detail a { font-weight: 600; }
+  .ok { color: var(--green); }
+  .err { color: var(--red); }
+</style>
+</head>
+<body>
+
+<site-header></site-header>
+
+<main class="prose" style="display:flex; align-items:center; min-height:60vh;">
+  <div class="wrap">
+    <div class="panel">
+      <div class="status" id="status">Signing you in…</div>
+      <div class="detail" id="detail">One moment.</div>
+    </div>
+  </div>
+</main>
+
+<site-footer></site-footer>
+
+<script>
+  // supabase-js (detectSessionInUrl) consumes the magic-link tokens from the
+  // URL automatically when the client is created; we just report the result.
+  (function () {
+    var status = document.getElementById('status');
+    var detail = document.getElementById('detail');
+
+    function done(user) {
+      if (user) {
+        status.textContent = 'You’re signed in';
+        status.className = 'status ok';
+        detail.innerHTML =
+          'Signed in as <strong>' + user.email + '</strong>.<br />' +
+          'You can now <a href="/pricing.html">complete your purchase</a> — ' +
+          'or head back to the V-Tune app and sign in there to unlock it.';
+      } else {
+        status.textContent = 'Sign-in link didn’t work';
+        status.className = 'status err';
+        detail.innerHTML =
+          'The link may have expired (they’re valid for one hour, once). ' +
+          'Request a fresh one from the <a href="/pricing.html">pricing page</a>.';
+      }
+    }
+
+    // Give detectSessionInUrl a beat to process the hash, then check — and
+    // re-check briefly in case token exchange is still in flight.
+    var tries = 0;
+    (function poll() {
+      window.VTuneStore.getUser().then(function (u) {
+        if (u || tries++ > 20) return done(u);
+        setTimeout(poll, 250);
+      });
+    })();
+  })();
+</script>
+
+</body>
+</html>

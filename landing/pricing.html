@@ -12,6 +12,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/site.css" />
 <script src="/site.js" defer></script>
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/store.js"></script>
 <style>
   .card {
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px;
@@ -33,6 +36,26 @@
   .buy:hover { transform: scale(1.02); text-decoration: none; }
   .checkout-note { color: var(--text-faint); font-size: 13px; text-align: center; margin-top: 12px; }
   .vat { color: var(--text-faint); font-size: 13px; margin-bottom: 32px; }
+  .account {
+    border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 16px; font-size: 14px;
+  }
+  .account.attention { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(6,182,212,0.35); }
+  .account .row { display: flex; gap: 8px; }
+  .account input[type="email"] {
+    flex: 1; min-width: 0; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+    font: inherit; font-size: 14px;
+  }
+  .account button {
+    background: var(--cyan); color: #04191d; border: 0; border-radius: 8px;
+    padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    white-space: nowrap;
+  }
+  .account .hint { color: var(--text-faint); font-size: 12.5px; margin-top: 8px; }
+  .account .who { color: var(--text-dim); }
+  .account .who strong { color: var(--text); }
+  .account .signout { margin-left: 8px; font-size: 12.5px; }
 </style>
 </head>
 <body>
@@ -56,8 +79,136 @@
         <li>Buy once, unlocked on all your devices</li>
         <li>All future updates — no subscription, ever</li>
       </ul>
-      <a class="buy" href="#" aria-disabled="true" onclick="return false;">Buy V-Tune Pro — £49.99</a>
-      <div class="checkout-note">Secure checkout by Paddle — launching shortly.<br />Until then, <a href="/#download">download the free trial</a>.</div>
+      <div class="account" id="account" hidden>
+        <div id="account-body"></div>
+      </div>
+
+      <a class="buy" href="#" id="buy-pro">Buy V-Tune Pro — £49.99</a>
+      <div class="checkout-note" id="checkout-note">Secure checkout by Paddle — launching shortly.<br />Until then, <a href="/#download">download the free trial</a>.</div>
+
+      <script>
+      /*
+       * Storefront checkout. Environment selection:
+       *   - ?checkout=test on the URL  → Paddle SANDBOX (test cards only)
+       *   - otherwise, if a live_ token is configured → LIVE checkout
+       *   - otherwise → disarmed ("launching shortly")
+       * A purchase requires sign-in first: the buyer's account id rides along
+       * as customData.app_user_id, which is how RevenueCat attaches the
+       * entitlement to their V-Tune account on every device.
+       */
+      (function () {
+        var LIVE = { token: 'live_6f872e3cc331e1abda6158fe7b8', priceId: 'pri_01m0r8b1dmgww1pstrxg0dcrzr' };
+        var SANDBOX = {
+          token: 'test_f4d9e79d8ed9d60965980348f09',
+          priceId: 'pri_01m0r7ar5gvqx1q98trag33v3b',
+        };
+
+        var wantTest = new URLSearchParams(location.search).get('checkout') === 'test';
+        var cfg = wantTest
+          ? { env: 'sandbox', token: SANDBOX.token, priceId: SANDBOX.priceId }
+          : LIVE.token.indexOf('live_') === 0
+            ? { env: 'production', token: LIVE.token, priceId: LIVE.priceId }
+            : null;
+
+        var btn = document.getElementById('buy-pro');
+        var note = document.getElementById('checkout-note');
+        var strip = document.getElementById('account');
+        var stripBody = document.getElementById('account-body');
+        var user = null;
+
+        if (!cfg) {
+          btn.setAttribute('aria-disabled', 'true');
+          btn.addEventListener('click', function (e) { e.preventDefault(); });
+          return;
+        }
+
+        if (cfg.env === 'sandbox') {
+          note.innerHTML = 'SANDBOX checkout — test cards only, no real charge.';
+          note.style.color = '#fbbf24';
+        } else {
+          note.innerHTML = 'Secure checkout by Paddle. VAT/GST added where applicable.';
+        }
+
+        /* ── Account strip ─────────────────────────────────────────── */
+        function renderSignedOut(prompted) {
+          strip.hidden = false;
+          strip.className = prompted ? 'account attention' : 'account';
+          stripBody.innerHTML =
+            '<div class="row">' +
+            '<input type="email" id="acct-email" placeholder="you@example.com" autocomplete="email" />' +
+            '<button id="acct-send">Sign in</button>' +
+            '</div>' +
+            '<div class="hint">' +
+            (prompted ? '<strong>Sign in first</strong> — y' : 'Y') +
+            'our purchase attaches to your V-Tune account, so it unlocks the app on every device. We’ll email you a sign-in link — no password needed.' +
+            '</div>';
+          document.getElementById('acct-send').addEventListener('click', function () {
+            var email = document.getElementById('acct-email').value.trim();
+            if (email.indexOf('@') === -1) return;
+            window.VTuneStore.signInWithEmail(email).then(function (r) {
+              stripBody.innerHTML = r.error
+                ? '<div class="hint">Couldn’t send the link: ' + r.error + '</div>'
+                : '<div class="who">Check your inbox — we emailed a sign-in link to <strong>' +
+                  email + '</strong>. It brings you straight back here.</div>';
+            });
+          });
+        }
+
+        function renderSignedIn() {
+          strip.hidden = false;
+          strip.className = 'account';
+          stripBody.innerHTML =
+            '<span class="who">Buying as <strong>' + user.email + '</strong></span>' +
+            '<a href="#" class="signout" id="acct-out">sign out</a>';
+          document.getElementById('acct-out').addEventListener('click', function (e) {
+            e.preventDefault();
+            window.VTuneStore.signOut().then(function () { user = null; renderSignedOut(false); });
+          });
+        }
+
+        window.VTuneStore.getUser().then(function (u) {
+          user = u;
+          if (u) renderSignedIn();
+          else renderSignedOut(false);
+        });
+
+        /* ── Checkout ──────────────────────────────────────────────── */
+        function ready(fn) {
+          if (window.Paddle) return fn();
+          var t = setInterval(function () {
+            if (window.Paddle) { clearInterval(t); fn(); }
+          }, 50);
+        }
+
+        ready(function () {
+          if (cfg.env === 'sandbox') Paddle.Environment.set('sandbox');
+          Paddle.Initialize({
+            token: cfg.token,
+            eventCallback: function (ev) {
+              if (ev.name === 'checkout.completed') {
+                btn.textContent = 'Purchased ✓';
+                note.innerHTML =
+                  'Payment received — open V-Tune and sign in with the same email to unlock it. A receipt is on its way from Paddle.';
+                note.style.color = '';
+              }
+            },
+          });
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (!user) {
+              renderSignedOut(true);
+              strip.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              return;
+            }
+            Paddle.Checkout.open({
+              items: [{ priceId: cfg.priceId, quantity: 1 }],
+              customer: { email: user.email },
+              customData: { app_user_id: user.id },
+            });
+          });
+        });
+      })();
+      </script>
     </div>
     <p class="vat">Price shown in GBP. Local taxes (VAT/GST) are calculated at checkout where applicable. Payments are processed by Paddle as merchant of record.</p>
 
