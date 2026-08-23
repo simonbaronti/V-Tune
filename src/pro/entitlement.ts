@@ -78,9 +78,19 @@ async function configureRc(appUserId: string | null): Promise<void> {
     return;
   }
   // Web + Tauri desktop. purchases-js requires an app user id; RC's
-  // anonymous-id helper covers the signed-out case.
+  // anonymous-id helper covers the signed-out case. Persist the generated id
+  // so signed-out sessions reuse ONE anonymous identity instead of minting a
+  // new RC customer on every page load.
   if (!rcKeyLooksReal(RC_API_KEY_WEB)) return;
-  const id = appUserId ?? WebPurchases.generateRevenueCatAnonymousAppUserId();
+  const ANON_KEY = 'v-tune-rc-anon-id';
+  let id = appUserId;
+  if (!id) {
+    id = localStorage.getItem(ANON_KEY) ?? null;
+    if (!id) {
+      id = WebPurchases.generateRevenueCatAnonymousAppUserId();
+      localStorage.setItem(ANON_KEY, id);
+    }
+  }
   if (!WebPurchases.isConfigured()) {
     WebPurchases.configure({ apiKey: RC_API_KEY_WEB, appUserId: id });
   } else if (appUserId) {

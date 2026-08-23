@@ -4,6 +4,21 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.2.0] — 2026-08-24
+
+### Added
+- **V-Tune Pro.** V-Tune is now a paid app: every install includes a
+  **14-day free trial of the complete app** (no card, no sign-up), after
+  which a single **£49.99 one-time purchase** unlocks it forever — no
+  subscription. Buy on [vtune-app.com](https://vtune-app.com), or directly
+  inside the iOS app; **one purchase covers all your devices**.
+- **V-Tune accounts.** Sign in with your email (a link, or a 6-digit code
+  from the sign-in email) and your unlock follows you to every platform.
+- A trial countdown and an unlock screen with sign-in / restore built in.
+
+### Changed
+- The onboarding tour no longer runs while the app is locked.
+
 ## [1.1.5] — 2026-08-22
 
 ### Added
@@ -250,6 +265,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - Light and dark themes; sharp / flat / solfège / German notation.
 - Fully offline — no accounts, no analytics, no network requests.
 
+[1.2.0]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.2.0
 [1.1.5]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.5
 [1.1.4]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.4
 [1.1.3]: https://github.com/simonbaronti/V-Tune/releases/tag/v1.1.3

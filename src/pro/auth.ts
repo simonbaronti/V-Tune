@@ -11,6 +11,7 @@
  *   - Sign in with Apple  (required by Apple once any social login exists)
  *   - Google
  */
+import { Capacitor } from '@capacitor/core';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { PRO_ENABLED, SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
 
@@ -47,10 +48,34 @@ export async function signInWithEmail(email: string): Promise<{ error: string | 
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: {
-      // TODO(live): switch to the app deep link (app.vtune.tuner://auth) on
-      // native once the custom URL scheme is registered; storefront for web.
-      emailRedirectTo: 'https://vtune-app.com/auth-callback.html',
+      // In a browser context (web app, desktop webview, dev server) the link
+      // must come back to THIS origin so supabase-js can pick the session up
+      // from the URL (detectSessionInUrl). Native (Capacitor) can't receive
+      // an http redirect, so it lands on the storefront until the deep link
+      // (app.vtune.tuner://auth) is registered.
+      // TODO(native): switch to the deep link on iOS/Android.
+      emailRedirectTo: Capacitor.isNativePlatform()
+        ? 'https://vtune-app.com/auth-callback.html'
+        : window.location.origin,
     },
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Verify the 6-digit code from the sign-in email — the native-friendly
+ *  completion of signInWithEmail (magic links can't redirect back into the
+ *  iOS/Android app, but a typed code works everywhere). Requires the
+ *  Supabase "Magic Link" email template to include {{ .Token }}. */
+export async function verifyEmailCode(
+  email: string,
+  code: string,
+): Promise<{ error: string | null }> {
+  const sb = supabase();
+  if (!sb) return { error: 'Accounts are not available in this build.' };
+  const { error } = await sb.auth.verifyOtp({
+    email,
+    token: code.trim(),
+    type: 'email',
   });
   return { error: error?.message ?? null };
 }

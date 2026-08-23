@@ -12,8 +12,10 @@
  *   - The storefront URL (Paddle checkout lives there, not in the app)
  */
 
+// ON by default since 1.2.0 — the launch release. A free/unlocked build can
+// still be produced with VITE_PRO_ENABLED=false at build time.
 export const PRO_ENABLED: boolean =
-  (import.meta.env.VITE_PRO_ENABLED ?? 'false') === 'true';
+  (import.meta.env.VITE_PRO_ENABLED ?? 'true') === 'true';
 
 /** Days the app is fully unlocked before the paywall appears. */
 export const TRIAL_DAYS = 14;
@@ -41,7 +43,7 @@ export const RC_API_KEY_APPLE: string =
 export const RC_API_KEY_GOOGLE: string =
   import.meta.env.VITE_RC_KEY_GOOGLE ?? 'PLACEHOLDER_goog_KEY';
 export const RC_API_KEY_WEB: string =
-  import.meta.env.VITE_RC_KEY_WEB ?? 'PLACEHOLDER_rcb_KEY';
+  import.meta.env.VITE_RC_KEY_WEB ?? 'pdl_egKhUjSvOdXwfMBGVuDeBAizslZZ';
 
 /** The entitlement identifier — must match the RevenueCat dashboard. */
 export const ENTITLEMENT_ID = 'pro';
