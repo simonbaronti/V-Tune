@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTunerStore } from '../store/tunerStore';
+import { useProStore } from '../pro/proStore';
 import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
 import { ReferenceBar } from './ReferenceBar';
 
@@ -68,6 +69,55 @@ function Row({
       </div>
       <div className="flex items-center gap-2 sm:justify-end flex-wrap">{children}</div>
     </div>
+  );
+}
+
+/** V-Tune Pro status + a way to buy before the trial runs out. Also the
+ *  purchase path App Review can always reach. Hidden while Pro is off. */
+function ProSection() {
+  const status = useProStore((s) => s.status);
+  const trialDaysLeft = useProStore((s) => s.trialDaysLeft);
+  const accountEmail = useProStore((s) => s.accountEmail);
+  if (status === 'disabled' || status === 'loading') return null;
+
+  const statusLabel =
+    status === 'pro'
+      ? 'Unlocked — thanks for supporting V-Tune ✓'
+      : status === 'trial'
+        ? `Free trial — ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left`
+        : 'Locked';
+
+  return (
+    <Section title="V-Tune Pro">
+      <Row
+        title="Status"
+        description={accountEmail ? `Signed in as ${accountEmail}` : 'Not signed in'}
+      >
+        <span
+          className="text-sm font-semibold"
+          style={{ color: status === 'pro' ? '#22c55e' : 'var(--text-primary)' }}
+        >
+          {statusLabel}
+        </span>
+      </Row>
+      {status === 'trial' && (
+        <Row
+          title="Unlock forever"
+          description="One purchase, every device — no subscription"
+        >
+          <button
+            onClick={() => {
+              useTunerStore.getState().setSettingsOpen(false);
+              useProStore.getState().set({ paywallOpen: true });
+            }}
+            className="text-sm px-3 py-1.5 rounded font-semibold transition-colors"
+            style={{ background: '#22c55e', color: '#fff', border: '1px solid #22c55e' }}
+          >
+            Unlock now
+          </button>
+        </Row>
+      )}
+    </Section>
   );
 }
 
@@ -327,6 +377,9 @@ export function SettingsModal() {
               </button>
             </Row>
           </Section>
+
+          {/* ── V-Tune Pro (hidden while the Pro layer is disabled) ── */}
+          <ProSection />
         </div>
       </div>
     </div>

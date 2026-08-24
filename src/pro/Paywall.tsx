@@ -8,7 +8,7 @@
  *   - Web/desktop → vtune-app.com (Paddle checkout), then Sign in to unlock
  * Plus Sign in / Restore for existing buyers.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Purchases as NativePurchases } from '@revenuecat/purchases-capacitor';
 import { PRICE_DISPLAY, STORE_URL } from './config';
@@ -159,11 +159,20 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
 /** Full-screen lock. Mounted always; renders only when status === 'locked'. */
 export function ProGate() {
   const status = useProStore((s) => s.status);
+  const paywallOpen = useProStore((s) => s.paywallOpen);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
-  if (status !== 'locked') return null;
+  // Close a manually-opened gate the moment the purchase lands.
+  useEffect(() => {
+    if (status === 'pro' && paywallOpen) useProStore.getState().set({ paywallOpen: false });
+  }, [status, paywallOpen]);
+
+  // 'locked' forces the gate; 'trial' can open it voluntarily (Settings →
+  // V-Tune Pro → Unlock now) — that path gets a close button.
+  const voluntary = status === 'trial' && paywallOpen;
+  if (status !== 'locked' && !voluntary) return null;
 
   return (
     <div
@@ -193,13 +202,28 @@ export function ProGate() {
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         }}
       >
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" style={{ position: 'relative' }}>
+          {voluntary && (
+            <button
+              onClick={() => useProStore.getState().set({ paywallOpen: false })}
+              aria-label="Close"
+              className="w-7 h-7 rounded flex items-center justify-center"
+              style={{
+                position: 'absolute', top: -12, right: -8,
+                background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              ✕
+            </button>
+          )}
           <span className="text-xl font-bold tracking-wide" style={{ color: 'var(--text-primary)' }}>
             V-TUNE <span style={{ color: '#a855f7' }}>PRO</span>
           </span>
           <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Your 14-day free trial has ended. One purchase unlocks V-Tune
-            forever — on every device.
+            {voluntary
+              ? 'One purchase unlocks V-Tune forever — on every device. No subscription.'
+              : 'Your 14-day free trial has ended. One purchase unlocks V-Tune forever — on every device.'}
           </span>
         </div>
 

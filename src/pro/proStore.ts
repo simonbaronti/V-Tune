@@ -19,6 +19,10 @@ interface ProState {
   trialDaysLeft: number;
   /** Signed-in account email, when a session exists. */
   accountEmail: string | null;
+  /** Manually opened unlock screen (Settings → V-Tune Pro → Unlock now) —
+   *  lets trial users (and App Review) reach the purchase before the trial
+   *  ends. When 'locked', the gate shows regardless of this flag. */
+  paywallOpen: boolean;
   set: (patch: Partial<Omit<ProState, 'set'>>) => void;
 }
 
@@ -26,5 +30,6 @@ export const useProStore = create<ProState>()((set) => ({
   status: 'disabled',
   trialDaysLeft: 0,
   accountEmail: null,
+  paywallOpen: false,
   set: (patch) => set(patch),
 }));
