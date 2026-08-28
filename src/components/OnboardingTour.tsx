@@ -322,6 +322,17 @@ export function OnboardingTour() {
   useEffect(() => {
     if (!tourActive || !step) return;
     step.onEnter?.();
+    // Bring the step's target into view. Some targets live inside scrollable
+    // containers (the Settings modal body on phones) and can sit below the
+    // fold — leaving the spotlight and tooltip pinned offscreen with no way
+    // to read or reach Next. block:'center' scrolls the nearest scrollable
+    // ancestor; the per-frame measurer tracks the moving rects. Delayed so
+    // open/slide animations settle first.
+    const t = setTimeout(() => {
+      const el = findVisibleByDataTour(step.targets[0]);
+      (el as HTMLElement | null)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 300);
+    return () => clearTimeout(t);
   }, [tourActive, step]);
 
   // ── Re-measure target boxes every frame (cheap, robust against scroll
