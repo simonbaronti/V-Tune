@@ -82,18 +82,18 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
       {sent ? (
         <>
           <p className="text-sm text-center" style={{ color: 'var(--text-secondary)' }}>
-            We emailed <strong>{email}</strong> a sign-in link and a 6-digit
+            We emailed <strong>{email}</strong> a sign-in link and a
             code. Tap the link, or enter the code here:
           </p>
           <div className="flex gap-2 justify-center">
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={10}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="123456"
-              className="w-28 rounded px-3 py-2 text-base text-center tracking-[0.3em] font-semibold"
+              className="w-36 rounded px-3 py-2 text-base text-center tracking-[0.2em] font-semibold"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-primary)',
@@ -102,12 +102,12 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
             />
             <button
               onClick={() => void submitCode()}
-              disabled={code.length !== 6 || busy}
+              disabled={code.length < 6 || busy}
               className="rounded px-3 py-2 text-sm font-semibold"
               style={{
                 background: 'var(--accent-blue)',
                 color: '#fff',
-                opacity: code.length === 6 && !busy ? 1 : 0.4,
+                opacity: code.length >= 6 && !busy ? 1 : 0.4,
               }}
             >
               {busy ? 'Checking…' : 'Sign in'}
