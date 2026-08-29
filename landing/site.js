@@ -30,7 +30,34 @@
         link('/V-Tune-User-Guide.pdf', 'Guide', 'hide-sm') +
         link('https://app.vtune-app.com', 'Web App') +
         link('mailto:support@vtune-app.com', 'Support') +
-        '</nav></div></header>';
+        '<button class="nav-close" aria-label="Close menu">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+        '</button>' +
+        '</nav>' +
+        '<button class="nav-toggle" aria-label="Menu" aria-expanded="false">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>' +
+        '</button>' +
+        '</div></header>';
+
+      // Burger behaviour: toggle, close on any link tap, close on Escape.
+      var nav = this.querySelector('.header-links');
+      var toggle = this.querySelector('.nav-toggle');
+      var close = this.querySelector('.nav-close');
+      function setOpen(open) {
+        nav.classList.toggle('open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('nav-open', open);
+      }
+      toggle.addEventListener('click', function () {
+        setOpen(!nav.classList.contains('open'));
+      });
+      close.addEventListener('click', function () { setOpen(false); });
+      nav.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') setOpen(false);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setOpen(false);
+      });
     }
   }
 

@@ -61,7 +61,53 @@ a.logo:hover { text-decoration: none; }
 .header-links a { color: var(--text-dim); font-size: 14px; font-weight: 500; }
 .header-links a:hover { color: var(--text); text-decoration: none; }
 .header-links a[aria-current="page"] { color: var(--cyan-bright); }
-@media (max-width: 640px) { .header-links a.hide-sm { display: none; } }
+/* ── Mobile nav ──────────────────────────────────────────────────────
+   Phones get a burger + full-screen slide-in menu; the inline links
+   simply wrap and cramp otherwise. Desktop is untouched. */
+.nav-toggle { display: none; }
+
+@media (max-width: 720px) {
+  /* The header's backdrop-filter would otherwise become the containing
+     block for the fixed panel below, anchoring it to the header instead
+     of the viewport. Drop it on phones — the header is opaque anyway. */
+  header.site { backdrop-filter: none; background: var(--bg); }
+
+  .nav-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; height: 42px; margin-right: -8px;
+    background: none; border: 0; cursor: pointer; color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-toggle svg { width: 24px; height: 24px; }
+
+  .header-links {
+    position: fixed; inset: 0; z-index: 60;
+    flex-direction: column; justify-content: center; align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    /* Slide in from the right; hidden (and untabbable) when closed. */
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.16,1,.3,1);
+    visibility: hidden;
+  }
+  .header-links.open { transform: translateX(0); visibility: visible; }
+  .header-links a {
+    font-size: 22px; font-weight: 600; color: var(--text);
+    padding: 16px 24px; text-align: center;
+  }
+  .header-links a.hide-sm { display: block; }
+  .header-links a[aria-current="page"] { color: var(--cyan-bright); }
+
+  /* Close button sits top-right, mirroring the burger it replaced. */
+  .nav-close {
+    position: absolute; top: 9px; right: 16px;
+    width: 42px; height: 42px; display: inline-flex;
+    align-items: center; justify-content: center;
+    background: none; border: 0; color: var(--text); cursor: pointer;
+  }
+  .nav-close svg { width: 24px; height: 24px; }
+  body.nav-open { overflow: hidden; }
+}
 
 /* ── Footer (rendered by <site-footer>) ── */
 footer.site { border-top: 1px solid var(--border); padding: 40px 0; }
