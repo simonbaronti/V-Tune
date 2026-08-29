@@ -24,12 +24,14 @@
         '<header class="site"><div class="wrap header-inner">' +
         '<a href="/" class="logo"><img src="/wordmark.svg" alt="V-Tune" /></a>' +
         '<nav class="header-links">' +
+        '<img class="nav-brand" src="/wordmark.svg" alt="V-Tune" />' +
         link('/#download', 'Download') +
         link('/pricing.html', 'Pricing') +
         link('/#features', 'Features', 'hide-sm') +
         link('/V-Tune-User-Guide.pdf', 'Guide', 'hide-sm') +
         link('https://app.vtune-app.com', 'Web App') +
         link('mailto:support@vtune-app.com', 'Support') +
+        '<span class="nav-buy"><a href="/pricing.html">Buy V-Tune Pro &mdash; \u00a349.99</a></span>' +
         '<button class="nav-close" aria-label="Close menu">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
         '</button>' +
