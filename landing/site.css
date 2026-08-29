@@ -64,7 +64,7 @@ a.logo:hover { text-decoration: none; }
 /* ── Mobile nav ──────────────────────────────────────────────────────
    Phones get a burger + full-screen slide-in menu; the inline links
    simply wrap and cramp otherwise. Desktop is untouched. */
-.nav-toggle, .nav-brand, .nav-buy { display: none; }  /* mobile-panel chrome */
+.nav-toggle, .nav-brand, .nav-buy, .nav-close { display: none; }  /* mobile-panel chrome */
 
 @media (max-width: 720px) {
   /* The header's backdrop-filter would otherwise become the containing
