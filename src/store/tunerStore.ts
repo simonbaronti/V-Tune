@@ -61,6 +61,22 @@ export interface IsolationWindow {
 
 export const MAX_ISOLATIONS = 2;
 
+/** Frequency limits of the spectrum analyser's view. Live here rather than
+ * in the component so anything driving the view (the Gu-port chip) can ask
+ * for "all the way out" without importing the analyser. */
+export const SPECTRUM_MIN_FREQ = 20;
+export const SPECTRUM_MAX_FREQ = 5000;
+
+/** The view range the analyser has last been asked to show. The analyser
+ * owns its own zoom/pan (component state, redrawn every frame); this is how
+ * the rest of the app asks it to look somewhere. Each request is a fresh
+ * object so asking for the same range twice still re-applies it, and it's
+ * persisted so a reload comes back framed on whatever you were watching. */
+export interface SpectrumZoomRequest {
+  minFreq: number;
+  maxFreq: number;
+}
+
 /** Colour per isolation slot — index 0 teal, index 1 purple. Components
  * build rgba()/hex from these so the spectrum bracket and its strobe band
  * always match. */
@@ -127,6 +143,7 @@ export interface TunerState {
   // brackets. Each loudest-peak-in-window drives a live tuning band
   // rendered under the spectrum. When two exist the band area splits 50/50.
   isolations: IsolationWindow[];
+  spectrumZoom: SpectrumZoomRequest | null;
   // Mains-hum notch filter — cascaded biquad notches in the worklet at
   // f, 2f, 3f, 4f. 'off' bypasses; '50' / '60' picks the region's grid Hz.
   humFilter: 'off' | '50' | '60';
@@ -217,6 +234,12 @@ export interface TunerState {
   setIsolationPeak: (id: string, freq: number | null) => void;
   clearIsolations: () => void;
   resetIsolationsToDefault: () => void;
+  /** Replace every isolation window at once, low → high, teal then purple.
+   * Used to drop the brackets onto a known set of targets (Gu-port notes)
+   * rather than having the user draw them by hand. */
+  setIsolationWindows: (ranges: Array<[number, number]>) => void;
+  /** Ask the spectrum analyser to show this frequency range. */
+  setSpectrumZoom: (minFreq: number, maxFreq: number) => void;
   setHumFilter: (mode: 'off' | '50' | '60') => void;
   setSelectedScale: (id: string) => void;
   setOnboardingDone: (done: boolean) => void;
@@ -399,6 +422,7 @@ export const useTunerStore = create<TunerState>()(
   fftSize: 16384,
   fftSmoothing: 0.80,
   isolations: defaultIsolations(),
+  spectrumZoom: null,
   humFilter: (typeof localStorage !== 'undefined' && (localStorage.getItem('v-tune-hum') as 'off' | '50' | '60' | null)) || 'off',
   // Default to chromatic on a fresh install. Once the user picks a scale
   // the persist middleware remembers it across sessions.
@@ -562,6 +586,18 @@ export const useTunerStore = create<TunerState>()(
   },
   clearIsolations: () => set({ isolations: [] }),
   resetIsolationsToDefault: () => set({ isolations: defaultIsolations() }),
+  setIsolationWindows: (ranges) => {
+    set({
+      isolations: ranges.slice(0, MAX_ISOLATIONS).map(([a, b], i) => ({
+        id: `iso-${++isolationCounter}`,
+        minFreq: Math.min(a, b),
+        maxFreq: Math.max(a, b),
+        peakFreq: null,
+        colorIndex: i,
+      })),
+    });
+  },
+  setSpectrumZoom: (minFreq, maxFreq) => set({ spectrumZoom: { minFreq, maxFreq } }),
   // The persist middleware handles localStorage automatically for all
   // whitelisted fields below — setters just update state.
   setHumFilter: (mode) => set({ humFilter: mode }),
@@ -754,6 +790,9 @@ export const useTunerStore = create<TunerState>()(
         bandConfigs: state.bandConfigs,
         // User-drawn isolation windows
         isolations: state.isolations,
+        // Persisted alongside them: re-opening on a set of Gu-port windows
+        // with the view zoomed all the way out would look broken.
+        spectrumZoom: state.spectrumZoom,
         // Theme / accessibility
         theme: state.theme,
         highContrast: state.highContrast,

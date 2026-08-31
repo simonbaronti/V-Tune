@@ -1,5 +1,11 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useTunerStore, MAX_ISOLATIONS, ISO_COLORS } from '../store/tunerStore';
+import {
+  useTunerStore,
+  MAX_ISOLATIONS,
+  ISO_COLORS,
+  SPECTRUM_MIN_FREQ,
+  SPECTRUM_MAX_FREQ,
+} from '../store/tunerStore';
 import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
 import { micLiveness, mixRgba } from './bgSignal';
@@ -11,8 +17,8 @@ const TOUCH_HOLD_MS = 350;
 // the user trying to create an iso rather than nudge the pan a hair.
 const DRAG_THRESHOLD_PX = 4;
 
-const MIN_FREQ = 20;
-const MAX_FREQ = 5000;
+const MIN_FREQ = SPECTRUM_MIN_FREQ;
+const MAX_FREQ = SPECTRUM_MAX_FREQ;
 // Zoom limits expressed as a log10 frequency span.
 // Full range ≈ 2.9; the small min lets you zoom right in on a single peak
 // (~0.008 ≈ a ±1% window, e.g. ~±10 Hz around 1 kHz).
@@ -39,6 +45,20 @@ function dbToY(db: number, height: number, floor: number, ceil: number): number 
   return height - ((clamped - floor) / (ceil - floor)) * height;
 }
 
+/** Clamp an arbitrary requested range to the analyser's limits, honouring
+ * the same maximum zoom the wheel/pinch handlers use. */
+function clampViewRange(a: number, b: number): [number, number] {
+  const lo = Math.max(MIN_FREQ, Math.min(a, b));
+  const hi = Math.min(MAX_FREQ, Math.max(a, b));
+  const logSpan = Math.log10(hi) - Math.log10(lo);
+  if (logSpan >= MIN_LOG_SPAN) return [lo, hi];
+  const mid = (Math.log10(hi) + Math.log10(lo)) / 2;
+  return [
+    Math.pow(10, mid - MIN_LOG_SPAN / 2),
+    Math.pow(10, mid + MIN_LOG_SPAN / 2),
+  ];
+}
+
 function formatFreq(f: number): string {
   if (f >= 1000) return `${(f / 1000).toFixed(1)}k`;
   return `${Math.round(f)}`;
@@ -56,7 +76,13 @@ export function SpectrumAnalyzer() {
   const fftSmoothing = useTunerStore((s) => s.fftSmoothing);
   const isolations = useTunerStore((s) => s.isolations);
 
-  const [viewRange, setViewRange] = useState<[number, number]>([MIN_FREQ, MAX_FREQ]);
+  // A zoom request can be waiting before we even mount — arming the Gu-port
+  // chip turns the analyser on and asks for a range in the same breath — so
+  // pick it up here rather than only in the subscription below.
+  const [viewRange, setViewRange] = useState<[number, number]>(() => {
+    const pending = useTunerStore.getState().spectrumZoom;
+    return pending ? clampViewRange(pending.minFreq, pending.maxFreq) : [MIN_FREQ, MAX_FREQ];
+  });
   const [threshold, setThreshold] = useState(-60);
   // Pending isolation being painted right now via mouse/touch drag. Stored
   // in component state (not the store) until commit on pointer-up — keeps
@@ -518,6 +544,19 @@ export function SpectrumAnalyzer() {
   useEffect(() => {
     setAnalyserFftSize(fftSize);
   }, [fftSize]);
+
+  // Someone (the Gu-port chip) asked us to look at a particular range.
+  // Subscribed rather than read as state: the view range is ours to own —
+  // a request only nudges it, and the user is free to pan/zoom away after.
+  // Each request is a fresh object, so tapping the same chip twice re-frames
+  // the view even when the numbers are identical.
+  useEffect(() => {
+    return useTunerStore.subscribe((state, prev) => {
+      const req = state.spectrumZoom;
+      if (!req || req === prev.spectrumZoom) return;
+      setViewRange(clampViewRange(req.minFreq, req.maxFreq));
+    });
+  }, []);
 
   useEffect(() => {
     setAnalyserSmoothing(fftSmoothing);

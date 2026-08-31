@@ -4,6 +4,7 @@ import { NOTE_NAMES, noteToFrequency, getDisplayName } from '../utils/notes';
 import { updateWorkletTargets, startAudio, stopAudio } from '../audio/AudioEngine';
 import { findScale, HANDPAN_SCALES, CHROMATIC_ID, type ScaleNote } from '../data/scales';
 import { TealIconRow } from './TealIconRow';
+import { GuPortChip } from './GuPortChip';
 
 const AUTO_HIDE_MS = 20_000;
 
@@ -254,16 +255,9 @@ export function QuickPitchBar() {
               {activeScale!.notes.map((n, i) => (
                 <ScaleButton key={`${n.name}${n.octave}`} note={n} isDing={i === activeScale!.dingIndex} />
               ))}
-              {/* Gu port notes — display-only reference, not selectable targets. */}
-              {activeScale!.guPort && (
-                <div
-                  className="text-[11px] font-semibold tracking-wider"
-                  style={{ gridColumn: '1 / -1', color: '#fbbf24', textAlign: 'center', paddingTop: 2 }}
-                  title="Notes sometimes tuned into the Gu opening on the underside"
-                >
-                  GU PORT · {activeScale!.guPort.join(' · ')}
-                </div>
-              )}
+              {/* Gu port notes — not selectable targets, but tappable: the
+                  chip aims both isolation windows at them. */}
+              {activeScale!.guPort && <GuPortChip guPort={activeScale!.guPort} />}
             </div>
           ) : (
             <>
