@@ -55,11 +55,24 @@ def _register_fonts():
 
 _register_fonts()
 
+# Printed on the cover — bump it whenever the guide is rebuilt for a release,
+# so a downloaded PDF says which version of the app it describes.
+GUIDE_VERSION = '1.2.0'
+SITE = 'vtune-app.com'
+
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
 # musical accidental is needed, otherwise the body font drops to ▢.
 SHARP = '<font name="V-Sym">♯</font>'
 FLAT  = '<font name="V-Sym">♭</font>'
 NOTE  = '<font name="V-Sym">♪</font>'
+# Arrow keycaps need the symbol font too — Helvetica renders them as nothing
+# at all, which is worse than a box: the row silently loses its label.
+UP    = '<font name="V-Sym">↑</font>'
+DOWN  = '<font name="V-Sym">↓</font>'
+LEFT  = '<font name="V-Sym">←</font>'
+RIGHT = '<font name="V-Sym">→</font>'
+# Every "Settings → Tuning" in the body needs RIGHT too, not a bare arrow:
+# an unwrapped one vanishes and the breadcrumb reads as a double space.
 
 
 # ── V-Tune palette ────────────────────────────────────────────────────
@@ -106,7 +119,7 @@ def paint_background(canv: rl_canvas.Canvas, doc):
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 8)
     canv.drawRightString(PAGE_W - MARGIN, 7 * mm, f'{doc.page}')
-    canv.drawString(MARGIN, 7 * mm, 'v-tune-handpan.vercel.app')
+    canv.drawString(MARGIN, 7 * mm, SITE)
     canv.restoreState()
 
 
@@ -205,7 +218,7 @@ def paint_cover(canv: rl_canvas.Canvas, doc):
     # ── Footer (clear of the hero) ──────────────────────────────────────
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 8)
-    canv.drawString(MARGIN, 7 * mm, 'v-tune-handpan.vercel.app  ·  v1.0.1')
+    canv.drawString(MARGIN, 7 * mm, f'{SITE}  ·  v{GUIDE_VERSION}')
     canv.drawRightString(PAGE_W - MARGIN, 7 * mm,
                          'FFT peak detection + phase-rate Goertzel analysis')
 
@@ -449,10 +462,12 @@ def build(out_path: Path):
         ('6.  The tuning & scale controls', 'Chromatic and scale modes, PURE vs EQUAL'),
         ('7.  Mobile quick-pick panel', 'The slide-up controls on phones / tablets'),
         ('8.  Spectrum Analyser + ISO', 'See the full spectrum, isolate frequencies'),
-        ('9.  Settings', 'Every knob, what it does'),
-        ('10. Stopwatch', 'Time your tuning sessions'),
-        ('11. Theme, notation, tour', f'Light/dark, {SHARP}/{FLAT}/Do/DE, re-run onboarding'),
-        ('12. Tips & troubleshooting', 'Things to try if something feels off'),
+        ('9.  Keyboard shortcuts', 'Play the picker from a computer keyboard'),
+        ('10. Settings', 'Every knob, what it does'),
+        ('11. Stopwatch', 'Time your tuning sessions'),
+        ('12. Theme, notation, tour', f'Light/dark, {SHARP}/{FLAT}/Do/DE, re-run onboarding'),
+        ('13. V-Tune Pro', 'The trial, the one-time unlock, your account'),
+        ('14. Tips & troubleshooting', 'Things to try if something feels off'),
     ]
     for left, right in toc:
         row = Table(
@@ -512,7 +527,7 @@ def build(out_path: Path):
     story.append(HRule(50, length=36))
 
     qs = [
-        ('Grant microphone access', 'On first launch V-Tune asks for the mic. Allow it. You can change device later in Settings → Input (open Settings with the ⚙ gear in the teal icon bar).'),
+        ('Grant microphone access', 'On first launch V-Tune asks for the mic. Allow it. You can change device later in Settings <font name="V-Sym">→</font> Input (open Settings with the gear in the teal icon bar).'),
         ('Pick a note', 'The menu loads open. In the <font color="#22d3ee">Tuning / Scale</font> controls pick a scale from the <font color="#22d3ee">SCALE</font> dropdown and tap a note, or stay on Chromatic and use <font color="#22d3ee">OCT −</font> / <font color="#22d3ee">OCT +</font> to set the octave. The three foundation strobe bands (1×, 2×, 3×) update instantly.'),
         ('Press <font color="#00e878">Let’s Go</font>', 'The green button lives at the bottom of the menu (or the bottom of the mobile slide-up). Audio starts. Strike your instrument. The bars freeze when you’re in tune; they drift <i>left</i> when you’re flat, <i>right</i> when you’re sharp.'),
         ('Read the cents number on the right of each band', 'It reads 0 (and the band washes green) when you’re in tune, within ±5¢ by default. The signed number is exactly how many cents off you are.'),
@@ -588,8 +603,8 @@ def build(out_path: Path):
         s['body'],
     ))
     story += bullets([
-        '<b>⚙ Settings</b> — opens the Settings modal (section 9).',
-        '<b>⏱ Stopwatch</b> — reveals or hides the stopwatch (section 10).',
+        '<b>Settings</b> (gear) — opens the Settings modal (section 10).',
+        '<b>Stopwatch</b> (stopwatch face) — reveals or hides the stopwatch (section 11).',
         '<b>Spectrum Analyser</b> (equaliser-bars icon) — reveals or hides '
         'the Spectrum Analyser (section 8).',
     ], s)
@@ -670,9 +685,9 @@ def build(out_path: Path):
 
     story.append(Paragraph('Motion = drift', s['h2']))
     story.append(Paragraph(
-        '<b>Bars moving left</b> → your input is <i>flat</i> (pitch too low). '
-        'Tune up. <b>Bars moving right</b> → your input is <i>sharp</i> '
-        '(pitch too high). Tune down. <b>Bars holding still</b> → you’re '
+        '<b>Bars moving left</b> <font name="V-Sym">→</font> your input is <i>flat</i> (pitch too low). '
+        'Tune up. <b>Bars moving right</b> <font name="V-Sym">→</font> your input is <i>sharp</i> '
+        '(pitch too high). Tune down. <b>Bars holding still</b> <font name="V-Sym">→</font> you’re '
         'locked. When a band is in tune it gets a <font color="#00e878">dark-'
         'green wash</font> and its cents readout settles on 0.',
         s['body'],
@@ -681,7 +696,7 @@ def build(out_path: Path):
         'The bars are green in tune and red out of tune, and their '
         '<i>blur</i> tracks how far off you are: crisp and sharp when locked, '
         'blurring more the further out of tune you drift (and during the '
-        'unstable attack transient of a fresh strike). Settings → Blur sets '
+        'unstable attack transient of a fresh strike). Settings <font name="V-Sym">→</font> Blur sets '
         'the ceiling on that softness.',
         s['body_secondary'],
     ))
@@ -764,7 +779,7 @@ def build(out_path: Path):
         'below the teal bar. On phones and portrait tablets they split: the '
         'scale picker, note grid and <font color="#00e878">Let’s Go</font> '
         'live in the slide-up quick-pick panel (section 7), while Reference '
-        'A4 and Tolerance move into Settings → Tuning. Either way the picker '
+        'A4 and Tolerance move into Settings <font name="V-Sym">→</font> Tuning. Either way the picker '
         'has two modes:',
         s['body'],
     ))
@@ -788,19 +803,55 @@ def build(out_path: Path):
 
     story.append(Paragraph('Scale mode', s['h2']))
     story.append(Paragraph(
-        'Pick a pre-saved handpan scale (Kurd, Amara, Celtic, etc.) from '
-        'the <b>SCALE</b> dropdown above the keyboard. The note picker '
-        'switches from a chromatic keyboard to just the notes in that '
-        'scale, each with a fixed octave matching the physical instrument. '
-        'The <font color="#a855f7">ding</font> (root) is highlighted in '
-        'purple. Switching scales auto-selects the ding.',
+        'Pick a pre-saved handpan scale from the <b>SCALE</b> dropdown above '
+        'the keyboard — Kurd, Amara, Pygmy, Aavartan, Ashakiran, Aegean, '
+        'Equinox and Nordlys, twenty-two layouts in all, with the '
+        '<b>Ayasa Elements</b> scales at the top of the list. The note picker '
+        'switches from a chromatic keyboard to just the notes in that scale, '
+        'each with a fixed octave matching the physical instrument. The '
+        '<font color="#a855f7">ding</font> (root) is highlighted in purple. '
+        'Switching scales auto-selects the ding.',
         s['body'],
     ))
     story.append(Paragraph(
         'Note naming: in scale mode the accidentals follow the scale’s '
-        'convention (Kurd uses flats, Amara uses sharps). In chromatic '
-        'mode they follow your <i>Settings → Notation</i> preference.',
+        'convention (Kurd uses flats, Amara uses sharps). In chromatic mode '
+        f'they follow the <b>{SHARP} {FLAT} Do DE</b> buttons in the menu '
+        '(section 12).',
         s['body_secondary'],
+    ))
+
+    story.append(Paragraph('Bottom notes', s['h2']))
+    story.append(Paragraph(
+        'Notes tuned into the underside of the shell sit in the picker at '
+        'their <i>true pitch position</i> — often below the ding — and carry '
+        'a <font color="#06b6d4">teal outline</font> so you can tell them '
+        'apart at a glance. They tune exactly like any other note; the '
+        'outline is just there so you know where you are on the instrument.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('Gu port notes', s['h2']))
+    story.append(Paragraph(
+        'Some instruments carry one or two notes tuned into the <b>Gu</b> '
+        'opening underneath. Where a scale has them, they appear as an '
+        '<font color="#fbbf24">amber chip</font> beneath the note grid — '
+        'D Kurd 13 / 15 show <b>E5 · A5</b>, E Amara 13 / 15 show '
+        f'<b>B{FLAT}5 · D6</b>. They aren’t playable targets, so you '
+        'can’t select one the way you select a note.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        '<b>Tap the chip</b> and V-Tune aims itself at them: both '
+        'Spectrum Analyser isolation windows jump to ±35 cents around the '
+        'notes, the analyser zooms in to frame them, and the two strobe '
+        'bands underneath then read nothing but the Gu port. Each note '
+        'takes the colour of the band reading it — '
+        '<font color="#06b6d4">teal</font> for the lower, '
+        '<font color="#a855f7">purple</font> for the higher — so there’s no '
+        'guessing which is which. Tap it again to hand the windows back to '
+        'their defaults. Full detail on those windows in section 8.',
+        s['body'],
     ))
 
     story.append(Paragraph('Live note indicator', s['h2']))
@@ -841,7 +892,7 @@ def build(out_path: Path):
         '<b>Reference A4</b> sets concert pitch (default 440 Hz) and '
         '<b>Tolerance</b> sets how close counts as in tune (default ±5 '
         'cents). On desktop these sit in the menu alongside the picker; on '
-        'mobile they move into Settings → Tuning. <font color="#00e878">Let’s '
+        'mobile they move into Settings <font name="V-Sym">→</font> Tuning. <font color="#00e878">Let’s '
         'Go</font> — which starts and stops audio — is pinned to the '
         '<b>bottom</b> of the menu on desktop, and the bottom of the slide-up '
         'on mobile.',
@@ -880,7 +931,7 @@ def build(out_path: Path):
         'of no interaction so the strobe gets full width, and it has its own '
         '<b>pin</b> (in the teal bar) to keep it open. When it re-collapses '
         'it just shows the selected note, centred, ready to tap again. '
-        'Reference A4 and Tolerance live in Settings → Tuning on mobile.',
+        'Reference A4 and Tolerance live in Settings <font name="V-Sym">→</font> Tuning on mobile.',
         s['body_secondary'],
     ))
 
@@ -928,21 +979,100 @@ def build(out_path: Path):
         'window reclaims the freed colour slot.',
         s['body'],
     ))
+    story.append(Paragraph(
+        'The isolation bands read frequency with the same sub-cent precision '
+        'as the main strobe — the same phase-rate physics, not a coarser '
+        'reading off the FFT peak. What you see on an ISO band is as '
+        'trustworthy as what you see on the 1× / 2× / 3× bands.',
+        s['body_secondary'],
+    ))
+
+    story.append(Paragraph('Jumping straight to the Gu port', s['h2']))
+    story.append(Paragraph(
+        'On a scale with Gu port notes you don’t have to place the brackets '
+        'by hand. Tap the <font color="#fbbf24">amber Gu port chip</font> '
+        'under the note grid and both windows land on the port notes at '
+        '±35 cents, with the analyser zoomed to frame them — wide enough to '
+        'watch the peak float inside the bracket, tight enough that nothing '
+        'else in the shell wanders in. Tap it again to restore the default '
+        'windows and the full view. See section 6.',
+        s['body'],
+    ))
 
     story.append(Spacer(1, 40))
 
-    # ── 9. Settings ───────────────────────────────────────────────────
-    story.append(Paragraph('9. Settings', s['h1']))
+    # ── 9. Keyboard shortcuts ─────────────────────────────────────────
+    story.append(Paragraph('9. Keyboard shortcuts', s['h1']))
+    story.append(Paragraph('Play the note picker from a computer keyboard', s['h1_sub']))
+    story.append(HRule(50, length=36))
+
+    story.append(Paragraph(
+        'On desktop you can drive the whole picker from the keyboard without '
+        'reaching for the mouse — useful when one hand is on the instrument. '
+        'Hit the <font color="#a855f7"><b>MAP</b></font> button at the right '
+        'of the notation row in the menu for an on-screen reminder of '
+        'everything below.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('Note keys', s['h2']))
+    story.append(Paragraph(
+        'The letter keys are laid out like a piano: the home row is the white '
+        'keys, the row above is the black keys, sitting where they would on a '
+        'real keyboard.',
+        s['body'],
+    ))
+    story.append(settings_table([
+        ('A S D F G H J', 'The naturals — C D E F G A B, in the current octave.'),
+        ('W E &nbsp;&nbsp; T Y U',
+         f'The accidentals — C{SHARP} D{SHARP} &nbsp; F{SHARP} G{SHARP} A{SHARP}, '
+         'grouped in twos and threes like the black keys.'),
+    ], s))
+
+    story.append(Paragraph('Everything else', s['h2']))
+    story.append(settings_table([
+        (f'{UP} / {DOWN}', 'Octave up / down.'),
+        (f'{LEFT} / {RIGHT}', 'Nudge the target by a cent. Hold Shift for ±10.'),
+        ('0', 'Reset that nudge back to zero.'),
+        ('Q', 'Toggle AUTO note detection.'),
+        ('+ / −', 'Reference pitch (A4) up / down.'),
+        ('Space', 'Slides the main menu in and out on a wide window. On a '
+                  'narrow one, where there is no side menu, it starts / stops '
+                  'the tuner instead.'),
+        ('Enter', 'Start / stop the tuner — the keyboard’s Let’s Go.'),
+        ('Esc', 'Deselect the current strobe band.'),
+    ], s))
+    story.append(Paragraph(
+        'Shortcuts stay out of the way while you’re typing in a field or '
+        'using a dropdown, so they never fire by accident.',
+        s['body_secondary'],
+    ))
+
+    story.append(Spacer(1, 40))
+
+    # ── 10. Settings ──────────────────────────────────────────────────
+    story.append(Paragraph('10. Settings', s['h1']))
     story.append(Paragraph('Every knob, what it does', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'Settings is a <b>modal</b>, opened by the ⚙ gear in the teal '
+        'Settings is a <b>modal</b>, opened by the gear in the teal '
         'utility bar. It’s organised into labelled teal-header sections, each '
         'laid out in two columns — the setting’s name and a short description '
         'on the left, its control on the right.',
         s['body'],
     ))
+
+    story.append(Paragraph('V-Tune Pro', s['h2']))
+    story.append(settings_table([
+        ('Status',
+         'Where you stand — <b>Free trial</b> with the days left, or '
+         '<b>Unlocked</b> once you’ve bought it. The line underneath says '
+         'which account you’re signed in as. Full detail in section 13.'),
+        ('Unlock forever',
+         'Shown during the trial: opens the unlock screen so you can buy '
+         'without waiting for the trial to run out.'),
+    ], s))
 
     story.append(Paragraph('Input', s['h2']))
     story.append(settings_table([
@@ -984,19 +1114,20 @@ def build(out_path: Path):
          'Boosts contrast throughout the UI for easier reading.'),
         ('Larger text',
          'Scales up the interface text.'),
-        ('Show tour again',
-         'Re-runs the interactive onboarding tour from the start (section 11).'),
+        ('Onboarding tour',
+         'Replays the interactive guided walkthrough from the start '
+         '(section 12).'),
     ], s))
 
     story.append(Spacer(1, 40))
 
-    # ── 10. Stopwatch ─────────────────────────────────────────────────
-    story.append(Paragraph('10. Stopwatch', s['h1']))
+    # ── 11. Stopwatch ─────────────────────────────────────────────────
+    story.append(Paragraph('11. Stopwatch', s['h1']))
     story.append(Paragraph('Time your tuning sessions', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
-        'Toggle the <b>stopwatch</b> on and off with the ⏱ icon in the teal '
+        'Toggle the <b>stopwatch</b> on and off with its icon in the teal '
         'utility bar. When on, its panel appears pinned at the <b>bottom</b> '
         'of the menu, just above <font color="#00e878">Let’s Go</font> (on '
         'mobile, just above the slide-up). Start, stop and reset controls sit '
@@ -1014,8 +1145,8 @@ def build(out_path: Path):
 
     story.append(Spacer(1, 40))
 
-    # ── 11. Theme / notation / tour ───────────────────────────────────
-    story.append(Paragraph('11. Theme, notation, and the onboarding tour', s['h1']))
+    # ── 12. Theme / notation / tour ───────────────────────────────────
+    story.append(Paragraph('12. Theme, notation, and the onboarding tour', s['h1']))
     story.append(Paragraph('A few preferences worth knowing about', s['h1_sub']))
     story.append(HRule(50, length=36))
 
@@ -1030,10 +1161,16 @@ def build(out_path: Path):
 
     story.append(Paragraph('Notation', s['h2']))
     story.append(Paragraph(
-        'Pick how accidentals are labelled in <b>Settings → Notation</b>: '
-        f'<b>{SHARP}</b> sharps, <b>{FLAT}</b> flats, <b>Do</b> solfège, '
-        f'or <b>DE</b> German naming (which uses H for B and B for B{FLAT}).',
+        'Pick how accidentals are labelled with the four small buttons in the '
+        f'menu, on the row below the note picker: <b>{SHARP}</b> sharps, '
+        f'<b>{FLAT}</b> flats, <b>Do</b> solfège, or <b>DE</b> German naming '
+        f'(which uses H for B and B for B{FLAT}).',
         s['body'],
+    ))
+    story.append(Paragraph(
+        'They only appear in chromatic mode — a scale brings its own '
+        'convention with it (section 6).',
+        s['body_secondary'],
     ))
 
     story.append(Paragraph('The onboarding tour', s['h2']))
@@ -1047,7 +1184,7 @@ def build(out_path: Path):
         s['body'],
     ))
     story.append(Paragraph(
-        'Want it again? Open Settings and hit <b>Show tour again</b> under '
+        'Want it again? Open Settings and hit <b>Onboarding tour</b> under '
         'Accessibility Options — it restarts the whole guided tour from the '
         'top, any time.',
         s['body_secondary'],
@@ -1059,20 +1196,75 @@ def build(out_path: Path):
         'version is published, V-Tune notices on launch and offers a '
         'one-click <b>Install &amp; Restart</b> — no need to redownload or '
         'reinstall. (iOS and Android update through their stores; the web '
-        'app refreshes itself.)',
+        f'app at <b>app.{SITE}</b> refreshes itself.)',
         s['body'],
     ))
 
     story.append(Spacer(1, 40))
 
-    # ── 12. Tips & troubleshooting ────────────────────────────────────
-    story.append(Paragraph('12. Tips & troubleshooting', s['h1']))
+    # ── 13. V-Tune Pro ────────────────────────────────────────────────
+    story.append(Paragraph('13. V-Tune Pro', s['h1']))
+    story.append(Paragraph('The trial, the one-time unlock, your account', s['h1_sub']))
+    story.append(HRule(50, length=36))
+
+    story.append(Paragraph(
+        'Every install starts with a <b>14-day free trial of the complete '
+        'app</b> — no card, no sign-up, nothing withheld. When it ends, a '
+        'single <font color="#00e878"><b>£49.99</b></font> purchase unlocks '
+        'V-Tune forever. It is not a subscription and there is nothing to '
+        'renew.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('One purchase, every device', s['h2']))
+    story.append(Paragraph(
+        'The unlock belongs to your <b>account</b>, not to a machine. Buy '
+        'once and sign in on the Mac in the workshop, the iPad on the bench '
+        'and the phone in your pocket — all of them unlock. Buy on '
+        f'<b>{SITE}</b>, or directly inside the iOS app, whichever suits.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('Signing in', s['h2']))
+    story.append(Paragraph(
+        'Enter your email on the unlock screen and V-Tune sends you a '
+        'sign-in link <i>and</i> a <b>6-digit code</b>. Tap the link on a '
+        'desktop or web browser; inside the phone and tablet apps, type the '
+        'code — that’s the path that brings you back into the app itself. '
+        'There is no password to invent or forget.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'Already bought it on this device and just reinstalled? '
+        '<b>Restore purchase</b>, next to Sign in, asks the store directly.',
+        s['body_secondary'],
+    ))
+
+    story.append(Paragraph('While the trial runs', s['h2']))
+    story.append(Paragraph(
+        'Nothing nags you until the last three days, when a slim purple '
+        'countdown appears above the strobe — dismissible, and back on the '
+        'next launch. To buy before the trial is out, open '
+        '<b>Settings <font name="V-Sym">→</font> V-Tune Pro <font name="V-Sym">→</font> Unlock now</b>. Once the trial ends the '
+        'unlock screen stays up until you buy, sign in or restore.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'The onboarding tour holds off while the app is locked, so you never '
+        'get walked through an app you can’t yet use.',
+        s['body_secondary'],
+    ))
+
+    story.append(Spacer(1, 40))
+
+    # ── 14. Tips & troubleshooting ────────────────────────────────────
+    story.append(Paragraph('14. Tips & troubleshooting', s['h1']))
     story.append(Paragraph('Things to try if something feels off', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph('“The bars are jittery / never lock.”', s['h3']))
     story.append(Paragraph(
-        'Background noise is usually the culprit. Open Settings with the ⚙ '
+        'Background noise is usually the culprit. Open Settings with the '
         'gear, then (a) lower Microphone Sensitivity until just your strikes '
         'register, and (b) set Hum to your local mains frequency (50 Hz '
         'UK/EU, 60 Hz US).',
@@ -1093,7 +1285,7 @@ def build(out_path: Path):
     story.append(Paragraph(
         'Check Reference A4. If it’s set to something exotic (442, 432) '
         'you’ll be tuning against a different concert pitch — it’s in the '
-        'menu on desktop, or Settings → Tuning on mobile. Also check you’re '
+        'menu on desktop, or Settings <font name="V-Sym">→</font> Tuning on mobile. Also check you’re '
         'on the right note: handpans have rich overtones, and it’s easy to '
         'accidentally lock onto a partial that isn’t the fundamental. The '
         'live note indicator on the note grid (cyan glow) helps catch this.',
@@ -1102,7 +1294,7 @@ def build(out_path: Path):
 
     story.append(Paragraph('“The strobe is too lively / too sluggish.”', s['h3']))
     story.append(Paragraph(
-        '<b>Settings → Speed</b> is your friend. Drop it for a calmer '
+        '<b>Settings <font name="V-Sym">→</font> Speed</b> is your friend. Drop it for a calmer '
         'reading, raise it for a more responsive one.',
         s['body'],
     ))
@@ -1112,6 +1304,16 @@ def build(out_path: Path):
         'Turn on the Spectrum Analyser, find the peak you care about, and '
         'shift+drag (or touch-hold drag on mobile) a bracket around it. '
         'V-Tune will generate a dedicated strobe band for that partial.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('“I bought V-Tune but this device still shows the trial.”', s['h3']))
+    story.append(Paragraph(
+        'The unlock travels with your account, so the device needs to know '
+        'who you are. Open the unlock screen — <b>Settings <font name="V-Sym">→</font> V-Tune Pro</b> '
+        'during the trial — hit <b>Sign in</b>, and use the same email you '
+        'bought with. If you bought inside the iOS app on this very device, '
+        '<b>Restore purchase</b> is the quicker route.',
         s['body'],
     ))
 
