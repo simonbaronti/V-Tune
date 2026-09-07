@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "v-tune-handpan.vercel.app" }],
+      "destination": "https://vtune-app.com/:path*",
+      "permanent": true
+    }
+  ]
+}
