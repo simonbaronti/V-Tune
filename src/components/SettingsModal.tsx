@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { useProStore } from '../pro/proStore';
+import { Capacitor } from '@capacitor/core';
 import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
+import { isTauri } from '../audio/alwaysOnTop';
 import { ReferenceBar } from './ReferenceBar';
 
 /** True on the narrow layout (<1024px) — phone + portrait tablet. */
@@ -380,10 +382,47 @@ export function SettingsModal() {
 
           {/* ── V-Tune Pro (hidden while the Pro layer is disabled) ── */}
           <ProSection />
+
+          {/* ── About ────────────────────────────────────────────── */}
+          <Section title="About">
+            <Row title="Version" description={`Running on ${platformLabel()}`}>
+              <span
+                className="text-sm font-semibold tabular-nums"
+                style={{
+                  color: 'var(--text-primary)',
+                  // The app disables text selection globally; allow it here
+                  // so this can be copied straight into a support email.
+                  userSelect: 'text',
+                  WebkitUserSelect: 'text',
+                }}
+              >
+                {__APP_VERSION__}
+              </span>
+            </Row>
+          </Section>
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Which build someone is actually running. Worth showing next to the
+ * version: "1.2.0 on iOS" and "1.2.0 on the web" behave differently, and
+ * a bug report that says which one saves a round of questions.
+ */
+function platformLabel(): string {
+  if (isTauri()) {
+    const ua = navigator.userAgent;
+    if (/Mac/i.test(ua)) return 'macOS';
+    if (/Win/i.test(ua)) return 'Windows';
+    return 'Linux';
+  }
+  switch (Capacitor.getPlatform()) {
+    case 'ios': return 'iOS';
+    case 'android': return 'Android';
+    default: return 'the web';
+  }
 }
 
 /** iOS-style toggle switch. */
