@@ -14,6 +14,9 @@ All notable changes to V-Tune are documented here. The format is based on
   takes the colour of the band reading it. Tap again to release.
 - **The running version is shown in Settings**, under a new About heading,
   along with which platform you're on.
+- Signed-in accounts now attach their **email address to the RevenueCat
+  customer record**, so support and entitlement grants can find a person by
+  their address instead of translating it through a database of UUIDs.
 
 ### Fixed
 - `npm run bump` rewrote the version string everywhere it appeared in the

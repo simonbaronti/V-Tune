@@ -98,6 +98,40 @@ async function configureRc(appUserId: string | null): Promise<void> {
   }
 }
 
+// Last app user id we attached an email to. RevenueCat stores attributes
+// server-side, so this only needs doing once per signed-in session rather
+// than on every status refresh.
+let taggedUserId: string | null = null;
+
+/**
+ * Put the account's email on the RevenueCat customer.
+ *
+ * Without it the dashboard shows nothing but UUIDs, and finding the person
+ * who emailed you about their unlock means a round-trip through Supabase to
+ * translate an address into an id. That lookup is exactly where a
+ * promotional entitlement ends up granted to the wrong row.
+ *
+ * Signed-in users only: an anonymous customer has no email to attach, and
+ * gets aliased away the moment they do sign in. Never allowed to throw —
+ * this is a convenience for us, and an unreachable RevenueCat must not stop
+ * someone tuning.
+ */
+async function tagCustomerEmail(userId: string, email: string | null): Promise<void> {
+  if (!email || taggedUserId === userId) return;
+  try {
+    if (isNative) {
+      if (!nativeConfigured) return;
+      await NativePurchases.setEmail({ email });
+    } else {
+      if (!WebPurchases.isConfigured()) return;
+      await WebPurchases.getSharedInstance().setAttributes({ $email: email });
+    }
+    taggedUserId = userId;
+  } catch {
+    // Retried on the next refresh, since taggedUserId stays unset.
+  }
+}
+
 /** True when RevenueCat says the `pro` entitlement is active. */
 async function entitlementActive(): Promise<boolean> {
   try {
@@ -128,6 +162,7 @@ export async function refreshProStatus(): Promise<void> {
 
   const user = await currentUser();
   await configureRc(user?.id ?? null);
+  if (user?.id) await tagCustomerEmail(user.id, user.email ?? null);
 
   const paid = await entitlementActive();
   if (paid) {
