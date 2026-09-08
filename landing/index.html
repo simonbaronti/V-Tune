@@ -207,13 +207,12 @@
 
       <!-- iOS -->
       <div class="dl-card" data-os="ios">
-        <span class="badge soon">Beta</span>
         <div class="platform">
           <svg viewBox="0 0 24 24"><path d="M16.365 1.43c0 1.14-.467 2.23-1.214 3.018-.78.83-2.05 1.47-3.117 1.387-.137-1.08.42-2.23 1.123-2.95.793-.81 2.166-1.41 3.208-1.455zM20.95 17.07c-.55 1.27-.815 1.84-1.524 2.96-.99 1.56-2.385 3.5-4.114 3.515-1.537.014-1.932-.998-4.02-.987-2.087.012-2.522.999-4.06.985-1.73-.016-3.05-1.766-4.04-3.327C-.66 16.06-.99 11.07.99 8.404c.99-1.34 2.55-2.18 4.02-2.18 1.5 0 2.44.998 3.68.998 1.2 0 1.93-.999 3.66-.999 1.31 0 2.7.714 3.69 1.95-3.244 1.78-2.71 6.4.91 7.897z"/></svg>
           <h3>iOS</h3>
         </div>
-        <p class="meta">iPhone &amp; iPad. Currently in TestFlight beta — install Apple's <a href="https://apps.apple.com/app/testflight/id899247664">TestFlight</a> app first, then tap the invite below.</p>
-        <a class="dl-link" href="https://testflight.apple.com/join/b6pCcWQ7" data-ios-link>Join the TestFlight beta &rarr;</a>
+        <p class="meta">iPhone &amp; iPad. Free on the App Store, with the full 14-day trial built in.</p>
+        <a class="dl-link" href="https://apps.apple.com/app/id6773939656">Download on the App Store &rarr;</a>
       </div>
 
       <!-- Android -->
@@ -352,7 +351,7 @@
 
     if (os) {
       var card = document.querySelector('.dl-card[data-os="' + os + '"]');
-      if (card && os !== 'ios') {
+      if (card) {
         card.classList.add('featured');
         var badge = document.createElement('span');
         badge.className = 'badge your-os';
