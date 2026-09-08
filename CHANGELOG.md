@@ -4,6 +4,25 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.2.1] — unreleased
+
+### Added
+- **Gu port notes are now tappable.** On scales that list them, the amber
+  Gu port chip under the note grid puts both Spectrum Analyser isolation
+  windows ±35 cents around the port notes and zooms the analyser to frame
+  them, so the two strobe bands read nothing but the Gu port. Each note
+  takes the colour of the band reading it. Tap again to release.
+- **The running version is shown in Settings**, under a new About heading,
+  along with which platform you're on.
+
+### Fixed
+- `npm run bump` rewrote the version string everywhere it appeared in the
+  landing page, including inside SVG path data — a coordinate run reads
+  "1.2.0" verbatim, so bumping mangled an icon. It now only touches the
+  release download links, and `check-versions` verifies those links rather
+  than searching the whole file for the version (which had been passing on
+  that same coincidence while the links pointed at v1.1.5).
+
 ## [1.2.0] — 2026-08-24
 
 ### Added

@@ -111,9 +111,16 @@ edit("android/app/build.gradle", (s) => {
     .replace(/versionCode \d+/, `versionCode ${code + 1}`);
 });
 
-// 8. Landing page — download links + footer embed the version
+// 8. Landing page — the GitHub release download links embed the version.
+//
+// Scoped to the release URLs on purpose. A blind global replace of the
+// version string also rewrites SVG `d` attributes: coordinate runs like
+// "…-1.2.0-1.7…" contain the version verbatim, and bumping 1.2.0 silently
+// mangled the Linux icon's path. Only touch the hrefs.
+const RELEASE_URL =
+  /https:\/\/github\.com\/simonbaronti\/V-Tune\/releases\/download\/v[\d.]+\/[^"']+/g;
 edit("landing/index.html", (s) =>
-  s.replace(new RegExp(cur, "g"), next)
+  s.replace(RELEASE_URL, (url) => url.replace(/\d+\.\d+\.\d+/g, next))
 );
 
 // CHANGELOG sanity: the release workflow derives GitHub release notes, the

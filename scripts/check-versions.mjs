@@ -51,10 +51,25 @@ const versionCode = gradle.match(/versionCode (\d+)/)?.[1];
 console.log(`  ${versionCode ? "✓" : "✗"} android build.gradle versionCode: ${versionCode ?? "NOT FOUND"}`);
 ok &&= Boolean(versionCode);
 
-// The landing page embeds download links + footer for the current version.
-const landingOk = read("landing/index.html").includes(expected);
+// The landing page's download links must point at this release's assets.
+//
+// This used to be a bare `.includes(expected)`, which passed on any
+// occurrence of the version anywhere in the file — including inside SVG
+// path data, where a coordinate run happens to read "1.2.0". It reported a
+// tick for the whole 1.2.0 cycle while every download link still pointed
+// at v1.1.5. Check the links themselves.
+const landingVersions = [
+  ...read("landing/index.html").matchAll(/releases\/download\/v([\d.]+)\//g),
+].map((m) => m[1]);
+const landingOk =
+  landingVersions.length > 0 && landingVersions.every((v) => v === expected);
 ok &&= landingOk;
-console.log(`  ${landingOk ? "✓" : "✗"} landing/index.html mentions ${expected}`);
+console.log(
+  `  ${landingOk ? "✓" : "✗"} landing/index.html download links → ${expected}` +
+    (landingOk
+      ? ` (${landingVersions.length} links)`
+      : ` (found: ${[...new Set(landingVersions)].join(", ") || "none"})`),
+);
 
 // Release notes / updater banner / TestFlight notes come from this section.
 const changelogOk = read("CHANGELOG.md").includes(`## [${expected}]`);
