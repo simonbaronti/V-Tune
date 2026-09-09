@@ -154,14 +154,14 @@ const STEPS: TourStep[] = [
     id: 'spectrum-icon',
     targets: ['sa-toggle'],
     title: 'Spectrum analyser',
-    body: 'Tap to reveal the analyser — with two isolation strobes for fine-tuning partials.',
+    body: 'Tap to reveal the analyser — with two isolation windows for fine-tuning partials.',
     advanceWhen: (s, snap) => s.showSpectrum && !snap.showSpectrum,
   },
   {
     id: 'spectrum-panel',
     targets: ['tour-spectrum-panel'],
     title: 'The analyser',
-    body: 'It appears under the strobes, with two isolation strobes ready to fine-tune partials. Tap Next.',
+    body: 'It appears under the strobes, with two isolation windows and their bands, ready to fine-tune partials. Tap Next.',
     manualAdvance: true,
   },
   {

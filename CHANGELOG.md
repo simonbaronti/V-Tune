@@ -18,6 +18,12 @@ All notable changes to V-Tune are documented here. The format is based on
   customer record**, so support and entitlement grants can find a person by
   their address instead of translating it through a database of UUIDs.
 
+### Changed
+- Consistent naming for the Spectrum Analyser's two parts throughout the app,
+  guide and changelog: an **isolation window** is the coloured bracket you
+  place on the spectrum, an **isolation band** is the strobe it drives. They
+  had also been called brackets and isolation strobes.
+
 ### Fixed
 - `npm run bump` rewrote the version string everywhere it appeared in the
   landing page, including inside SVG path data — a coordinate run reads
@@ -119,7 +125,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - **Settings is now a modal**, opened with the gear icon — laid out in two columns with clear sections: Input, Strobe Preferences and Accessibility (plus Tuning on mobile).
 - **Strobe display is theme-aware.** It rests at a light grey (light mode) or soft charcoal (dark mode) and darkens as soon as the mic picks up, for maximum bar contrast — then eases back when you stop. A locked band gets a dark-green wash that brightens as the note rings out.
 - **Light mode is now the default** for new installs.
-- **Spectrum Analyser** is toggled from the utility bar and now always reveals its two isolation strobes — even if you'd cleared them.
+- **Spectrum Analyser** is toggled from the utility bar and now always reveals its two isolation windows — even if you'd cleared them.
 - Title trimmed to **"Strobe Tuner"**.
 
 ### Fixed
@@ -161,7 +167,7 @@ All notable changes to V-Tune are documented here. The format is based on
 - **Smooth** and **Readout** now default to a calmer **75 %**.
 - The **Spectrum Analyser toggle** moved to sit directly under Settings.
 - The frequency / note / cents readout now stays visible **while dragging
-  an isolation bracket**, so you can line an edge up against a note.
+  an isolation window**, so you can line an edge up against a note.
 
 ### Fixed
 - Removed dead space above the "Let's Go" button in the mobile side panel.

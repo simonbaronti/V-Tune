@@ -947,8 +947,17 @@ def build(out_path: Path):
         'in the teal utility bar. It appears under the strobes as a '
         'frequency-domain view across the audible range — a real-time '
         'picture of every harmonic your instrument is producing, with two '
-        'isolation strobe bands beneath it for fine-tuning partials.',
+        'isolation bands beneath it for fine-tuning partials.',
         s['body'],
+    ))
+    story.append(Paragraph(
+        'Two names worth keeping straight, because they are two different '
+        'things: an <b>isolation window</b> is the coloured bracket you place '
+        'on the spectrum, and an <b>isolation band</b> is the strobe it '
+        'drives underneath. You move the window; you read the band. They '
+        'share a colour so it is always obvious which belongs to which, and '
+        'the app labels both <b>ISO</b> for short.',
+        s['body_secondary'],
     ))
     story.append(Paragraph(
         'Turning the Spectrum Analyser <b>on always restores the two default '
