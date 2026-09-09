@@ -134,6 +134,10 @@ export interface TunerState {
   showSpectrum: boolean;
   readoutSmoothing: number;
   micGainDb: number;
+  /** Pitch-pipe output level, 0-1. Shipped at 0.15 until 1.2.1, which was
+   * faint enough that the first thing a user asked on launch day was how to
+   * make it louder. */
+  pipeVolume: number;
   inTuneHysteresis: number;
   strobeIntensity: number;
   strobeSoftness: number;
@@ -222,6 +226,7 @@ export interface TunerState {
   setShowSpectrum: (show: boolean) => void;
   setReadoutSmoothing: (value: number) => void;
   setMicGainDb: (value: number) => void;
+  setPipeVolume: (value: number) => void;
   setInTuneHysteresis: (value: number) => void;
   setStrobeIntensity: (value: number) => void;
   setStrobeSoftness: (value: number) => void;
@@ -416,6 +421,7 @@ export const useTunerStore = create<TunerState>()(
   showSpectrum: true,
   readoutSmoothing: 0.70,
   micGainDb: 0,
+  pipeVolume: 0.45,
   inTuneHysteresis: 1.0,
   strobeIntensity: 0.9,
   strobeSoftness: 0.35,
@@ -545,6 +551,7 @@ export const useTunerStore = create<TunerState>()(
   setShowSpectrum: (show) => set({ showSpectrum: show }),
   setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
   setMicGainDb: (value) => set({ micGainDb: value }),
+  setPipeVolume: (value) => set({ pipeVolume: Math.max(0, Math.min(1, value)) }),
   setInTuneHysteresis: (value) => set({ inTuneHysteresis: value }),
   setStrobeIntensity: (value) => set({ strobeIntensity: value }),
   setStrobeSoftness: (value) => set({ strobeSoftness: value }),
@@ -767,6 +774,7 @@ export const useTunerStore = create<TunerState>()(
         harmonicMode: state.harmonicMode,
         strobeSpeed: state.strobeSpeed,
         micGainDb: state.micGainDb,
+        pipeVolume: state.pipeVolume,
         inTuneHysteresis: state.inTuneHysteresis,
         strobeIntensity: state.strobeIntensity,
         strobeSoftness: state.strobeSoftness,

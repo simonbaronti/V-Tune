@@ -3,6 +3,7 @@ import { useTunerStore } from '../store/tunerStore';
 import { useProStore } from '../pro/proStore';
 import { Capacitor } from '@capacitor/core';
 import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
+import { setPipeVolume } from '../audio/PitchPipe';
 import { isTauri } from '../audio/alwaysOnTop';
 import { ReferenceBar } from './ReferenceBar';
 
@@ -131,6 +132,7 @@ export function SettingsModal() {
   const availableDevices = useTunerStore((s) => s.availableDevices);
   const inputDeviceId = useTunerStore((s) => s.inputDeviceId);
   const micGainDb = useTunerStore((s) => s.micGainDb);
+  const pipeVolume = useTunerStore((s) => s.pipeVolume);
   const humFilter = useTunerStore((s) => s.humFilter);
   const strobeIntensity = useTunerStore((s) => s.strobeIntensity);
   const strobeSoftness = useTunerStore((s) => s.strobeSoftness);
@@ -294,6 +296,33 @@ export function SettingsModal() {
               ))}
             </Row>
           </Section>
+
+          {/* ── Sound — the pitch pipe is the only thing V-Tune plays
+               out, and nobody hunting for "louder" looks under Input. ─ */}
+            <Section title="Sound">
+              <Row
+                title="Pitch pipe volume"
+                description="How loud the ♪ reference tone plays on each band"
+              >
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={Math.round(pipeVolume * 100)}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value) / 100;
+                    useTunerStore.getState().setPipeVolume(v);
+                    setPipeVolume(v);
+                  }}
+                  className="flex-1 sm:flex-none sm:w-40 h-1"
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                <span className="text-sm w-14 text-right tabular-nums shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                  {Math.round(pipeVolume * 100)}%
+                </span>
+              </Row>
+            </Section>
 
           {/* ── Tuning (narrow only — on wide these live in the menu) ─ */}
           {narrow && (

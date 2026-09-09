@@ -1,3 +1,20 @@
+import { useTunerStore } from '../store/tunerStore';
+
+/**
+ * How much quieter the beep is than the sustained tone.
+ *
+ * A repeating beep at the same level as a held tone is wearing over a long
+ * tuning session, so it sits a little under it — but it tracks the same
+ * volume setting rather than being independently fixed.
+ */
+const BEEP_SCALE = 0.8;
+
+/** Current output level, 0-1, read fresh each time so the setting can't
+ *  drift out of sync with the store. */
+function level(): number {
+  return useTunerStore.getState().pipeVolume;
+}
+
 let audioCtx: AudioContext | null = null;
 let oscillator: OscillatorNode | null = null;
 let gainNode: GainNode | null = null;
@@ -28,7 +45,7 @@ export function playTone(frequency: number) {
   oscillator.type = 'sine';
   oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
   gainNode.gain.setValueAtTime(0, ctx.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+  gainNode.gain.linearRampToValueAtTime(level(), ctx.currentTime + 0.05);
 
   oscillator.connect(gainNode);
   gainNode.connect(ctx.destination);
@@ -57,7 +74,7 @@ export function playBeep(frequency: number, duration = 0.15) {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(frequency, ctx.currentTime);
   gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+  gain.gain.linearRampToValueAtTime(level() * BEEP_SCALE, ctx.currentTime + 0.01);
   gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
 
   osc.connect(gain);
@@ -72,4 +89,14 @@ export function isPlaying(): boolean {
 
 export function getActiveFreq(): number | null {
   return activeFreq;
+}
+
+/** Apply a new volume to a tone that's already sounding, so dragging the
+ *  slider is audible immediately rather than only on the next note. */
+export function setPipeVolume(volume: number): void {
+  if (!gainNode || !audioCtx) return;
+  gainNode.gain.linearRampToValueAtTime(
+    Math.max(0, Math.min(1, volume)),
+    audioCtx.currentTime + 0.05,
+  );
 }

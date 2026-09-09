@@ -17,8 +17,15 @@ All notable changes to V-Tune are documented here. The format is based on
 - Signed-in accounts now attach their **email address to the RevenueCat
   customer record**, so support and entitlement grants can find a person by
   their address instead of translating it through a database of UUIDs.
+- **A volume control for the pitch pipe**, under a new **Sound** section in
+  Settings. Dragging it is audible straight away, on a tone that's already
+  sounding.
 
 ### Changed
+- **The pitch pipe is louder by default** — it shipped at a level faint
+  enough that the first question anyone asked on launch day was how to turn
+  it up. The beep still sits a little under the sustained tone, since a
+  repeating beep at full level wears thin over a session.
 - Consistent naming for the Spectrum Analyser's two parts throughout the app,
   guide and changelog: an **isolation window** is the coloured bracket you
   place on the spectrum, an **isolation band** is the strobe it drives. They
