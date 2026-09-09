@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import AVFoundation
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,8 +8,58 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        configureAudioSession()
         return true
+    }
+
+    // MARK: - Audio session
+    //
+    // The moment the web layer opens the microphone, iOS moves the audio
+    // session into .playAndRecord — and that category sends playback to the
+    // earpiece, not the speaker. V-Tune holds the mic open the whole time
+    // it's tuning, so the pitch pipe came out of the receiver at a fraction
+    // of its volume. That was the first thing a user reported after launch:
+    // "very quiet on my phone".
+    //
+    // Asking for .defaultToSpeaker at launch isn't enough on its own,
+    // because the web view reconfigures the session for itself when capture
+    // starts and stops. So we also watch for route changes and re-assert the
+    // speaker whenever we find ourselves back on the receiver.
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // .allowBluetoothA2DP covers AirPods and speakers for output.
+            // .allowBluetooth is deliberately absent: it would also permit
+            // an HFP headset as the *input*, and a mono 8 kHz microphone is
+            // useless for measuring a handpan's partials.
+            try session.setCategory(
+                .playAndRecord,
+                options: [.defaultToSpeaker, .allowBluetoothA2DP]
+            )
+        } catch {
+            // Non-fatal. The pipe is quiet, but the tuner still tunes.
+        }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(audioRouteChanged(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func audioRouteChanged(_ notification: Notification) {
+        let session = AVAudioSession.sharedInstance()
+
+        // Only override when we'd otherwise be on the earpiece. Headphones,
+        // AirPods and car audio are all deliberate choices by the user and
+        // must be left alone.
+        let onReceiver = session.currentRoute.outputs.contains {
+            $0.portType == .builtInReceiver
+        }
+        guard onReceiver else { return }
+
+        try? session.overrideOutputAudioPort(.speaker)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

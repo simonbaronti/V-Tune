@@ -32,6 +32,12 @@ All notable changes to V-Tune are documented here. The format is based on
   had also been called brackets and isolation strobes.
 
 ### Fixed
+- **iOS: the pitch pipe played through the earpiece instead of the speaker.**
+  Opening the microphone puts iOS into its record-and-play audio mode, which
+  routes playback to the receiver — so the reference tone was barely audible
+  while the tuner was running, and noticeably louder the moment you stopped
+  it. V-Tune now asks for the speaker, and re-asserts it whenever the route
+  changes. Headphones, AirPods and car audio are left alone.
 - `npm run bump` rewrote the version string everywhere it appeared in the
   landing page, including inside SVG path data — a coordinate run reads
   "1.2.0" verbatim, so bumping mangled an icon. It now only touches the
