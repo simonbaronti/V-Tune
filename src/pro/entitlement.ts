@@ -132,22 +132,74 @@ async function tagCustomerEmail(userId: string, email: string | null): Promise<v
   }
 }
 
-/** True when RevenueCat says the `pro` entitlement is active. */
-async function entitlementActive(): Promise<boolean> {
+// ── Offline grace ────────────────────────────────────────────────────────
+// The last answer RevenueCat gave us, so an unreachable server doesn't
+// present the paywall to somebody who has already paid. Falling back to the
+// trial clock is no use here: by the time you've bought, the trial has long
+// since expired, so "no network" and "never paid" looked identical and the
+// app locked. A tuner in a workshop with no wifi is exactly who this
+// protects, and exactly who was affected.
+//
+// Cached under the app user id so signing in as somebody else on a shared
+// machine can't inherit their grace, and re-checked online whenever there
+// IS a connection — so a refund still revokes access on the next check.
+const ENTITLEMENT_CACHE_KEY = 'v-tune-entitlement-cache';
+const OFFLINE_GRACE_DAYS = 30;
+
+interface EntitlementCache {
+  userId: string;
+  pro: boolean;
+  at: string;
+}
+
+function rememberEntitlement(userId: string, pro: boolean): void {
   try {
-    if (isNative) {
-      if (!nativeConfigured) return false;
-      const { customerInfo } = await NativePurchases.getCustomerInfo();
-      return ENTITLEMENT_ID in customerInfo.entitlements.active;
-    }
-    if (!WebPurchases.isConfigured()) return false;
-    const info = await WebPurchases.getSharedInstance().getCustomerInfo();
-    return ENTITLEMENT_ID in info.entitlements.active;
+    const entry: EntitlementCache = { userId, pro, at: new Date().toISOString() };
+    localStorage.setItem(ENTITLEMENT_CACHE_KEY, JSON.stringify(entry));
   } catch {
-    // Offline / RC unreachable: fail open onto the trial clock rather than
-    // locking a paying customer out in a field with no signal. A cached
-    // last-known-entitlement can harden this later.
+    // Storage unavailable (private window). Grace is a convenience, not a
+    // guarantee — carry on without it.
+  }
+}
+
+/** The cached answer, but only an unexpired `true` for this same user. */
+function cachedEntitlement(userId: string): boolean {
+  try {
+    const raw = localStorage.getItem(ENTITLEMENT_CACHE_KEY);
+    if (!raw) return false;
+    const entry = JSON.parse(raw) as EntitlementCache;
+    if (!entry?.pro || entry.userId !== userId) return false;
+    const age = Date.now() - new Date(entry.at).getTime();
+    if (!isFinite(age) || age < 0) return false;
+    return age < OFFLINE_GRACE_DAYS * 86_400_000;
+  } catch {
     return false;
+  }
+}
+
+/**
+ * True when RevenueCat says the `pro` entitlement is active — or, when
+ * RevenueCat can't be reached, when it said so recently enough.
+ */
+async function entitlementActive(userId: string): Promise<boolean> {
+  try {
+    let active: boolean;
+    if (isNative) {
+      // Not configured means configure() didn't complete, which offline is
+      // a real possibility — treat it as "couldn't check", not "not paid".
+      if (!nativeConfigured) return cachedEntitlement(userId);
+      const { customerInfo } = await NativePurchases.getCustomerInfo();
+      active = ENTITLEMENT_ID in customerInfo.entitlements.active;
+    } else {
+      if (!WebPurchases.isConfigured()) return cachedEntitlement(userId);
+      const info = await WebPurchases.getSharedInstance().getCustomerInfo();
+      active = ENTITLEMENT_ID in info.entitlements.active;
+    }
+    // Record both answers: a cached `false` is what lets a refund stick.
+    rememberEntitlement(userId, active);
+    return active;
+  } catch {
+    return cachedEntitlement(userId);
   }
 }
 
@@ -164,7 +216,7 @@ export async function refreshProStatus(): Promise<void> {
   await configureRc(user?.id ?? null);
   if (user?.id) await tagCustomerEmail(user.id, user.email ?? null);
 
-  const paid = await entitlementActive();
+  const paid = await entitlementActive(user?.id ?? 'anonymous');
   if (paid) {
     store.set({ status: 'pro', accountEmail: user?.email ?? null });
     return;

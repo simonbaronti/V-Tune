@@ -32,6 +32,13 @@ All notable changes to V-Tune are documented here. The format is based on
   had also been called brackets and isolation strobes.
 
 ### Fixed
+- **Being offline could show the paywall to someone who had already paid.**
+  When the licence server couldn't be reached, V-Tune fell back to the trial
+  clock — but anyone who has bought is by definition past their trial, so
+  "no connection" and "never paid" looked identical and the app locked. It
+  now remembers the last answer for 30 days, so a workshop with no wifi, a
+  festival or a plane changes nothing. A refund still takes effect on the
+  next check with a connection.
 - **macOS: the app installed on versions it can't run on.** The bundle
   claimed macOS 10.15 as its minimum, but the interface needs Safari 16.4's
   CSS — first available on macOS 11 Big Sur. On Catalina the app installed
