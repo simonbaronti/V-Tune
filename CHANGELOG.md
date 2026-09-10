@@ -32,6 +32,12 @@ All notable changes to V-Tune are documented here. The format is based on
   had also been called brackets and isolation strobes.
 
 ### Fixed
+- **macOS: the app installed on versions it can't run on.** The bundle
+  claimed macOS 10.15 as its minimum, but the interface needs Safari 16.4's
+  CSS — first available on macOS 11 Big Sur. On Catalina the app installed
+  happily and opened a black window, with nothing to explain why. The
+  minimum is now 11.0, so macOS declines the install with a reason instead.
+  The download page says so too, and points older Macs at the web app.
 - **iOS: the pitch pipe played through the earpiece instead of the speaker.**
   Opening the microphone puts iOS into its record-and-play audio mode, which
   routes playback to the receiver — so the reference tone was barely audible
