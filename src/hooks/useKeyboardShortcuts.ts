@@ -106,11 +106,13 @@ export function useKeyboardShortcuts() {
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         store.setCentsOffset(store.centsOffset - (e.shiftKey ? 10 : 1));
+        updateWorkletTargets();
         return;
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         store.setCentsOffset(store.centsOffset + (e.shiftKey ? 10 : 1));
+        updateWorkletTargets();
         return;
       }
 
@@ -135,6 +137,7 @@ export function useKeyboardShortcuts() {
       // 0: reset cents offset
       if (e.key === '0') {
         store.setCentsOffset(0);
+        updateWorkletTargets();
         return;
       }
 

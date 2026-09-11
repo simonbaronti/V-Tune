@@ -20,6 +20,11 @@ All notable changes to V-Tune are documented here. The format is based on
 - **A volume control for the pitch pipe**, under a new **Sound** section in
   Settings. Dragging it is audible straight away, on a tone that's already
   sounding.
+- **A FINE control** beside A4 and Tolerance, for sitting the target a
+  fraction off the note in cents — for an instrument that isn't on the
+  12-TET grid. It shifts the fundamental, octave and compound fifth
+  together, in both PURE and EQUAL, and shows in purple whenever it isn't
+  zero. Tap the value to clear it.
 
 ### Changed
 - **The pitch pipe is louder by default** — it shipped at a level faint
@@ -32,6 +37,12 @@ All notable changes to V-Tune are documented here. The format is based on
   had also been called brackets and isolation strobes.
 
 ### Fixed
+- **The cents nudge did nothing at all.** The keyboard map advertised
+  <kbd>←</kbd> / <kbd>→</kbd> to nudge the target in cents and <kbd>0</kbd>
+  to reset — but the offset was written to memory and read by nothing, so
+  the strobe bands never moved. It now shifts every partial coherently, is
+  clamped to ±100 cents, survives a restart, and is visible in the new FINE
+  control so it can't be left on by accident.
 - **Being offline could show the paywall to someone who had already paid.**
   When the licence server couldn't be reached, V-Tune fell back to the trial
   clock — but anyone who has bought is by definition past their trial, so

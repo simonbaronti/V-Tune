@@ -316,6 +316,28 @@ function bandFrequency(
 /** Recompute every band's target frequency for a new referenceFreq and/or
  *  harmonic mode. The fundamental (harmonic === 1) sets f₀; pure-mode
  *  foundation bands then derive as integer multiples of it. */
+/**
+ * Reference pitch with the fine offset folded in.
+ *
+ * Every band frequency is ultimately `noteToFrequency(name, octave, ref)`,
+ * or a whole multiple of an f0 derived the same way — so shifting the
+ * reference by n cents shifts every partial by exactly n cents, coherently,
+ * in both PURE and EQUAL. That's what a fine offset means: the instrument
+ * sits a little off the 12-TET grid and the whole target moves with it.
+ *
+ * Until 1.2.1 the offset was written to the store and read by nothing, so
+ * the arrow keys the keyboard map advertises did nothing at all.
+ */
+function tunedRef(referenceFreq: number, centsOffset: number): number {
+  return centsOffset === 0
+    ? referenceFreq
+    : referenceFreq * Math.pow(2, centsOffset / 1200);
+}
+
+/** Cents either side of the note the fine offset may reach. Past a
+ *  semitone you want a different note, not a bigger offset. */
+export const MAX_CENTS_OFFSET = 100;
+
 function rebuildFrequencies(
   configs: BandConfig[],
   referenceFreq: number,
@@ -457,7 +479,8 @@ export const useTunerStore = create<TunerState>()(
 
   setReferenceFreq: (freq) => {
     const state = get();
-    const updated = rebuildFrequencies(state.bandConfigs, freq, state.harmonicMode);
+    const updated = rebuildFrequencies(
+      state.bandConfigs, tunedRef(freq, state.centsOffset), state.harmonicMode);
     set({
       referenceFreq: freq,
       baseFrequency: state.currentNote
@@ -471,7 +494,8 @@ export const useTunerStore = create<TunerState>()(
   setCurrentNote: (note) => {
     const state = get();
     const newBase = note.frequency * Math.pow(2, state.centsOffset / 1200);
-    const newBands = defaultBandsForNote(note, state.referenceFreq, state.harmonicMode);
+    const newBands = defaultBandsForNote(
+      note, tunedRef(state.referenceFreq, state.centsOffset), state.harmonicMode);
     set({
       currentNote: note,
       baseFrequency: newBase,
@@ -482,13 +506,17 @@ export const useTunerStore = create<TunerState>()(
 
   setCentsOffset: (cents) => {
     const state = get();
-    const note = state.currentNote;
-    if (note) {
-      const newBase = note.frequency * Math.pow(2, cents / 1200);
-      set({ centsOffset: cents, baseFrequency: newBase });
-    } else {
-      set({ centsOffset: cents });
-    }
+    const clamped = Math.max(-MAX_CENTS_OFFSET, Math.min(MAX_CENTS_OFFSET, cents));
+    const ref = tunedRef(state.referenceFreq, clamped);
+    const updated = rebuildFrequencies(state.bandConfigs, ref, state.harmonicMode);
+    set({
+      centsOffset: clamped,
+      baseFrequency: state.currentNote
+        ? noteToFrequency(state.currentNote.name, state.currentNote.octave, ref)
+        : ref,
+      bandConfigs: updated,
+      bands: configsToBands(updated),
+    });
   },
 
   updateBands: (bandData) => {
@@ -539,7 +567,8 @@ export const useTunerStore = create<TunerState>()(
     // Recompute every band's target under the new mode, then update state.
     // The caller (UI toggle) pushes the new targets to the worklet via
     // updateWorkletTargets() so the strobe re-references immediately.
-    const updated = rebuildFrequencies(state.bandConfigs, state.referenceFreq, mode);
+    const updated = rebuildFrequencies(
+      state.bandConfigs, tunedRef(state.referenceFreq, state.centsOffset), mode);
     set({
       harmonicMode: mode,
       bandConfigs: updated,
@@ -714,7 +743,8 @@ export const useTunerStore = create<TunerState>()(
   syncBandsToCurrentNote: () => {
     const state = get();
     if (!state.currentNote) return;
-    const newBands = defaultBandsForNote(state.currentNote, state.referenceFreq, state.harmonicMode);
+    const newBands = defaultBandsForNote(
+      state.currentNote, tunedRef(state.referenceFreq, state.centsOffset), state.harmonicMode);
     set({
       bandConfigs: newBands,
       bands: configsToBands(newBands),
@@ -827,10 +857,13 @@ export const useTunerStore = create<TunerState>()(
         const foundationsUntagged = merged.bandConfigs.some(
           (c) => c.isFoundation && c.harmonic === undefined,
         );
+        // The saved fine offset has to come back with the bands, or a
+        // restart would silently drop it and every target would move.
+        const restoredRef = tunedRef(merged.referenceFreq, merged.centsOffset);
         if (foundationsUntagged && merged.currentNote) {
           const fresh = defaultBandsForNote(
             merged.currentNote,
-            merged.referenceFreq,
+            restoredRef,
             merged.harmonicMode,
           );
           const custom = merged.bandConfigs.filter((c) => !c.isFoundation);
@@ -838,7 +871,7 @@ export const useTunerStore = create<TunerState>()(
         } else {
           merged.bandConfigs = rebuildFrequencies(
             merged.bandConfigs,
-            merged.referenceFreq,
+            restoredRef,
             merged.harmonicMode,
           );
         }
@@ -847,9 +880,9 @@ export const useTunerStore = create<TunerState>()(
           ? noteToFrequency(
               merged.currentNote.name,
               merged.currentNote.octave,
-              merged.referenceFreq,
+              restoredRef,
             )
-          : merged.referenceFreq;
+          : restoredRef;
         return merged;
       },
     },

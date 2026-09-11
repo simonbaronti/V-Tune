@@ -18,10 +18,18 @@ export function ReferenceBar() {
   const tolerance = useTunerStore((s) => s.tolerance);
   const autoDetect = useTunerStore((s) => s.autoDetect);
   const harmonicMode = useTunerStore((s) => s.harmonicMode);
+  const centsOffset = useTunerStore((s) => s.centsOffset);
 
   const handleRefChange = (delta: number) => {
     const store = useTunerStore.getState();
     store.setReferenceFreq(store.referenceFreq + delta);
+    updateWorkletTargets();
+  };
+
+  const handleFineChange = (next: number) => {
+    // Round to a tenth: repeated ±0.5 on a float otherwise drifts into
+    // values like 2.4999999999999996, which then print as 2.5 but aren't.
+    useTunerStore.getState().setCentsOffset(Math.round(next * 10) / 10);
     updateWorkletTargets();
   };
 
@@ -144,6 +152,38 @@ export function ReferenceBar() {
             </span>
             {stepperBtn('+', () => useTunerStore.getState().setTolerance(Math.min(10, tolerance + 0.5)))}
           </div>
+        </div>
+      </div>
+
+      {/* Row 4 — FINE: sits the target off the 12-TET grid, in cents.
+          Shifts every partial together, in both PURE and EQUAL. */}
+      <div className="flex flex-col gap-1 min-w-0">
+        <span
+          className="text-xs text-center tracking-wide"
+          style={{ color: 'var(--text-dim)' }}
+        >
+          FINE
+        </span>
+        <div className="flex items-center justify-between gap-1">
+          {stepperBtn('−', () => handleFineChange(centsOffset - 0.5))}
+          <button
+            onClick={() => handleFineChange(0)}
+            title={
+              centsOffset === 0
+                ? 'Offset from the selected note, in cents'
+                : 'Tap to clear the offset'
+            }
+            className="flex-1 text-center text-sm font-medium tabular-nums min-w-0 rounded py-1 transition-colors"
+            style={{
+              background: centsOffset === 0 ? 'transparent' : 'rgba(168, 85, 247, 0.15)',
+              color: centsOffset === 0 ? 'var(--text-primary)' : '#a855f7',
+              border: `1px solid ${centsOffset === 0 ? 'transparent' : 'rgba(168, 85, 247, 0.4)'}`,
+            }}
+          >
+            {centsOffset > 0 ? '+' : centsOffset < 0 ? '−' : ''}
+            {Math.abs(centsOffset).toFixed(1)}¢
+          </button>
+          {stepperBtn('+', () => handleFineChange(centsOffset + 0.5))}
         </div>
       </div>
     </div>
