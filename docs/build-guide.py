@@ -57,7 +57,7 @@ _register_fonts()
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
-GUIDE_VERSION = '1.2.0'
+GUIDE_VERSION = '1.2.1'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
@@ -887,6 +887,26 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
+    story.append(Paragraph('FINE — sitting between the notes', s['h2']))
+    story.append(Paragraph(
+        'Not every instrument sits on the equal-tempered grid, and sometimes '
+        'you want to tune to where a pan actually is rather than where the '
+        'grid says it should be. <b>FINE</b> offsets the target by a fraction '
+        'of a semitone, in cents — half a cent per press, up to a semitone '
+        'either way.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'It moves the fundamental, the octave and the compound fifth '
+        '<i>together</i>, so the relationship between the partials is '
+        'preserved — in PURE and in EQUAL alike. The value turns '
+        '<font color="#a855f7">purple</font> whenever it isn’t zero, so an '
+        'offset can’t be left on by accident; tap it to clear. On a keyboard, '
+        f'{LEFT} and {RIGHT} nudge it a cent at a time, Shift takes ten, and '
+        '<b>0</b> resets it (section 9).',
+        s['body'],
+    ))
+
     story.append(Paragraph('Reference A4, Tolerance & Let’s Go', s['h2']))
     story.append(Paragraph(
         '<b>Reference A4</b> sets concert pitch (default 440 Hz) and '
@@ -1081,6 +1101,14 @@ def build(out_path: Path):
         ('Unlock forever',
          'Shown during the trial: opens the unlock screen so you can buy '
          'without waiting for the trial to run out.'),
+    ], s))
+
+    story.append(Paragraph('Sound', s['h2']))
+    story.append(settings_table([
+        ('Pitch pipe volume',
+         f'How loud the {NOTE} reference tone plays on each band (section 5). '
+         'Takes effect on a tone that’s already sounding, so you can set it '
+         'by ear.'),
     ], s))
 
     story.append(Paragraph('Input', s['h2']))
