@@ -5,6 +5,7 @@ import { updateWorkletTargets, startAudio, stopAudio } from '../audio/AudioEngin
 import { findScale, HANDPAN_SCALES, CHROMATIC_ID, type ScaleNote } from '../data/scales';
 import { TealIconRow } from './TealIconRow';
 import { GuPortChip } from './GuPortChip';
+import { CustomTargetInput } from './CustomTargetInput';
 
 const AUTO_HIDE_MS = 20_000;
 
@@ -267,6 +268,10 @@ export function QuickPitchBar() {
             </>
           )}
           </div>
+
+          {/* Type a target in Hz — works in either mode, since a frequency
+              doesn't care which notes are on screen. */}
+          <CustomTargetInput />
 
           {/* OCT (chromatic only) + Let's Go */}
           <div className="flex items-center gap-2 pt-1">

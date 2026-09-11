@@ -7,6 +7,12 @@ All notable changes to V-Tune are documented here. The format is based on
 ## [1.2.2] — unreleased
 
 ### Added
+- **Type a target frequency in Hz.** A new field in the note picker takes a
+  frequency directly — 659.34, or 123.456 — instead of picking a note, in
+  either chromatic or scale mode. The octave and compound fifth track it as
+  exact multiples, so you can follow an instrument's overtones against a
+  base that isn't on the equal-tempered grid. Decimals are kept as typed
+  rather than rounded to the nearest tenth of a cent.
 - **The strobe bands show when a FINE offset is in play.** Each band's
   target frequency sits on the same purple chip the FINE control uses, so
   it's obvious at a glance that you're tuning to a modified target rather

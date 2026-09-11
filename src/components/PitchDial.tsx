@@ -9,6 +9,7 @@ import {
   type ScaleNote,
 } from '../data/scales';
 import { GuPortChip } from './GuPortChip';
+import { CustomTargetInput } from './CustomTargetInput';
 
 const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
   { value: 'sharp', label: '♯' },
@@ -255,6 +256,10 @@ export function PitchDial() {
           ))}
         </div>
       )}
+
+      {/* Type a target in Hz — works in either mode, since a frequency
+          doesn't care which notes are on screen. */}
+      <CustomTargetInput />
 
       {/* Octave + note-naming row. Octave control only makes sense in
           chromatic mode (scale notes have a fixed octave each); naming is
