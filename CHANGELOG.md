@@ -4,6 +4,15 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.2.2] — unreleased
+
+### Added
+- **The strobe bands show when a FINE offset is in play.** Each band's
+  target frequency sits on the same purple chip the FINE control uses, so
+  it's obvious at a glance that you're tuning to a modified target rather
+  than the standard one for that note. It matters most on a phone, where
+  FINE lives in Settings and can't be seen while you're tuning.
+
 ## [1.2.1] — unreleased
 
 ### Added

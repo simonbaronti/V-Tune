@@ -204,7 +204,7 @@ export function StrobeDisplay() {
     ctx.clearRect(0, 0, w, h);
 
     const state = useTunerStore.getState();
-    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness, pipeBandId, pipeMode } = state;
+    const { rmsLevel, tolerance, selectedBandId, noteNaming, displaySmoothing, strobeSpeed, readoutSmoothing, inTuneHysteresis, strobeIntensity, strobeSoftness, pipeBandId, pipeMode, centsOffset } = state;
     const bands = state.bands;
     const numBands = bands.length;
 
@@ -522,9 +522,40 @@ export function StrobeDisplay() {
       // 8px of breathing room between it and the note label above
       const isNarrow = w < 500;
       const hzFontSize = isNarrow ? 13 : 16;
-      ctx.fillStyle = PAL.hz;
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
-      ctx.fillText(`${band.frequency.toFixed(1)} Hz`, PIPE_ICON_W + 6, y + bandHeight / 2 + labelSize * 0.35 + 8);
+      const hzText = `${band.frequency.toFixed(1)} Hz`;
+      const hzX = PIPE_ICON_W + 6;
+      const hzY = y + bandHeight / 2 + labelSize * 0.35 + 8;
+
+      // A FINE offset means this target isn't the standard one for the note,
+      // and the band is where you're actually looking while tuning — on a
+      // phone the FINE control is buried in Settings and invisible from here.
+      // Same purple chip as the control, so the two read as one idea.
+      if (centsOffset !== 0) {
+        const padX = 5;
+        const padY = 3;
+        const tw = ctx.measureText(hzText).width;
+        const chipH = hzFontSize + padY * 2;
+        const chipX = hzX - padX;
+        const chipY = hzY - chipH / 2;
+        ctx.beginPath();
+        // roundRect arrived in Safari 16.4 — the same release the app's CSS
+        // already requires — but fall back rather than throw mid-frame.
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(chipX, chipY, tw + padX * 2, chipH, 4);
+        } else {
+          ctx.rect(chipX, chipY, tw + padX * 2, chipH);
+        }
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#a855f7';
+      } else {
+        ctx.fillStyle = PAL.hz;
+      }
+      ctx.fillText(hzText, hzX, hzY);
 
       // Cents deviation on right — show during live signal, or during
       // decay only if we WERE in tune (so a wrong, red reading doesn't
