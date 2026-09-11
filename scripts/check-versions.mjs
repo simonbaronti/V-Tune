@@ -43,6 +43,14 @@ for (const [name, value] of Object.entries(sources)) {
 }
 
 // Build numbers just need to exist and agree internally (iOS Debug==Release).
+//
+// NOTE: this script can't see whether ios/App/App/public/ has been re-synced.
+// Xcode compiles the native sources straight from the repo, but the web app
+// only reaches the bundle via `cap sync` — so archiving without it ships the
+// last-synced web build with the current native code. 1.2.1 build 19 went to
+// TestFlight that way: the Swift audio-routing fix was present, none of the
+// web changes were. Always archive via `npm run cap:ios`, never by opening
+// Xcode directly.
 const iosBuilds = [...pbx.matchAll(/CURRENT_PROJECT_VERSION = (\d+);/g)].map((m) => m[1]);
 const iosBuildOk = iosBuilds.length >= 2 && new Set(iosBuilds).size === 1;
 ok &&= iosBuildOk;
