@@ -215,15 +215,26 @@ export function QuickPitchBar() {
           left: 0,
           right: 0,
           zIndex: 40,
-          maxHeight: expanded ? 820 : 0,
-          overflow: 'hidden',
+          // Cap to the room actually above the collapsed bar, not a flat 820.
+          // In flow the layout used to compress to fit; floating, anything
+          // taller than the viewport simply runs off the top with no way to
+          // reach it — which a phone in landscape (~360px tall) would hit
+          // every time. Scrolls internally when the content doesn't fit.
+          maxHeight: expanded ? 'min(820px, calc(100dvh - 5rem))' : 0,
+          overflowX: 'hidden',
+          overflowY: 'auto',
           transition: 'max-height 260ms cubic-bezier(0.4, 0, 0.2, 1)',
           // Theme-aware translucency: the panel's own colour, thinned, so it
           // floats over the strobe in light and dark alike. A flat black
           // would be a dark slab on a light-mode app.
-          background: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          //
+          // 72%, not the 92% this first shipped at — at 92% only 8% of the
+          // backdrop showed through, which reads as a solid panel and makes
+          // the blur invisible. The heavy blur plus a saturation lift is what
+          // keeps text legible over a moving strobe at this transparency.
+          background: 'color-mix(in srgb, var(--bg-panel) 72%, transparent)',
+          backdropFilter: 'blur(24px) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
           borderTop: '1px solid var(--border)',
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
           paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
