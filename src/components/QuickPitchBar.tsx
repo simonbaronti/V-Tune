@@ -202,6 +202,28 @@ export function QuickPitchBar() {
         </svg>
       </button>
 
+      {/* Scrim over everything above the picker. Translucency alone was
+          invisible in light mode: a near-white panel at 72% over a near-white
+          page composites to near-white, and blurring a flat surface returns
+          the same flat surface. Dimming the backdrop doesn't depend on what
+          happens to be behind it. Non-interactive, so taps still reach the
+          canvas underneath. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: 0,
+          right: 0,
+          height: '100dvh',
+          zIndex: 30,
+          pointerEvents: 'none',
+          background: 'rgba(0, 0, 0, 0.28)',
+          opacity: expanded ? 1 : 0,
+          transition: 'opacity 260ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      />
+
       {/* Expandable — teal icon row (now inside the slide-up) + the picker.
           Slides up OVER the canvas rather than compressing it. The collapsed
           bar above stays in flow, so nothing moves when it's shut; only this
@@ -236,6 +258,7 @@ export function QuickPitchBar() {
           backdropFilter: 'blur(24px) saturate(1.8)',
           WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
           borderTop: '1px solid var(--border)',
+          boxShadow: '0 -12px 32px rgba(0, 0, 0, 0.28)',
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
           paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
           boxSizing: 'border-box',
