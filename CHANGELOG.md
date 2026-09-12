@@ -7,6 +7,11 @@ All notable changes to V-Tune are documented here. The format is based on
 ## [1.2.2] — unreleased
 
 ### Added
+- **The mobile note picker now slides over the tuner instead of squashing
+  it.** Opening it used to compress the strobe, forcing the canvas to resize
+  and re-initialise mid-tune; it now floats above on a translucent panel
+  that follows the light or dark theme, and the display below stays exactly
+  where it was.
 - **Type a target frequency in Hz.** A new field in the note picker takes a
   frequency directly — 659.34, or 123.456 — instead of picking a note, in
   either chromatic or scale mode. The octave and compound fifth track it as

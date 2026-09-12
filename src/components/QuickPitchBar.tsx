@@ -157,7 +157,7 @@ export function QuickPitchBar() {
 
   return (
     <div
-      className="flex flex-col shrink-0"
+      className="flex flex-col shrink-0 relative"
       onPointerDown={bump}
       onPointerMove={bump}
       style={{
@@ -166,7 +166,11 @@ export function QuickPitchBar() {
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        overflowX: 'hidden',
+        // No overflowX here. CSS won't let one axis be hidden while the
+        // other is visible: overflow-y computes to auto, the root becomes a
+        // scroll container, and it clips the absolutely-positioned panel
+        // above it — invisibly, since the box still reports its full size.
+        // The panel clips its own contents instead.
         paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
         paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
         paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom))',
@@ -199,12 +203,31 @@ export function QuickPitchBar() {
       </button>
 
       {/* Expandable — teal icon row (now inside the slide-up) + the picker.
-          Slides open, pushing the canvas up. */}
+          Slides up OVER the canvas rather than compressing it. The collapsed
+          bar above stays in flow, so nothing moves when it's shut; only this
+          part floats, anchored to the top edge of the bar.
+          Overlaying also stops the strobe canvas being resized and re-
+          initialised every time the picker opens, which it was. */}
       <div
         style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: 0,
+          right: 0,
+          zIndex: 40,
           maxHeight: expanded ? 820 : 0,
           overflow: 'hidden',
           transition: 'max-height 260ms cubic-bezier(0.4, 0, 0.2, 1)',
+          // Theme-aware translucency: the panel's own colour, thinned, so it
+          // floats over the strobe in light and dark alike. A flat black
+          // would be a dark slab on a light-mode app.
+          background: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid var(--border)',
+          paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
+          paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
+          boxSizing: 'border-box',
         }}
       >
         <div className="-mx-2 mb-1">

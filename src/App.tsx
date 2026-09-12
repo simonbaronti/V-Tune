@@ -192,7 +192,11 @@ function App() {
       <div className="flex-1 min-h-0 flex relative">
         {/* Canvas column — strobe, spectrum (when toggled), then on narrow
             layouts the stopwatch + slide-up quick-pick pinned at the bottom. */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {/* No overflow-hidden here: the quick-pick panel is absolutely
+            positioned and floats up over the canvas, and this column would
+            otherwise clip it. min-h-0 on the children keeps the flex sizing
+            honest without it. */}
+        <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0">
             <StrobeDisplay />
           </div>
