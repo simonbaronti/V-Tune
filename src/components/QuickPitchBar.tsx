@@ -210,6 +210,7 @@ export function QuickPitchBar() {
           canvas underneath. */}
       <div
         aria-hidden="true"
+        onClick={() => setQuickPickOpen(false)}
         style={{
           position: 'absolute',
           bottom: '100%',
@@ -217,8 +218,18 @@ export function QuickPitchBar() {
           right: 0,
           height: '100dvh',
           zIndex: 30,
-          pointerEvents: 'none',
+          // Interactive only while open, so it can never swallow a tap meant
+          // for the strobe. The picker's own toggle stays the accessible
+          // control; this is the conventional tap-outside-to-dismiss.
+          pointerEvents: expanded ? 'auto' : 'none',
+          cursor: expanded ? 'pointer' : 'default',
           background: 'rgba(0, 0, 0, 0.28)',
+          // The panel's own backdrop-filter only blurs what sits directly
+          // behind the panel. This blurs the rest of the screen above it, so
+          // the whole tuner recedes rather than just the strip under the
+          // picker.
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
           opacity: expanded ? 1 : 0,
           transition: 'opacity 260ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
@@ -255,8 +266,8 @@ export function QuickPitchBar() {
           // the blur invisible. The heavy blur plus a saturation lift is what
           // keeps text legible over a moving strobe at this transparency.
           background: 'color-mix(in srgb, var(--bg-panel) 72%, transparent)',
-          backdropFilter: 'blur(24px) saturate(1.8)',
-          WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+          backdropFilter: 'blur(40px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(40px) saturate(1.6)',
           borderTop: '1px solid var(--border)',
           boxShadow: '0 -12px 32px rgba(0, 0, 0, 0.28)',
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
