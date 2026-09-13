@@ -104,17 +104,20 @@ export function setPipeVolume(volume: number): void {
 /**
  * Bring the pipe's context back after iOS has taken the audio session away.
  *
- * The pipe runs its own AudioContext, separate from the capture graph, so it
- * needs waking separately — otherwise you come back from another app, press a
- * note, and get silence from a context that's still parked.
+ * Throw it away rather than resume it. An interrupted context on iOS usually
+ * can't be revived — resume() neither succeeds nor rejects, it just never
+ * settles — so the pipe is dropped and the next playTone() builds a fresh one
+ * through ensureContext(). Cheap: an oscillator and a gain node.
  */
 export function recoverPipeContext(): void {
-  if (!audioCtx) return;
-  // WebKit parks an interrupted context in a non-standard 'interrupted' state
-  // that isn't in the spec, so testing for 'suspended' alone misses it.
-  if (audioCtx.state !== 'running') {
-    void audioCtx.resume().catch(() => {
-      // Nothing useful to do — the next playTone() calls ensureContext again.
-    });
-  }
+  if (!audioCtx || audioCtx.state === 'running') return;
+
+  const dead = audioCtx;
+  audioCtx = null;
+  oscillator = null;
+  gainNode = null;
+  activeFreq = null;
+  void dead.close().catch(() => {
+    // Already torn down by the system; nothing to release.
+  });
 }

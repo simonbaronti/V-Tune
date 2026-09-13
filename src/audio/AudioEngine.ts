@@ -528,6 +528,22 @@ function captureTrackIsDead(): boolean {
   return !track || track.readyState === 'ended';
 }
 
+/**
+ * Await a promise, but give up on it.
+ *
+ * On iOS an AudioContext that was interrupted frequently cannot be resumed at
+ * all, and `resume()` on one doesn't reject — it simply never settles. Awaiting
+ * it directly wedges the whole recovery: the in-progress guard never clears, so
+ * every later attempt returns immediately and the tuner stays dead until the
+ * app is force-quit. Which is exactly what it did.
+ */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  return Promise.race([
+    promise.catch(() => 'timeout' as const),
+    new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), ms)),
+  ]);
+}
+
 /** Full teardown and rebuild, on the device the user actually chose. */
 async function restartAudio(): Promise<void> {
   const deviceId = useTunerStore.getState().inputDeviceId;
@@ -538,6 +554,9 @@ async function restartAudio(): Promise<void> {
 // visibilitychange can fire more than once around a single app switch, and a
 // restart is slow enough to overlap itself if we let it.
 let recovering = false;
+
+/** How long to give a resume before treating the context as unrecoverable. */
+const RESUME_TIMEOUT_MS = 250;
 
 /**
  * Put the capture graph back together after the app returns to the foreground.
@@ -563,13 +582,10 @@ export async function recoverAudio(): Promise<void> {
     // WebKit parks an interrupted context in a non-standard 'interrupted'
     // state that isn't in the spec — testing for 'suspended' alone (as
     // startAudio does, where it only ever sees a fresh context) misses it
-    // entirely. Anything that isn't 'running' wants resuming.
+    // entirely. Anything that isn't 'running' wants resuming, and a resume
+    // that hasn't taken quickly isn't going to.
     if (audioContext.state !== 'running') {
-      try {
-        await audioContext.resume();
-      } catch {
-        // Fall through to the restart below.
-      }
+      await within(audioContext.resume(), RESUME_TIMEOUT_MS);
     }
 
     // Backgrounding pauses the keep-alive sink, and WebKit only pumps a
@@ -578,15 +594,13 @@ export async function recoverAudio(): Promise<void> {
     // as a perfectly healthy graph that receives pure silence, which is its
     // own flavour of the same bug.
     if (keepAliveSink?.paused) {
-      try {
-        await keepAliveSink.play();
-      } catch {
-        // Fall through to the restart below.
-      }
+      await within(keepAliveSink.play(), RESUME_TIMEOUT_MS);
     }
 
     // Still not right: rebuild rather than leave the user with a tuner that
-    // looks alive and isn't.
+    // looks alive and isn't. After a real interruption this is the usual
+    // outcome, not the exception — an interrupted context is generally gone
+    // for good and only a fresh one will run.
     if (audioContext.state !== 'running' || captureTrackIsDead()) {
       await restartAudio();
     }

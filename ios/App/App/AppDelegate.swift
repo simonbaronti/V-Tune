@@ -7,6 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    /// Whether we've been backgrounded at least once this launch — see
+    /// applicationDidBecomeActive.
+    private var hasBeenBackgrounded = false
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         configureAudioSession()
         return true
@@ -95,24 +99,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     @objc private func audioSessionInterrupted(_ notification: Notification) {
         // Another app taking the audio session — a video in a social feed, a
-        // call, an alarm — deactivates ours. Without handling the .ended half
-        // the session is never reactivated, and V-Tune comes back to the
-        // foreground with a dead microphone while the UI still says it's
-        // running. You had to swipe the app closed to get it back.
+        // call, an alarm — deactivates ours. Until it's activated again both
+        // capture and playback are dead, which is why the microphone AND the
+        // pitch pipe went together and why restarting the tuner from inside
+        // the app didn't help: the web layer was rebuilding its graph on top
+        // of a session the system had switched off.
         guard
             let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-            let type = AVAudioSession.InterruptionType(rawValue: raw)
+            let type = AVAudioSession.InterruptionType(rawValue: raw),
+            type == .ended
         else { return }
 
-        guard type == .ended else { return }
+        // No .shouldResume check. That flag is documented as the signal to
+        // resume *playback you were in the middle of*, and iOS routinely omits
+        // it — in particular when the interruption ends while we're in the
+        // background, which is every case that matters here. Gating on it is
+        // why the first version of this fix did nothing at all.
+        reactivate()
+    }
 
-        // Only reactivate when iOS says the interruption is one we should
-        // resume from. If it doesn't, something else still owns the session
-        // and grabbing it back would talk over whatever the user moved on to.
-        let options = (notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt)
-            .map(AVAudioSession.InterruptionOptions.init(rawValue:)) ?? []
-        guard options.contains(.shouldResume) else { return }
-
+    private func reactivate() {
         applyCategory()
         try? AVAudioSession.sharedInstance().setActive(true)
         preferSpeakerIfOnReceiver()
@@ -122,6 +128,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
+        hasBeenBackgrounded = true
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
@@ -129,11 +136,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Coming back from another app, the category may have been changed
-        // out from under us and any speaker override cleared. Re-assert both.
-        // Re-applying the category doesn't activate the session, so this is
-        // safe even when the tuner isn't running.
-        applyCategory()
-        preferSpeakerIfOnReceiver()
+        // out from under us and any speaker override cleared.
+        //
+        // Reactivating here as well as on the interruption notification isn't
+        // belt and braces — the notification is genuinely unreliable. When an
+        // interruption ends while we're in the background, .ended can arrive
+        // without .shouldResume, arrive late, or never arrive at all. Coming
+        // back to the foreground is the one moment we can count on.
+        //
+        // Gated on having actually been backgrounded so that launching the
+        // app is untouched: .playAndRecord isn't a mixing category, so
+        // activating it at launch would stop whatever the user was listening
+        // to before they'd asked for anything.
+        if hasBeenBackgrounded {
+            reactivate()
+        } else {
+            applyCategory()
+            preferSpeakerIfOnReceiver()
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
