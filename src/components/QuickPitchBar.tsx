@@ -5,7 +5,7 @@ import { updateWorkletTargets, startAudio, stopAudio } from '../audio/AudioEngin
 import { findScale, HANDPAN_SCALES, CHROMATIC_ID, type ScaleNote } from '../data/scales';
 import { TealIconRow } from './TealIconRow';
 import { GuPortChip } from './GuPortChip';
-import { CustomTargetInput } from './CustomTargetInput';
+import { TargetFrequency } from './TargetFrequency';
 
 const AUTO_HIDE_MS = 20_000;
 
@@ -337,9 +337,13 @@ export function QuickPitchBar() {
           )}
           </div>
 
-          {/* Type a target in Hz — works in either mode, since a frequency
-              doesn't care which notes are on screen. */}
-          <CustomTargetInput />
+          {/* CUSTOM — see PitchDial. Kept above the OCT row here because on
+              a phone that row carries Let's Go, and nothing belongs between
+              a start button and the bottom of the screen. */}
+          <TargetFrequency
+            bleedLeft="max(0.5rem, env(safe-area-inset-left))"
+            bleedRight="max(0.5rem, env(safe-area-inset-right))"
+          />
 
           {/* OCT (chromatic only) + Let's Go */}
           <div className="flex items-center gap-2 pt-1">

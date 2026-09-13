@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useTunerStore } from '../store/tunerStore';
-import { getDisplayName } from '../utils/notes';
+import { getDisplayName, formatHz } from '../utils/notes';
 import { playTone, stopTone, playBeep } from '../audio/PitchPipe';
 import { micLiveness, mixRgba, type Rgba } from './bgSignal';
 
@@ -523,14 +523,17 @@ export function StrobeDisplay() {
       const isNarrow = w < 500;
       const hzFontSize = isNarrow ? 13 : 16;
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
-      const hzText = `${band.frequency.toFixed(1)} Hz`;
+      // With a custom target, the band is showing a number the user typed
+      // — round it to a tenth and it stops being their number. Standard
+      // targets keep the tidier one-decimal readout.
+      const hzText = `${centsOffset !== 0 ? formatHz(band.frequency) : band.frequency.toFixed(1)} Hz`;
       const hzX = PIPE_ICON_W + 6;
       const hzY = y + bandHeight / 2 + labelSize * 0.35 + 8;
 
-      // A FINE offset means this target isn't the standard one for the note,
-      // and the band is where you're actually looking while tuning — on a
-      // phone the FINE control is buried in Settings and invisible from here.
-      // Same purple chip as the control, so the two read as one idea.
+      // A cents offset means this target isn't the standard one for the
+      // note, and the band is where you're actually looking while tuning —
+      // not at the Hz field that set it. Same purple chip as that control,
+      // so the two read as one idea.
       if (centsOffset !== 0) {
         const padX = 5;
         const padY = 3;

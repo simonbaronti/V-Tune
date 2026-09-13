@@ -9,7 +9,7 @@ import {
   type ScaleNote,
 } from '../data/scales';
 import { GuPortChip } from './GuPortChip';
-import { CustomTargetInput } from './CustomTargetInput';
+import { TargetFrequency } from './TargetFrequency';
 
 const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
   { value: 'sharp', label: '♯' },
@@ -257,10 +257,6 @@ export function PitchDial() {
         </div>
       )}
 
-      {/* Type a target in Hz — works in either mode, since a frequency
-          doesn't care which notes are on screen. */}
-      <CustomTargetInput />
-
       {/* Octave + note-naming row. Octave control only makes sense in
           chromatic mode (scale notes have a fixed octave each); naming is
           always relevant. */}
@@ -331,6 +327,11 @@ export function PitchDial() {
         </button>
       </div>
 
+      {/* CUSTOM — a typed target overrides whatever the grid above says, so
+          it gets its own band rather than passing for one more field. Bleeds
+          through the container's px-3 to the panel edges. Works in either
+          mode: a frequency doesn't care which notes are on screen. */}
+      <TargetFrequency bleedLeft="0.75rem" bleedRight="0.75rem" />
     </div>
   );
 }

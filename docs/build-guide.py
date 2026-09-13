@@ -57,7 +57,7 @@ _register_fonts()
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
-GUIDE_VERSION = '1.2.1'
+GUIDE_VERSION = '1.2.2'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
@@ -887,22 +887,41 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Paragraph('FINE — sitting between the notes', s['h2']))
+    story.append(Paragraph('CUSTOM — the target in hertz, to as many decimals as you like', s['h2']))
     story.append(Paragraph(
-        'Not every instrument sits on the equal-tempered grid, and sometimes '
-        'you want to tune to where a pan actually is rather than where the '
-        'grid says it should be. <b>FINE</b> offsets the target by a fraction '
-        'of a semitone, in cents — half a cent per press, up to a semitone '
-        'either way.',
+        'Below the note grid, in its own tinted band, is <b>CUSTOM</b>: the '
+        'pitch you are actually tuning to, in hertz. Picking a note fills it '
+        'in, but you can also set it yourself — and because a target set here '
+        'overrides whatever the grid above says, it gets a band of its own '
+        'rather than passing for one more field. There are two ways to set '
+        'it, depending on whether you know the number you are after.',
         s['body'],
     ))
     story.append(Paragraph(
-        'It moves the fundamental, the octave and the compound fifth '
-        '<i>together</i>, so the relationship between the partials is '
-        'preserved — in PURE and in EQUAL alike. The value turns '
-        '<font color="#a855f7">purple</font> whenever it isn’t zero, so an '
-        'offset can’t be left on by accident; tap it to clear. On a keyboard, '
-        f'{LEFT} and {RIGHT} nudge it a cent at a time, Shift takes ten, and '
+        '<b>Type it</b> when you do — 659.34, or 123.456 — from a maker’s '
+        'spec sheet or an instrument you have measured before. Decimals are '
+        'kept as typed rather than rounded away. Press Enter, or tap '
+        '<b>SET</b>; on a phone, simply tapping elsewhere commits it.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        '<b>Nudge it</b> when you don’t — the <b>−</b> and <b>+</b> buttons '
+        'either side move the target half a cent per press, up to a semitone '
+        'either way. That is the one to reach for when an instrument sits '
+        'between the notes and you are creeping up on it with the strobe '
+        'running, rather than working from a number.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'Either way it moves the fundamental, the octave and the compound '
+        'fifth <i>together</i>, so the relationship between the partials is '
+        'preserved — in PURE and in EQUAL alike. The field turns '
+        '<font color="#a855f7">purple</font> whenever the target is off the '
+        'note, so an offset cannot be left on by accident, and the caption '
+        'underneath names the nearest note and the offset in cents with a '
+        '<b>reset</b> beside it. The strobe bands show the same purple chip '
+        'while an offset is in play. On a keyboard, '
+        f'{LEFT} and {RIGHT} nudge a cent at a time, Shift takes ten, and '
         '<b>0</b> resets it (section 9).',
         s['body'],
     ))
@@ -931,8 +950,11 @@ def build(out_path: Path):
         'controls live in a bottom <b>quick-pick</b> panel that slides up. '
         'Collapsed, it’s a single bar with a soft <font color="#a855f7">'
         'purple glow</font> showing the currently-selected note (e.g. “D3”), '
-        'centred. Tap the bar to slide the panel up — this pushes the canvas '
-        'up, which shrinks responsively to make room.',
+        'centred. Tap the bar to slide the panel up. It floats <i>over</i> the '
+        'tuner on a translucent panel rather than compressing it, so the '
+        'strobe stays exactly where it was; the display behind dims and '
+        'blurs while the panel is up, and tapping anywhere outside closes '
+        'it.',
         s['body'],
     ))
     story.append(Paragraph(

@@ -69,3 +69,20 @@ export function getHarmonicFrequencies(
 }
 
 export { NOTE_NAMES, FLAT_NAMES, SOLFEGE_NAMES, GERMAN_NAMES, NAMING_SYSTEMS };
+
+/**
+ * Show a target frequency without rounding away what someone typed.
+ *
+ * Nothing is rounded on the way in — a typed frequency becomes an exact
+ * unrounded cents remainder — so the display is the only place precision can
+ * be lost, and it shouldn't be: the whole reason to type 123.456 rather than
+ * pick a note is that the decimals matter to you. Three places is about 0.004
+ * cents at concert A, finer than any instrument holds and finer than the
+ * strobe can resolve, so it's a ceiling nobody meets in practice. The third
+ * digit is dropped when it's a zero, so ordinary targets read as 440.00
+ * rather than 440.000.
+ */
+export function formatHz(hz: number): string {
+  const s = hz.toFixed(3);
+  return s.endsWith('0') ? s.slice(0, -1) : s;
+}

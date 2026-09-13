@@ -13,17 +13,35 @@ All notable changes to V-Tune are documented here. The format is based on
   that follows the light or dark theme, and the display below stays exactly
   where it was. The tuner behind it blurs and dims while the picker is up,
   and tapping anywhere outside closes it.
-- **Type a target frequency in Hz.** A new field in the note picker takes a
-  frequency directly — 659.34, or 123.456 — instead of picking a note, in
-  either chromatic or scale mode. The octave and compound fifth track it as
-  exact multiples, so you can follow an instrument's overtones against a
-  base that isn't on the equal-tempered grid. Decimals are kept as typed
-  rather than rounded to the nearest tenth of a cent.
-- **The strobe bands show when a FINE offset is in play.** Each band's
-  target frequency sits on the same purple chip the FINE control uses, so
-  it's obvious at a glance that you're tuning to a modified target rather
-  than the standard one for that note. It matters most on a phone, where
-  FINE lives in Settings and can't be seen while you're tuning.
+- **The tuning target is now shown in hertz, and can be typed.** A field
+  under the note picker takes a frequency directly — 659.34, or 123.456 —
+  instead of picking a note, in either chromatic or scale mode. The octave
+  and compound fifth track it as exact multiples, so you can follow an
+  instrument's overtones against a base that isn't on the equal-tempered
+  grid. Decimals are kept as typed rather than rounded to the nearest tenth
+  of a cent.
+- **The strobe bands show when the target is off the note.** Each band's
+  target frequency sits on the same purple chip as the CUSTOM field — shown
+  to the precision that was typed rather than rounded to a tenth of a hertz
+  — so it's obvious at a glance that you're tuning to a modified target
+  rather than the standard one for that note — and the band is where you're
+  looking while tuning, not the control that set it.
+
+### Changed
+- **FINE has been folded into a new CUSTOM band.** The two controls were
+  always one thing wearing two faces — both set the same cents offset, both
+  turned purple when it wasn't zero — but they lived in different panels,
+  and on a phone FINE was buried in Settings where it couldn't be reached
+  while tuning. There is now a single target, in hertz, in its own tinted
+  **CUSTOM** band below the note grid — a target set there overrides what
+  the grid says, so it reads as an override rather than as one more field —
+  with − and + either side that nudge half a cent per press. Type when you
+  know the number, nudge when you're creeping up on it. The field sits in
+  placeholder grey while it's showing the selected note's standard pitch and
+  turns purple the moment you start typing, so a target you set never looks
+  like one the app chose. Hertz is also the
+  unit that's actually printed on a maker's spec sheet, where cents are
+  jargon.
 
 ### Fixed
 - **The microphone no longer dies after switching apps.** Leaving V-Tune for
