@@ -3,6 +3,7 @@ import { useTunerStore } from '../store/tunerStore';
 import { frequencyToNote } from '../utils/notes';
 import { isoRefinedFreq } from '../components/bgSignal';
 import { YIN } from 'pitchfinder';
+import { recoverPipeContext } from './PitchPipe';
 
 let audioContext: AudioContext | null = null;
 let workletNode: AudioWorkletNode | null = null;
@@ -505,4 +506,102 @@ export async function enumerateDevices(probe = true): Promise<MediaDeviceInfo[]>
   const mergedList = merged.size ? Array.from(merged.values()) : audioInputs;
   useTunerStore.getState().setAvailableDevices(mergedList);
   return mergedList;
+}
+
+// ---------------------------------------------------------------------------
+// Recovering from an audio-session interruption
+//
+// Switch away from V-Tune to something that plays sound — a video in a social
+// feed, a call, an alarm — and iOS interrupts our audio session. Come back and
+// the capture graph is dead: the worklet's process() loop has stopped, so the
+// strobe sits still and nothing is detected. The UI shows no sign of it,
+// because `isRunning` is store state and the interruption never touched it.
+// The only way out was to swipe the app closed and start again.
+//
+// Three separate things can be broken on return, and they need different
+// answers, so we check for all of them rather than assuming which one it is.
+// ---------------------------------------------------------------------------
+
+/** Has the capture track been torn down rather than merely paused? */
+function captureTrackIsDead(): boolean {
+  const track = stream?.getAudioTracks()[0];
+  return !track || track.readyState === 'ended';
+}
+
+/** Full teardown and rebuild, on the device the user actually chose. */
+async function restartAudio(): Promise<void> {
+  const deviceId = useTunerStore.getState().inputDeviceId;
+  stopAudio();
+  await startAudio(deviceId !== 'default' ? deviceId : undefined);
+}
+
+// visibilitychange can fire more than once around a single app switch, and a
+// restart is slow enough to overlap itself if we let it.
+let recovering = false;
+
+/**
+ * Put the capture graph back together after the app returns to the foreground.
+ *
+ * Cheap and idempotent when nothing is wrong: if the context is running and
+ * the track is live this does nothing, so it's safe to call on every
+ * foreground event rather than trying to detect which ones mattered.
+ */
+export async function recoverAudio(): Promise<void> {
+  if (recovering) return;
+  if (!useTunerStore.getState().isRunning) return;
+
+  recovering = true;
+  try {
+    recoverPipeContext();
+
+    // Nothing left to resume — the graph has to be rebuilt.
+    if (!audioContext || captureTrackIsDead()) {
+      await restartAudio();
+      return;
+    }
+
+    // WebKit parks an interrupted context in a non-standard 'interrupted'
+    // state that isn't in the spec — testing for 'suspended' alone (as
+    // startAudio does, where it only ever sees a fresh context) misses it
+    // entirely. Anything that isn't 'running' wants resuming.
+    if (audioContext.state !== 'running') {
+      try {
+        await audioContext.resume();
+      } catch {
+        // Fall through to the restart below.
+      }
+    }
+
+    // Backgrounding pauses the keep-alive sink, and WebKit only pumps a
+    // capture stream into the graph while that element is *playing* — see the
+    // note on keepAliveSink above. A resumed context with a paused sink reads
+    // as a perfectly healthy graph that receives pure silence, which is its
+    // own flavour of the same bug.
+    if (keepAliveSink?.paused) {
+      try {
+        await keepAliveSink.play();
+      } catch {
+        // Fall through to the restart below.
+      }
+    }
+
+    // Still not right: rebuild rather than leave the user with a tuner that
+    // looks alive and isn't.
+    if (audioContext.state !== 'running' || captureTrackIsDead()) {
+      await restartAudio();
+    }
+  } catch (err) {
+    console.error('Failed to recover audio after interruption:', err);
+  } finally {
+    recovering = false;
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void recoverAudio();
+  });
+  // Returning via the back/forward cache doesn't always fire
+  // visibilitychange, and costs nothing to cover.
+  window.addEventListener('pageshow', () => void recoverAudio());
 }

@@ -25,7 +25,22 @@ All notable changes to V-Tune are documented here. The format is based on
   than the standard one for that note. It matters most on a phone, where
   FINE lives in Settings and can't be seen while you're tuning.
 
-## [1.2.1] — unreleased
+### Fixed
+- **The microphone no longer dies after switching apps.** Leaving V-Tune for
+  anything that plays sound — a video in a social feed, a call, an alarm —
+  interrupted the audio session, and nothing put it back together on return:
+  the strobe sat still and nothing was detected, while the app still showed
+  itself as running. The only way out was to force-quit. The session is now
+  reactivated when iOS hands it back, and the capture graph is checked and
+  rebuilt if it didn't survive.
+- **The pitch pipe no longer gets stuck in the earpiece.** Re-asserting the
+  speaker on a route change could read the route before it had settled,
+  decide nothing needed fixing, and return a moment before the route landed
+  on the receiver — leaving the tone in the earpiece until you toggled Stop
+  and Let's Go. The route is now re-checked once it has settled, and the
+  speaker preference is restored whenever the app returns to the foreground.
+
+## [1.2.1] — 2026-09-11
 
 ### Added
 - **Gu port notes are now tappable.** On scales that list them, the amber
