@@ -212,7 +212,13 @@ export function TargetFrequency({ bleedLeft = '0px', bleedRight = '0px' }: Props
               else setDraft(null);
             }}
             aria-label="Target frequency in hertz"
-            className="w-full rounded px-2 py-1.5 text-sm text-center tabular-nums"
+            // text-base is load-bearing, not cosmetic: iOS zooms the whole
+            // page in when you focus an input whose font-size is under 16px,
+            // and doesn't reliably zoom back out afterwards — the app is left
+            // stranded at 1.3x with no way back. 16px is the threshold.
+            // The panel's zoom doesn't count towards it; iOS reads the
+            // computed size, which was 14px.
+            className="w-full rounded px-2 py-1.5 text-base text-center tabular-nums"
             style={{
               background: 'var(--bg-tertiary)',
               // Dim until it's actually yours. The standard pitch for the

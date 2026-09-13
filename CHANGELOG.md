@@ -60,6 +60,11 @@ All notable changes to V-Tune are documented here. The format is based on
   itself as running. The only way out was to force-quit. The session is now
   reactivated when iOS hands it back, and the capture graph is checked and
   rebuilt if it didn't survive.
+- **Typing a target no longer zooms the app and strands it there.** iOS
+  magnifies the whole page when you focus an input whose font-size is under
+  16px, and doesn't reliably undo it — the app was left at 1.3x with no way
+  back. Both text fields are now at the threshold; the email box on the
+  purchase screen had the same flaw.
 - **The pitch pipe no longer gets stuck in the earpiece.** Re-asserting the
   speaker on a route change could read the route before it had settled,
   decide nothing needed fixing, and return a moment before the route landed

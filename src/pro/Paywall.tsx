@@ -121,7 +121,11 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="flex-1 min-w-0 rounded px-3 py-2 text-sm"
+            // 16px minimum, or iOS zooms the page in on focus and leaves it
+            // there — in the middle of a purchase, which is the worst place
+            // in the app for it to happen. The unlock-code field beside it
+            // was already text-base; this one wasn't.
+            className="flex-1 min-w-0 rounded px-3 py-2 text-base"
             style={{
               background: 'var(--bg-tertiary)',
               color: 'var(--text-primary)',
