@@ -43,6 +43,15 @@ All notable changes to V-Tune are documented here. The format is based on
   unit that's actually printed on a maker's spec sheet, where cents are
   jargon.
 
+- **The mobile picker runs 20% larger.** Everything in the slide-up — text,
+  buttons, spacing alike — is scaled up together, so the panel now fills
+  about three fifths of the screen rather than a little over a third, and
+  the note buttons are a comfortable thumb target. The scale dropdown now
+  matches the note buttons below it too — it had been set a size smaller
+  than any single note in the grid it decides the meaning of. It still
+  scrolls internally on a short screen, so a phone in landscape can reach
+  all of it.
+
 ### Fixed
 - **The microphone no longer dies after switching apps.** Leaving V-Tune for
   anything that plays sound — a video in a social feed, a call, an alarm —

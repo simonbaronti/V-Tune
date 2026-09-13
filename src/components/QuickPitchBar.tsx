@@ -17,6 +17,17 @@ const AUTO_HIDE_MS = 20_000;
  * canvas content up (it auto-shrinks). Auto-hides after 10s of no
  * interaction unless pinned. Pin lives in the teal row.
  */
+/**
+ * How much larger everything in the slide-up runs than its desktop size.
+ *
+ * `zoom` rather than `transform: scale()`: a transform paints bigger without
+ * reflowing, so the panel would overhang the screen and the taps would land
+ * in the wrong place. zoom scales the layout itself, which is why every
+ * rem-based Tailwind size — text, buttons, padding, gaps — comes up together
+ * and nothing has to be re-specified.
+ */
+const PANEL_ZOOM = 1.2;
+
 export function QuickPitchBar() {
   const currentNote = useTunerStore((s) => s.currentNote);
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
@@ -253,7 +264,13 @@ export function QuickPitchBar() {
           // taller than the viewport simply runs off the top with no way to
           // reach it — which a phone in landscape (~360px tall) would hit
           // every time. Scrolls internally when the content doesn't fit.
-          maxHeight: expanded ? 'min(820px, calc(100dvh - 5rem))' : 0,
+          // Divided by the zoom: inside a zoomed element a length renders
+          // at zoom × its value, so an undivided viewport cap would let the
+          // panel run off the top of the screen by that factor.
+          maxHeight: expanded
+            ? `min(${820 / PANEL_ZOOM}px, calc((100dvh - 5rem) / ${PANEL_ZOOM}))`
+            : 0,
+          zoom: PANEL_ZOOM,
           overflowX: 'hidden',
           overflowY: 'auto',
           transition: 'max-height 260ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -309,7 +326,11 @@ export function QuickPitchBar() {
             <select
               value={selectedScaleId}
               onChange={(e) => { setSelectedScale(e.target.value); bump(); }}
-              className="flex-1 min-w-0 rounded px-2 py-1.5 text-sm"
+              // text-base, not text-sm: it matches the note buttons directly
+              // below it. At text-sm the scale name — the thing that decides
+              // what the whole grid means — read smaller than any single note
+              // in it.
+              className="flex-1 min-w-0 rounded px-2 py-1.5 text-base"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             >
               <option value={CHROMATIC_ID}>Chromatic</option>
