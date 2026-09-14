@@ -180,8 +180,7 @@ export function SpectrumAnalyzer() {
   const showWaterfall = useTunerStore((s) => s.showWaterfall);
   const waterfallSoftness = useTunerStore((s) => s.waterfallSoftness);
   const waterfallFloor = useTunerStore((s) => s.waterfallFloor);
-  const spectrumHeight = useTunerStore((s) => s.spectrumHeight);
-  const waterfallHeight = useTunerStore((s) => s.waterfallHeight);
+  const analyserHeight = useTunerStore((s) => s.analyserHeight);
 
   // The waterfall needs vertical room to say anything — ten seconds squeezed
   // into a phone-sized strip is a smear. Gated on the space available rather
@@ -256,7 +255,10 @@ export function SpectrumAnalyzer() {
   // whole screen.
   const minH = Math.min(MIN_PANEL_PX, Math.max(70, Math.round(maxCanvas * 0.6)));
   const maxH = Math.max(minH, Math.min(MAX_PANEL_PX, maxCanvas));
-  const storedHeight = waterfallOn ? waterfallHeight : spectrumHeight;
+  // Deliberately not per-mode. Turning the waterfall on used to grow the
+  // panel to a size that suited it, which meant the toggle moved everything
+  // else on screen as a side effect of asking for a different view.
+  const storedHeight = analyserHeight;
   const panelHeight = Math.max(minH, Math.min(maxH, dragHeight ?? storedHeight));
 
   const clampHeight = (px: number) => Math.max(minH, Math.min(maxH, px));
@@ -282,7 +284,7 @@ export function SpectrumAnalyzer() {
     gripRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
     const finalH = clampHeight(g.startH + (g.startY - e.clientY));
-    useTunerStore.getState().setAnalyserHeight(finalH, waterfallOn);
+    useTunerStore.getState().setAnalyserHeight(finalH);
     setDragHeight(null);
   };
 

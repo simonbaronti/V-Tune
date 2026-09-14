@@ -20,9 +20,10 @@ All notable changes to V-Tune are documented here. The format is based on
   frequency, never across time, since blurring time would smear the decay.
   Both re-render the ten seconds already on screen, so you can find the right
   setting against a strike that has already happened.
-- **The analyser can be resized.** Drag the handle at its top edge; the
-  height is remembered separately for the curve alone and for the waterfall.
-  The strobe keeps a guaranteed share, and the band labels scale with it.
+- **The analyser can be resized.** Drag the handle at its top edge. One
+  height, kept whether the waterfall is on or off — turning it on doesn't
+  resize the panel under you. The strobe keeps a guaranteed share, and the
+  band labels scale with it.
 - **A phone held sideways is asked to turn back.** V-Tune stacks three strobe
   bands, the analyser and the picker, and a phone in landscape hasn't the
   height for it. Phones only: a tablet's wide layout switches on at 1024px,
