@@ -132,6 +132,18 @@ export interface TunerState {
   displaySmoothing: number;
   strobeSpeed: number;
   showSpectrum: boolean;
+  /** Waterfall (heatmap over time) behind the spectrum curve. */
+  showWaterfall: boolean;
+  /** How much the waterfall's colour is blurred across frequency, 0-1. */
+  waterfallSoftness: number;
+  /** dB at which the waterfall's colour ramp bottoms out. Lower = a decay
+   *  stays visible further down before it goes black. */
+  waterfallFloor: number;
+  /** User-set analyser height in CSS px. Remembered per mode — the curve on
+   *  its own wants far less room than the waterfall, and toggling between
+   *  them shouldn't leave either one the wrong size. */
+  spectrumHeight: number;
+  waterfallHeight: number;
   readoutSmoothing: number;
   micGainDb: number;
   /** Pitch-pipe output level, 0-1. Shipped at 0.15 until 1.2.1, which was
@@ -224,6 +236,10 @@ export interface TunerState {
   setDisplaySmoothing: (value: number) => void;
   setStrobeSpeed: (speed: number) => void;
   setShowSpectrum: (show: boolean) => void;
+  setShowWaterfall: (show: boolean) => void;
+  setWaterfallSoftness: (v: number) => void;
+  setWaterfallFloor: (db: number) => void;
+  setAnalyserHeight: (px: number, waterfall: boolean) => void;
   setReadoutSmoothing: (value: number) => void;
   setMicGainDb: (value: number) => void;
   setPipeVolume: (value: number) => void;
@@ -441,6 +457,11 @@ export const useTunerStore = create<TunerState>()(
   displaySmoothing: 0.20,
   strobeSpeed: 1,
   showSpectrum: true,
+  showWaterfall: false,
+  waterfallSoftness: 0.35,
+  waterfallFloor: -85,
+  spectrumHeight: 140,
+  waterfallHeight: 320,
   readoutSmoothing: 0.70,
   micGainDb: 0,
   pipeVolume: 0.45,
@@ -578,6 +599,11 @@ export const useTunerStore = create<TunerState>()(
   setDisplaySmoothing: (value) => set({ displaySmoothing: value }),
   setStrobeSpeed: (speed) => set({ strobeSpeed: speed }),
   setShowSpectrum: (show) => set({ showSpectrum: show }),
+  setShowWaterfall: (show) => set({ showWaterfall: show }),
+  setWaterfallSoftness: (v) => set({ waterfallSoftness: Math.max(0, Math.min(1, v)) }),
+  setWaterfallFloor: (db) => set({ waterfallFloor: Math.max(-115, Math.min(-40, db)) }),
+  setAnalyserHeight: (px, waterfall) =>
+    set(waterfall ? { waterfallHeight: px } : { spectrumHeight: px }),
   setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
   setMicGainDb: (value) => set({ micGainDb: value }),
   setPipeVolume: (value) => set({ pipeVolume: Math.max(0, Math.min(1, value)) }),
@@ -813,6 +839,11 @@ export const useTunerStore = create<TunerState>()(
         humFilter: state.humFilter,
         selectedScaleId: state.selectedScaleId,
         showSpectrum: state.showSpectrum,
+        showWaterfall: state.showWaterfall,
+        waterfallSoftness: state.waterfallSoftness,
+        waterfallFloor: state.waterfallFloor,
+        spectrumHeight: state.spectrumHeight,
+        waterfallHeight: state.waterfallHeight,
         openAccordion: state.openAccordion,
         // menuOpen is intentionally NOT persisted — the menu always loads
         // open (so the controls are visible on launch) and the 10s auto-hide

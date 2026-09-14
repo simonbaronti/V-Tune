@@ -6,6 +6,24 @@ All notable changes to V-Tune are documented here. The format is based on
 
 ## [1.3.0] — unreleased
 
+### Added
+- **A waterfall view in the Spectrum Analyser.** Ten seconds of the spectrum
+  as a heatmap, on the same frequency axis as the curve and behind it, with
+  colour standing in for power — so you can see how long each partial
+  actually sustains after the strike, not just how loud it is right now.
+  Asked for by a handpan maker who reads the same thing off a desktop
+  spectrogram alongside V-Tune.
+- **Isolation windows carry through to the waterfall** as lanes, so you can
+  bracket one partial and watch that one decay while the strobe reads it.
+- **TAIL** sets how quiet a partial may get before it goes black — drag it
+  right to follow a decay further down. **SOFT** blurs the heatmap across
+  frequency, never across time, since blurring time would smear the decay.
+  Both re-render the ten seconds already on screen, so you can find the right
+  setting against a strike that has already happened.
+- **The analyser can be resized.** Drag the handle at its top edge; the
+  height is remembered separately for the curve alone and for the waterfall.
+  The strobe keeps a guaranteed share, and the band labels scale with it.
+
 ### Fixed
 - **The sharp keys are readable in light mode again.** A piano black key is
   drawn dark whichever theme you're in, but its label was taking a theme

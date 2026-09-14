@@ -502,7 +502,7 @@ export function StrobeDisplay() {
           : iconMode === 'beep'
             ? '#22d3ee'
             : 'rgba(255, 255, 255, 0.8)';
-      const iconSize = Math.min(36, Math.max(24, bandHeight * 0.5));
+      const iconSize = Math.min(36, Math.max(13, bandHeight * 0.42));
       ctx.fillStyle = iconColor;
       ctx.font = `${iconSize}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'center';
@@ -512,7 +512,11 @@ export function StrobeDisplay() {
       // Band note name — shifted right of the icon strip
       const labelColor = isSelected ? '#06b6d4' : PAL.label;
       ctx.fillStyle = labelColor;
-      const labelSize = Math.min(56, Math.max(32, bandHeight * 0.7));
+      // Scales with the band, and keeps scaling all the way down. The floor
+      // used to be 32px, which meant that once the analyser was dragged tall
+      // enough to squeeze the bands under ~46px the label stopped shrinking
+      // and began overflowing the band it belongs to.
+      const labelSize = Math.min(56, Math.max(15, bandHeight * 0.62));
       ctx.font = `bold ${labelSize}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
@@ -521,7 +525,9 @@ export function StrobeDisplay() {
       // Frequency below label — slightly smaller on narrow viewports, with
       // 8px of breathing room between it and the note label above
       const isNarrow = w < 500;
-      const hzFontSize = isNarrow ? 13 : 16;
+      // Tracks the label rather than sitting at a fixed size, or it collides
+      // with it as soon as the band gets short.
+      const hzFontSize = Math.max(8, Math.min(isNarrow ? 13 : 16, bandHeight * 0.17));
       ctx.font = `${hzFontSize}px "JetBrains Mono", monospace`;
       // With a custom target, the band is showing a number the user typed
       // — round it to a tenth and it stops being their number. Standard
