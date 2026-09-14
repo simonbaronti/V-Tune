@@ -26,6 +26,12 @@ const AUTO_HIDE_MS = 20_000;
  * rem-based Tailwind size — text, buttons, padding, gaps — comes up together
  * and nothing has to be re-specified.
  */
+/** A piano black key is drawn dark in both themes, so its label can't take a
+ *  theme colour — in light mode --text-secondary is a dark grey, which put
+ *  near-black text on a near-black key and made the sharps unreadable. */
+const SHARP_KEY_BG = '#0a0a12';
+const SHARP_KEY_TEXT = '#b8b8c8';
+
 const PANEL_ZOOM = 1.2;
 
 export function QuickPitchBar() {
@@ -120,8 +126,8 @@ export function QuickPitchBar() {
             onClick={() => selectNote(name, currentOctave)}
             className="py-2.5 text-base font-medium rounded transition-colors"
             style={{
-              background: isActive ? 'var(--accent-blue)' : isSharp ? '#0a0a12' : 'var(--bg-tertiary)',
-              color: isActive ? '#fff' : isSharp ? 'var(--text-secondary)' : 'var(--text-primary)',
+              background: isActive ? 'var(--accent-blue)' : isSharp ? SHARP_KEY_BG : 'var(--bg-tertiary)',
+              color: isActive ? '#fff' : isSharp ? SHARP_KEY_TEXT : 'var(--text-primary)',
               border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border)'}`,
               boxShadow: isDetected ? '0 0 0 2px #22d3ee, 0 0 12px 2px rgba(34, 211, 238, 0.5)' : undefined,
             }}

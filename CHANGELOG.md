@@ -4,6 +4,13 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.0] — unreleased
+
+### Fixed
+- **The sharp keys are readable in light mode again.** A piano black key is
+  drawn dark whichever theme you're in, but its label was taking a theme
+  colour — so in light mode it was near-black text on a near-black key.
+
 ## [1.2.2] — unreleased
 
 ### Added
