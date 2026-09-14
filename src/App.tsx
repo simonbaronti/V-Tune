@@ -12,6 +12,7 @@ import { StopwatchChip } from './components/StopwatchChip';
 import { SettingsModal } from './components/SettingsModal';
 import { KeyboardHelpModal } from './components/KeyboardHelpModal';
 import { OnboardingTour } from './components/OnboardingTour';
+import { RotateNotice } from './components/RotateNotice';
 import { AudioErrorToast } from './components/AudioErrorToast';
 import { UpdateBanner } from './components/UpdateBanner';
 import { DesktopUpdater } from './components/DesktopUpdater';
@@ -122,6 +123,7 @@ function App() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative">
+      <RotateNotice />
       <OnboardingTour />
       <AudioErrorToast />
       <UpdateBanner />

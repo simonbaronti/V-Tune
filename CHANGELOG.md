@@ -23,6 +23,10 @@ All notable changes to V-Tune are documented here. The format is based on
 - **The analyser can be resized.** Drag the handle at its top edge; the
   height is remembered separately for the curve alone and for the waterfall.
   The strobe keeps a guaranteed share, and the band labels scale with it.
+- **A phone held sideways is asked to turn back.** V-Tune stacks three strobe
+  bands, the analyser and the picker, and a phone in landscape hasn't the
+  height for it. Phones only: a tablet's wide layout switches on at 1024px,
+  so landscape is a tablet's better orientation, not its worse one.
 
 ### Fixed
 - **The sharp keys are readable in light mode again.** A piano black key is
