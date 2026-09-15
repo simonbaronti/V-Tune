@@ -25,6 +25,16 @@ All notable changes to V-Tune are documented here. The format is based on
   never across time, since blurring time would smear the decay.
   Both re-render the ten seconds already on screen, so you can find the right
   setting against a strike that has already happened.
+- **A piano keyboard under the analyser.** Drawn against the frequency axis
+  rather than as evenly-spaced keys, so every key sits beneath the partials
+  it names and the whole thing stretches and slides with the zoom. The keys
+  your strobe bands are targeting are tinted, so you can see at a glance
+  which note each one is on. Note names appear as the width allows — every
+  white key when there's room, thinning to the octave Cs when zoomed out.
+- **The analyser's range is now 60 Hz – 4.3 kHz**, down from 20 Hz – 5 kHz.
+  Still comfortably wider than any handpan's fundamental-to-upper-partial
+  span, and narrow enough that the keyboard's keys are readable rather than
+  a 7px smear.
 - **The analyser can be resized.** Drag the handle at its top edge. One
   height, kept whether the waterfall is on or off — turning it on doesn't
   resize the panel under you. The strobe keeps a guaranteed share, and the

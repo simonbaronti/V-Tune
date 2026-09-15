@@ -64,8 +64,12 @@ export const MAX_ISOLATIONS = 2;
 /** Frequency limits of the spectrum analyser's view. Live here rather than
  * in the component so anything driving the view (the Gu-port chip) can ask
  * for "all the way out" without importing the analyser. */
-export const SPECTRUM_MIN_FREQ = 20;
-export const SPECTRUM_MAX_FREQ = 5000;
+// 60 Hz to 4.3 kHz — 6.2 octaves, comfortably wider than any handpan's
+// fundamental-to-upper-partial span, and narrow enough that the piano
+// keyboard under the analyser has drawable keys. At the old 20-5000 the
+// keys were ~7px and unreadable.
+export const SPECTRUM_MIN_FREQ = 60;
+export const SPECTRUM_MAX_FREQ = 4300;
 
 /** The view range the analyser has last been asked to show. The analyser
  * owns its own zoom/pan (component state, redrawn every frame); this is how
@@ -464,7 +468,7 @@ export const useTunerStore = create<TunerState>()(
   waterfallSoftness: 0.35,
   waterfallFloor: -85,
   waterfallTop: -20,
-  analyserHeight: 140,
+  analyserHeight: 200,
   readoutSmoothing: 0.70,
   micGainDb: 0,
   pipeVolume: 0.45,

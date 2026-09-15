@@ -7,7 +7,7 @@ import {
   SPECTRUM_MAX_FREQ,
 } from '../store/tunerStore';
 import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
-import { frequencyToNote, getDisplayName } from '../utils/notes';
+import { frequencyToNote, getDisplayName, NOTE_NAMES } from '../utils/notes';
 import { micLiveness, mixRgba } from './bgSignal';
 
 // How long the finger has to sit still before a touch-drag becomes an
@@ -58,7 +58,14 @@ const WF_MAX_BLUR_PX = 6;
  * of the screen, because what has to stay usable is a fixed amount of
  * furniture, not a proportion of it.
  */
-const MIN_PANEL_PX = 140;
+/** Axis furniture below the plot: the frequency numbers, then the keyboard. */
+const FREQ_LABEL_H = 17;
+const KEYBOARD_H = 30;
+const AXIS_H = FREQ_LABEL_H + KEYBOARD_H;
+
+// Raised with the keyboard: the axis furniture now costs a permanent 47px,
+// so the old 140 floor left under 100px of actual plot.
+const MIN_PANEL_PX = 180;
 const MAX_PANEL_PX = 700;
 
 /**
@@ -167,6 +174,44 @@ function formatFreq(f: number): string {
   if (f >= 1000) return `${(f / 1000).toFixed(1)}k`;
   return `${Math.round(f)}`;
 }
+
+
+/** Semitones above/below A4 → frequency, at whatever A the user has set. */
+function midiToFreq(midi: number, refFreq: number): number {
+  return refFreq * Math.pow(2, (midi - 69) / 12);
+}
+
+const WHITE_SET = new Set([0, 2, 4, 5, 7, 9, 11]);
+const isWhite = (midi: number) => WHITE_SET.has(((midi % 12) + 12) % 12);
+
+/**
+ * Where a white key ends, in semitones.
+ *
+ * On the black-key pitch itself where there is one — which is what makes a
+ * black key straddle the two whites either side of it, as on a real
+ * instrument, instead of being pinned to one white's right-hand edge. Where
+ * two whites are adjacent (E-F, B-C) the boundary falls halfway between.
+ *
+ * It also evens the whites out: 1.5 and 2 semitones rather than 1 and 2, so
+ * E and B stop looking like half-keys.
+ */
+function whiteEdges(midi: number): [number, number] {
+  let prev = midi - 1;
+  while (!isWhite(prev)) prev--;
+  let next = midi + 1;
+  while (!isWhite(next)) next++;
+  return [
+    midi - prev === 2 ? midi - 1 : midi - 0.5,
+    next - midi === 2 ? midi + 1 : midi + 0.5,
+  ];
+}
+
+/** Black-key width, in semitones. A real piano's black is a little over half
+ *  a white; at these spans that lands close. */
+const BLACK_KEY_SEMITONES = 0.8;
+const KEY_WHITE = '#eceef4';
+const KEY_BLACK = '#14141c';
+const KEY_EDGE = 'rgba(0, 0, 0, 0.45)';
 
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -569,6 +614,8 @@ export function SpectrumAnalyzer() {
 
     const w = rect.width;
     const h = rect.height;
+    // Plot area — everything above the frequency numbers and the keyboard.
+    const plotH = h - AXIS_H;
 
     const [minF, maxF] = viewRangeRef.current;
     const currentThreshold = thresholdRef.current;
@@ -593,7 +640,7 @@ export function SpectrumAnalyzer() {
     // read until further down, and one frame of lag at 60fps isn't visible.
     const wfOn = store.showWaterfall;
     if (wfOn && wfOffRef.current) {
-      ctx.drawImage(wfOffRef.current, 0, 0, w, h);
+      ctx.drawImage(wfOffRef.current, 0, 0, w, plotH);
     }
 
     // Grid lines. Over the heatmap the theme's own grid colour disappears,
@@ -611,12 +658,12 @@ export function SpectrumAnalyzer() {
       ctx.fillStyle = wfOn ? 'rgba(226, 226, 240, 0.85)' : specGridLabel;
       ctx.font = '12px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${formatFreq(gf)}`, gx, h - 4);
+      ctx.fillText(`${formatFreq(gf)}`, gx, plotH + 13);
     }
 
     // dB grid
     for (let db = -90; db <= -10; db += 10) {
-      const gy = dbToY(db, h - 20, DB_FLOOR, DB_CEIL);
+      const gy = dbToY(db, plotH, DB_FLOOR, DB_CEIL);
       ctx.beginPath();
       ctx.moveTo(0, gy);
       ctx.lineTo(w, gy);
@@ -628,7 +675,7 @@ export function SpectrumAnalyzer() {
     }
 
     // Threshold line
-    const threshY = dbToY(currentThreshold, h - 20, DB_FLOOR, DB_CEIL);
+    const threshY = dbToY(currentThreshold, plotH, DB_FLOOR, DB_CEIL);
     ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
@@ -680,28 +727,28 @@ export function SpectrumAnalyzer() {
       // so the two always agree about what's above the noise floor.
       if (wfOn) {
         // `raw` rather than `smooth`: see the capture loop.
-        wfUpdate({ smooth: raw, binCount, freqPerBin }, Math.round(w), Math.round(h),
+        wfUpdate({ smooth: raw, binCount, freqPerBin }, Math.round(w), Math.round(plotH),
           minF, maxF, store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
       }
 
       // Draw spectrum fill
       ctx.beginPath();
-      ctx.moveTo(0, h - 20);
+      ctx.moveTo(0, plotH);
       let firstPoint = true;
       for (let i = 1; i < binCount; i++) {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(smooth[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(smooth[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
-          ctx.moveTo(x, h - 20);
+          ctx.moveTo(x, plotH);
           ctx.lineTo(x, y);
           firstPoint = false;
         } else {
           ctx.lineTo(x, y);
         }
       }
-      ctx.lineTo(w, h - 20);
+      ctx.lineTo(w, plotH);
       ctx.closePath();
 
       // Thinner fill over the waterfall — at the opaque weight it works
@@ -720,7 +767,7 @@ export function SpectrumAnalyzer() {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(smooth[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(smooth[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
           ctx.moveTo(x, y);
           firstPoint = false;
@@ -739,7 +786,7 @@ export function SpectrumAnalyzer() {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(peaks[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(peaks[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
           ctx.moveTo(x, y);
           firstPoint = false;
@@ -812,7 +859,7 @@ export function SpectrumAnalyzer() {
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(bx, 0);
-      ctx.lineTo(bx, h - 20);
+      ctx.lineTo(bx, plotH);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -834,16 +881,16 @@ export function SpectrumAnalyzer() {
       const lx = freqToX(Math.max(minF, isoMin), w, minF, maxF);
       const rx = freqToX(Math.min(maxF, isoMax), w, minF, maxF);
       ctx.fillStyle = opts.pending ? `rgba(${rgb}, 0.18)` : `rgba(${rgb}, 0.10)`;
-      ctx.fillRect(lx, 0, rx - lx, h - 20);
+      ctx.fillRect(lx, 0, rx - lx, plotH);
 
       ctx.strokeStyle = opts.pending ? `rgba(${rgb}, 0.7)` : `rgba(${rgb}, 0.9)`;
       ctx.lineWidth = 2;
       if (opts.pending) ctx.setLineDash([4, 4]);
       ctx.beginPath();
       ctx.moveTo(lx, 0);
-      ctx.lineTo(lx, h - 20);
+      ctx.lineTo(lx, plotH);
       ctx.moveTo(rx, 0);
-      ctx.lineTo(rx, h - 20);
+      ctx.lineTo(rx, plotH);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -917,7 +964,7 @@ export function SpectrumAnalyzer() {
         ctx.setLineDash([2, 3]);
         ctx.beginPath();
         ctx.moveTo(hx, 0);
-        ctx.lineTo(hx, h - 20);
+        ctx.lineTo(hx, plotH);
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -955,8 +1002,82 @@ export function SpectrumAnalyzer() {
     }
 
     if (wfOn && (!analyser || !actx)) {
-      wfUpdate(null, Math.round(w), Math.round(h), minF, maxF,
+      wfUpdate(null, Math.round(w), Math.round(plotH), minF, maxF,
         store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
+    }
+
+
+    // ── Piano keyboard ────────────────────────────────────────────────────
+    // Drawn against the frequency axis rather than as evenly-spaced keys, so
+    // every key sits exactly under the partials it names and the whole thing
+    // stretches and slides with the zoom. The cost is that white keys come
+    // out unequal — C spans two semitones before D, E only one before F —
+    // which is what a real keyboard's geometry actually looks like once it's
+    // projected onto a log-frequency scale.
+    {
+      const kbTop = plotH + FREQ_LABEL_H;
+      const lowMidi = Math.floor(69 + 12 * Math.log2(minF / refFreq)) - 1;
+      const highMidi = Math.ceil(69 + 12 * Math.log2(maxF / refFreq)) + 1;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.fillRect(0, kbTop, w, KEYBOARD_H);
+
+      // Which keys a strobe band is sitting on — the reason for the keyboard
+      // is reading a partial's note off the axis, so say where the targets are.
+      const bandMidis = new Set(
+        store.bands.map((b) => Math.round(69 + 12 * Math.log2(b.frequency / refFreq))),
+      );
+
+      // Whites first, then blacks over the top, exactly as they overlap.
+      for (let m = lowMidi; m <= highMidi; m++) {
+        if (!isWhite(m)) continue;
+        const [lo, hi] = whiteEdges(m);
+        const x0 = freqToX(midiToFreq(lo, refFreq), w, minF, maxF);
+        const x1 = freqToX(midiToFreq(hi, refFreq), w, minF, maxF);
+        if (x1 < 0 || x0 > w) continue;
+        ctx.fillStyle = KEY_WHITE;
+        ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H);
+        if (bandMidis.has(m)) {
+          ctx.fillStyle = 'rgba(6, 182, 212, 0.45)';
+          ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H);
+        }
+        ctx.strokeStyle = KEY_EDGE;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x0 + 0.25, kbTop + 0.25, x1 - x0 - 0.5, KEYBOARD_H - 0.5);
+
+        // Labels only where they fit, so zooming reveals them rather than
+        // the view starting out as a wall of overlapping text.
+        const kw = x1 - x0;
+        const name = getDisplayName(NOTE_NAMES[((m % 12) + 12) % 12], currentNaming);
+        const octave = Math.floor(m / 12) - 1;
+        const isC = ((m % 12) + 12) % 12 === 0;
+        const label = kw >= 15 ? `${name}${octave}` : isC && kw >= 9 ? `${name}${octave}` : null;
+        if (label) {
+          ctx.fillStyle = isC ? 'rgba(10, 10, 20, 0.95)' : 'rgba(10, 10, 20, 0.6)';
+          ctx.font = `${isC ? 'bold ' : ''}8px "JetBrains Mono", monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, x0 + kw / 2, kbTop + KEYBOARD_H - 4);
+        }
+      }
+
+      for (let m = lowMidi; m <= highMidi; m++) {
+        if (isWhite(m)) continue;
+        // Centred on its own pitch, which is also the seam between the two
+        // whites — so it overlaps both by the same amount.
+        const half = BLACK_KEY_SEMITONES / 2;
+        const x0 = freqToX(midiToFreq(m - half, refFreq), w, minF, maxF);
+        const x1 = freqToX(midiToFreq(m + half, refFreq), w, minF, maxF);
+        if (x1 < 0 || x0 > w) continue;
+        ctx.fillStyle = bandMidis.has(m) ? 'rgba(6, 182, 212, 0.9)' : KEY_BLACK;
+        ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H * 0.62);
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, kbTop);
+      ctx.lineTo(w, kbTop);
+      ctx.stroke();
     }
 
     // Range info
@@ -1021,6 +1142,7 @@ export function SpectrumAnalyzer() {
     const y = e.clientY - rect.top;
     const h = rect.height;
     const w = rect.width;
+    const plotH = h - AXIS_H;
 
     // 1. Existing isolation handles (highest priority — most visually obvious)
     const hit = findIsoHandleAt(x, w);
@@ -1040,7 +1162,7 @@ export function SpectrumAnalyzer() {
     }
 
     // 2. Threshold line
-    const threshY = dbToY(threshold, h - 20, DB_FLOOR, DB_CEIL);
+    const threshY = dbToY(threshold, plotH, DB_FLOOR, DB_CEIL);
     if (Math.abs(y - threshY) < 10) {
       setDragState({
         type: 'threshold',
@@ -1096,7 +1218,7 @@ export function SpectrumAnalyzer() {
     if (dragState.type === 'threshold') {
       const dy = e.clientY - dragState.startY;
       const dbRange = DB_CEIL - DB_FLOOR;
-      const dbDelta = -(dy / (rect.height - 20)) * dbRange;
+      const dbDelta = -(dy / (rect.height - AXIS_H)) * dbRange;
       setThreshold(Math.max(-90, Math.min(-10, Math.round(dragState.startThreshold + dbDelta))));
     } else if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
       const x = e.clientX - rect.left;
@@ -1238,6 +1360,7 @@ export function SpectrumAnalyzer() {
       const y = t.clientY - rect.top;
       const w = rect.width;
       const h = rect.height;
+      const plotH = h - AXIS_H;
 
       // Iso handle resize wins
       const hit = findIsoHandleAt(x, w, 18);
@@ -1259,7 +1382,7 @@ export function SpectrumAnalyzer() {
 
       // Threshold line — same hit zone as the mouse path. Wider on touch
       // (16px vs the mouse's 10px) since fingers are less precise.
-      const threshY = dbToY(threshold, h - 20, DB_FLOOR, DB_CEIL);
+      const threshY = dbToY(threshold, plotH, DB_FLOOR, DB_CEIL);
       if (Math.abs(y - threshY) < 16) {
         e.preventDefault();
         setDragState({
@@ -1356,7 +1479,7 @@ export function SpectrumAnalyzer() {
         e.preventDefault();
         const dy = t.clientY - dragState.startY;
         const dbRange = DB_CEIL - DB_FLOOR;
-        const dbDelta = -(dy / (rect.height - 20)) * dbRange;
+        const dbDelta = -(dy / (rect.height - AXIS_H)) * dbRange;
         setThreshold(Math.max(-90, Math.min(-10, Math.round(dragState.startThreshold + dbDelta))));
       } else if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
         e.preventDefault();
