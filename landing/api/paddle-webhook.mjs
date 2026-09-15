@@ -29,6 +29,10 @@ import crypto from 'node:crypto';
 
 // Paddle needs the bytes exactly as sent — a parsed-and-restringified body
 // will not produce the same signature.
+//
+// The .mjs extension is load-bearing: this project's root is landing/, which
+// has no package.json, so a .js file here is treated as CommonJS and the
+// import above throws before any of this runs.
 export const config = { api: { bodyParser: false } };
 
 const RC_API = 'https://api.revenuecat.com/v1';
@@ -52,6 +56,18 @@ const MAX_SIGNATURE_AGE_S = 5 * 60;
 const REVOKING_ACTIONS = new Set(['refund', 'chargeback']);
 
 function readRawBody(req) {
+  // Belt and braces around the bodyParser:false above. If the runtime has
+  // already read the body we take what it left — but only while it's still
+  // bytes. Once it's been parsed into an object the original formatting is
+  // gone for good and no signature will ever match, so say so plainly rather
+  // than rejecting every genuine webhook with a baffling 401.
+  if (Buffer.isBuffer(req.body)) return Promise.resolve(req.body);
+  if (typeof req.body === 'string') return Promise.resolve(Buffer.from(req.body, 'utf8'));
+  if (req.body && typeof req.body === 'object') {
+    return Promise.reject(
+      new Error('request body was parsed before we saw it — raw bytes unavailable'),
+    );
+  }
   return new Promise((resolve, reject) => {
     const chunks = [];
     req.on('data', (c) => chunks.push(c));
@@ -173,7 +189,8 @@ export default async function handler(req, res) {
   let raw;
   try {
     raw = await readRawBody(req);
-  } catch {
+  } catch (err) {
+    console.error('paddle-webhook: could not read raw body —', err?.message ?? err);
     return res.status(400).json({ error: 'Unreadable body' });
   }
 
