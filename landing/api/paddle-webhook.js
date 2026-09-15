@@ -38,6 +38,19 @@ const PADDLE_API = 'https://api.paddle.com';
  *  request; Paddle's own retries are well inside it. */
 const MAX_SIGNATURE_AGE_S = 5 * 60;
 
+/**
+ * Adjustment actions that take the unlock away.
+ *
+ * A chargeback costs the money and the fee, so it revokes like a refund.
+ * Deliberately narrow beyond those two: `chargeback_warning` is a dispute
+ * being opened rather than decided, and revoking on it would lock out a
+ * customer who may well win. `credit` is a partial adjustment against an
+ * invoice, not a reversal of the sale. The reversal actions
+ * (`chargeback_reverse`, `credit_reverse`) mean the money came back — if
+ * either ever shows up here, the entitlement needs re-granting, not revoking.
+ */
+const REVOKING_ACTIONS = new Set(['refund', 'chargeback']);
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -193,20 +206,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, granted: appUserId });
     }
 
-    if (type === 'adjustment.created' && data?.action === 'refund') {
+    if (type === 'adjustment.created' && REVOKING_ACTIONS.has(data?.action)) {
       const appUserId = await appUserIdForTransaction(
         data?.transaction_id,
         process.env.PADDLE_API_KEY,
       );
       if (!appUserId) {
         console.warn(
-          `paddle-webhook: refund on txn ${data?.transaction_id} not revoked — ` +
+          `paddle-webhook: ${data?.action} on txn ${data?.transaction_id} not revoked — ` +
             'no app_user_id (set PADDLE_API_KEY to enable refund handling)',
         );
-        return res.status(200).json({ ok: true, skipped: 'no app_user_id for refund' });
+        return res.status(200).json({ ok: true, skipped: 'no app_user_id for adjustment' });
       }
       await revoke(appUserId, entitlement, rcKey);
-      console.log(`paddle-webhook: revoked ${entitlement} from ${appUserId}`);
+      console.log(`paddle-webhook: revoked ${entitlement} from ${appUserId} (${data?.action})`);
       return res.status(200).json({ ok: true, revoked: appUserId });
     }
 
