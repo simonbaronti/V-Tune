@@ -27,22 +27,46 @@
  */
 import crypto from 'node:crypto';
 
-// Web handler signature (Request in, Response out) rather than Node's
-// (req, res). Paddle signs the exact bytes it sent, and the Node signature
-// on this runtime hands over a body that has already been parsed into an
-// object — at which point the original formatting is gone and no signature
-// can ever match. `request.text()` is the bytes, untouched.
+// The .mjs extension is load-bearing: this project's root is landing/, which
+// has no package.json, so a .js file here is treated as CommonJS and the
+// import above throws before any of this runs.
 //
-// The .mjs extension is load-bearing too: this project's root is landing/,
-// which has no package.json, so a .js file here is treated as CommonJS and
-// the import above throws before any of this runs.
-export const config = { runtime: 'nodejs' };
+// Node (req, res) signature, not the Web one — this runtime serves the
+// former and simply hangs waiting for a response if you return a Response.
+export const config = { api: { bodyParser: false } };
 
-const json = (status, body) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+/**
+ * Paddle signs the exact bytes it sent, so verification needs those bytes.
+ *
+ * Three ways of getting them, in descending order of trust:
+ *   1. A raw buffer the runtime kept for us.
+ *   2. The request stream, when nothing has consumed it.
+ *   3. Re-serialising the parsed body — because `bodyParser: false` above is
+ *      a Next.js convention this runtime doesn't honour, and by the time we
+ *      run, the body is already an object.
+ *
+ * (3) is a reconstruction and can differ from the original over whitespace or
+ * escaping. That can only ever cause a *failed* verification, never a false
+ * pass, so it's safe — but it's also why the chosen path is logged: if
+ * genuine webhooks start 401ing, the log says which route produced the bytes.
+ */
+async function readRawBody(req) {
+  if (Buffer.isBuffer(req.rawBody)) return { raw: req.rawBody.toString('utf8'), via: 'rawBody' };
+  if (typeof req.rawBody === 'string') return { raw: req.rawBody, via: 'rawBody' };
+  if (Buffer.isBuffer(req.body)) return { raw: req.body.toString('utf8'), via: 'body-buffer' };
+  if (typeof req.body === 'string') return { raw: req.body, via: 'body-string' };
+
+  if (req.readable && !req.readableEnded) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    if (chunks.length) return { raw: Buffer.concat(chunks).toString('utf8'), via: 'stream' };
+  }
+
+  if (req.body && typeof req.body === 'object') {
+    return { raw: JSON.stringify(req.body), via: 'reserialised' };
+  }
+  return { raw: null, via: 'none' };
+}
 
 const RC_API = 'https://api.revenuecat.com/v1';
 const PADDLE_API = 'https://api.paddle.com';
@@ -157,12 +181,10 @@ async function appUserIdForTransaction(transactionId, paddleKey) {
   return json?.data?.custom_data?.app_user_id ?? null;
 }
 
-export default async function handler(request) {
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', Allow: 'POST' },
-    });
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET;
@@ -173,27 +195,31 @@ export default async function handler(request) {
     // Misconfigured rather than unauthorised. 500 so Paddle retries once the
     // variables are in place, instead of dropping a real purchase.
     console.error('paddle-webhook: PADDLE_WEBHOOK_SECRET or REVENUECAT_SECRET_KEY missing');
-    return json(500, { error: 'Not configured' });
+    return res.status(500).json({ error: 'Not configured' });
   }
 
-  let raw;
+  let raw, via;
   try {
-    raw = await request.text();
+    ({ raw, via } = await readRawBody(req));
   } catch (err) {
     console.error('paddle-webhook: could not read body —', err?.message ?? err);
-    return json(400, { error: 'Unreadable body' });
+    return res.status(400).json({ error: 'Unreadable body' });
+  }
+  if (raw === null) {
+    console.error('paddle-webhook: no body on the request');
+    return res.status(400).json({ error: 'Unreadable body' });
   }
 
-  if (!signatureValid(raw, request.headers.get('paddle-signature'), webhookSecret)) {
-    console.warn('paddle-webhook: rejected a request with a bad or stale signature');
-    return json(401, { error: 'Bad signature' });
+  if (!signatureValid(raw, req.headers['paddle-signature'], webhookSecret)) {
+    console.warn(`paddle-webhook: bad or stale signature (body via ${via})`);
+    return res.status(401).json({ error: 'Bad signature' });
   }
 
   let event;
   try {
     event = JSON.parse(raw);
   } catch {
-    return json(400, { error: 'Bad JSON' });
+    return res.status(400).json({ error: 'Bad JSON' });
   }
 
   const type = event?.event_type;
@@ -206,11 +232,11 @@ export default async function handler(request) {
         // Worth shouting about: a sale completed that can't be attached to
         // anyone, which means somebody has paid for nothing.
         console.error('paddle-webhook: transaction.completed with no app_user_id', data?.id);
-        return json(200, { ok: true, skipped: 'no app_user_id' });
+        return res.status(200).json({ ok: true, skipped: 'no app_user_id' });
       }
       await grant(appUserId, entitlement, rcKey);
       console.log(`paddle-webhook: granted ${entitlement} to ${appUserId} (txn ${data?.id})`);
-      return json(200, { ok: true, granted: appUserId });
+      return res.status(200).json({ ok: true, granted: appUserId });
     }
 
     if (type === 'adjustment.created' && REVOKING_ACTIONS.has(data?.action)) {
@@ -223,19 +249,19 @@ export default async function handler(request) {
           `paddle-webhook: ${data?.action} on txn ${data?.transaction_id} not revoked — ` +
             'no app_user_id (set PADDLE_API_KEY to enable refund handling)',
         );
-        return json(200, { ok: true, skipped: 'no app_user_id for adjustment' });
+        return res.status(200).json({ ok: true, skipped: 'no app_user_id for adjustment' });
       }
       await revoke(appUserId, entitlement, rcKey);
       console.log(`paddle-webhook: revoked ${entitlement} from ${appUserId} (${data?.action})`);
-      return json(200, { ok: true, revoked: appUserId });
+      return res.status(200).json({ ok: true, revoked: appUserId });
     }
 
     // Anything else is fine, just not ours. 200 so Paddle stops retrying.
-    return json(200, { ok: true, ignored: type });
+    return res.status(200).json({ ok: true, ignored: type });
   } catch (err) {
     // 500 makes Paddle retry, which is what we want: a transient RevenueCat
     // failure shouldn't cost somebody their unlock.
     console.error('paddle-webhook:', err?.message ?? err);
-    return json(500, { error: 'Handler failed' });
+    return res.status(500).json({ error: 'Handler failed' });
   }
 }
