@@ -139,6 +139,9 @@ export interface TunerState {
   /** dB at which the waterfall's colour ramp bottoms out. Lower = a decay
    *  stays visible further down before it goes black. */
   waterfallFloor: number;
+  /** dB at which the ramp saturates — everything above paints the hot end.
+   *  Lower = brighter, because more of the signal reaches the top. */
+  waterfallTop: number;
   /** User-set analyser height in CSS px. One value, not one per mode:
    *  toggling the waterfall shouldn't resize the panel under you. The
    *  default applies on first run and the drag handle owns it after that. */
@@ -238,6 +241,7 @@ export interface TunerState {
   setShowWaterfall: (show: boolean) => void;
   setWaterfallSoftness: (v: number) => void;
   setWaterfallFloor: (db: number) => void;
+  setWaterfallTop: (db: number) => void;
   setAnalyserHeight: (px: number) => void;
   setReadoutSmoothing: (value: number) => void;
   setMicGainDb: (value: number) => void;
@@ -459,6 +463,7 @@ export const useTunerStore = create<TunerState>()(
   showWaterfall: false,
   waterfallSoftness: 0.35,
   waterfallFloor: -85,
+  waterfallTop: -20,
   analyserHeight: 140,
   readoutSmoothing: 0.70,
   micGainDb: 0,
@@ -600,6 +605,7 @@ export const useTunerStore = create<TunerState>()(
   setShowWaterfall: (show) => set({ showWaterfall: show }),
   setWaterfallSoftness: (v) => set({ waterfallSoftness: Math.max(0, Math.min(1, v)) }),
   setWaterfallFloor: (db) => set({ waterfallFloor: Math.max(-115, Math.min(-40, db)) }),
+  setWaterfallTop: (db) => set({ waterfallTop: Math.max(-70, Math.min(-5, db)) }),
   setAnalyserHeight: (px) => set({ analyserHeight: px }),
   setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
   setMicGainDb: (value) => set({ micGainDb: value }),
@@ -839,6 +845,7 @@ export const useTunerStore = create<TunerState>()(
         showWaterfall: state.showWaterfall,
         waterfallSoftness: state.waterfallSoftness,
         waterfallFloor: state.waterfallFloor,
+        waterfallTop: state.waterfallTop,
         analyserHeight: state.analyserHeight,
         openAccordion: state.openAccordion,
         // menuOpen is intentionally NOT persisted — the menu always loads

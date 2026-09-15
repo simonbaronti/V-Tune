@@ -15,9 +15,14 @@ All notable changes to V-Tune are documented here. The format is based on
   spectrogram alongside V-Tune.
 - **Isolation windows carry through to the waterfall** as lanes, so you can
   bracket one partial and watch that one decay while the strobe reads it.
-- **TAIL** sets how quiet a partial may get before it goes black — drag it
-  right to follow a decay further down. **SOFT** blurs the heatmap across
-  frequency, never across time, since blurring time would smear the decay.
+- **BRIGHT** and **TAIL** set the two ends of the colour ramp. BRIGHT is the
+  saturation point — everything above it paints the hot end — so lowering it
+  brings more of the signal into the top of the ramp. TAIL is how quiet a
+  partial may get before it goes black. Between them they're the same pair of
+  controls a desktop spectrogram calls brightness and dynamic range, which is
+  what makes the colours usable on a quiet instrument rather than leaving the
+  whole image in the blues. **SOFT** blurs the heatmap across frequency,
+  never across time, since blurring time would smear the decay.
   Both re-render the ten seconds already on screen, so you can find the right
   setting against a strike that has already happened.
 - **The analyser can be resized.** Drag the handle at its top edge. One

@@ -72,7 +72,9 @@ const MAX_PANEL_PX = 700;
  */
 const MIN_STROBE_PX = 165;
 
-const WF_DB_MAX = -20;
+/** Smallest usable span between the ramp's floor and its saturation point.
+ *  Any less and the colours step rather than gradate. */
+const WF_MIN_SPAN_DB = 10;
 
 /**
  * The range rows are *stored* against — deliberately wider than anything the
@@ -180,6 +182,7 @@ export function SpectrumAnalyzer() {
   const showWaterfall = useTunerStore((s) => s.showWaterfall);
   const waterfallSoftness = useTunerStore((s) => s.waterfallSoftness);
   const waterfallFloor = useTunerStore((s) => s.waterfallFloor);
+  const waterfallTop = useTunerStore((s) => s.waterfallTop);
   const analyserHeight = useTunerStore((s) => s.analyserHeight);
 
   // The waterfall needs vertical room to say anything — ten seconds squeezed
@@ -352,8 +355,9 @@ export function SpectrumAnalyzer() {
   const wfBinsRef = useRef<{ binCount: number; freqPerBin: number }>({ binCount: 0, freqPerBin: 0 });
   // What the offscreen currently depicts. Any mismatch forces a full redraw.
   const wfPaintedRef = useRef<{
-    w: number; rows: number; minF: number; maxF: number; soft: number; floor: number;
-  }>({ w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0 });
+    w: number; rows: number; minF: number; maxF: number;
+    soft: number; floor: number; top: number;
+  }>({ w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 });
 
   /** Paint one stored row across the frequency axis at `y` on the offscreen. */
   const wfPaintRow = useCallback((
@@ -365,6 +369,7 @@ export function SpectrumAnalyzer() {
     maxF: number,
     softness: number,
     floorDb: number,
+    topDb: number,
   ) => {
     const { binCount, freqPerBin } = wfBinsRef.current;
     if (!binCount || !freqPerBin) return;
@@ -411,7 +416,9 @@ export function SpectrumAnalyzer() {
 
     const img = octx.createImageData(w, 1);
     const px = img.data;
-    const rampSpan = WF_DB_MAX - floorDb;
+    // Guarded: if the two controls meet, the span goes to zero and every
+    // level paints the same colour.
+    const rampSpan = Math.max(WF_MIN_SPAN_DB, topDb - floorDb);
     for (let x = 0; x < w; x++) {
       const db = WF_STORE_MIN + (src[x] / 255) * WF_STORE_SPAN;
       heat((db - floorDb) / rampSpan, wfRgb);
@@ -425,7 +432,7 @@ export function SpectrumAnalyzer() {
   }, []);
 
   /** Repaint every stored row — after a zoom, a resize, or first paint. */
-  const wfRepaint = useCallback((w: number, rows: number, minF: number, maxF: number, soft: number, floorDb: number) => {
+  const wfRepaint = useCallback((w: number, rows: number, minF: number, maxF: number, soft: number, floorDb: number, topDb: number) => {
     const off = wfOffRef.current;
     if (!off) return;
     const octx = off.getContext('2d');
@@ -438,9 +445,9 @@ export function SpectrumAnalyzer() {
     const head = wfHeadRef.current;
     for (let y = 0; y < Math.min(filled, rows); y++) {
       const idx = (head - 1 - y + ring.length * 2) % ring.length;
-      wfPaintRow(octx, ring[idx], y, w, minF, maxF, soft, floorDb);
+      wfPaintRow(octx, ring[idx], y, w, minF, maxF, soft, floorDb, topDb);
     }
-    wfPaintedRef.current = { w, rows, minF, maxF, soft, floor: floorDb };
+    wfPaintedRef.current = { w, rows, minF, maxF, soft, floor: floorDb, top: topDb };
   }, [wfPaintRow]);
 
   /**
@@ -461,6 +468,7 @@ export function SpectrumAnalyzer() {
     maxF: number,
     soft: number,
     floorDb: number,
+    topDb: number,
   ): HTMLCanvasElement | null => {
     if (w < 1 || rows < 1) return null;
 
@@ -472,7 +480,7 @@ export function SpectrumAnalyzer() {
       wfHeadRef.current = 0;
       wfFilledRef.current = 0;
       wfBinsRef.current = { binCount: data.binCount, freqPerBin: data.freqPerBin };
-      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0 };
+      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 };
     }
     if (data) bins.freqPerBin = data.freqPerBin;
 
@@ -482,7 +490,7 @@ export function SpectrumAnalyzer() {
       off.width = w;
       off.height = rows;
       wfOffRef.current = off;
-      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0 };
+      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 };
     }
     const octx = off.getContext('2d');
     if (!octx) return null;
@@ -491,12 +499,12 @@ export function SpectrumAnalyzer() {
     if (
       painted.w !== w || painted.rows !== rows
       || painted.minF !== minF || painted.maxF !== maxF
-      || painted.soft !== soft || painted.floor !== floorDb
+      || painted.soft !== soft || painted.floor !== floorDb || painted.top !== topDb
     ) {
       // Zoom, resize or a softness change — repaint the stored history
       // against the new settings rather than throwing the last ten seconds
       // away, which is why rows are kept as dB and not just as pixels.
-      wfRepaint(w, rows, minF, maxF, soft, floorDb);
+      wfRepaint(w, rows, minF, maxF, soft, floorDb, topDb);
     }
 
     const now = performance.now();
@@ -523,7 +531,7 @@ export function SpectrumAnalyzer() {
       // "now" is the top edge — where the live curve is drawn — and history
       // falls away beneath it.
       octx.drawImage(off, 0, 0, w, rows - 1, 0, 1, w, rows - 1);
-      wfPaintRow(octx, row, 0, w, minF, maxF, soft, floorDb);
+      wfPaintRow(octx, row, 0, w, minF, maxF, soft, floorDb, topDb);
     }
 
     return off;
@@ -673,7 +681,7 @@ export function SpectrumAnalyzer() {
       if (wfOn) {
         // `raw` rather than `smooth`: see the capture loop.
         wfUpdate({ smooth: raw, binCount, freqPerBin }, Math.round(w), Math.round(h),
-          minF, maxF, store.waterfallSoftness, store.waterfallFloor);
+          minF, maxF, store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
       }
 
       // Draw spectrum fill
@@ -948,7 +956,7 @@ export function SpectrumAnalyzer() {
 
     if (wfOn && (!analyser || !actx)) {
       wfUpdate(null, Math.round(w), Math.round(h), minF, maxF,
-        store.waterfallSoftness, store.waterfallFloor);
+        store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
     }
 
     // Range info
@@ -1493,6 +1501,32 @@ export function SpectrumAnalyzer() {
             {Math.round(fftSmoothing * 100)}%
           </span>
         </label>
+        {waterfallOn && (
+          <label
+            className="flex items-center gap-1.5 text-[9px] shrink-0"
+            style={{ color: 'var(--text-dim)' }}
+            title="Where the colour ramp saturates. Drag right to lower it, so more of the signal reaches the hot end."
+          >
+            <span className="whitespace-nowrap">BRIGHT</span>
+            <input
+              type="range"
+              min="-70"
+              max="-5"
+              step="1"
+              // Same rtl inversion as TAIL, so on both controls "more to the
+              // right" means more of what the label promises.
+              value={waterfallTop}
+              onChange={(e) =>
+                useTunerStore.getState().setWaterfallTop(parseFloat(e.target.value))
+              }
+              className="w-12 h-1"
+              style={{ accentColor: 'var(--accent-blue)', direction: 'rtl' }}
+            />
+            <span className="tabular-nums w-7 text-right" style={{ color: 'var(--text-secondary)' }}>
+              {waterfallTop}
+            </span>
+          </label>
+        )}
         {waterfallOn && (
           <label
             className="flex items-center gap-1.5 text-[9px] shrink-0"
