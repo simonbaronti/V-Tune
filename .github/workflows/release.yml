@@ -251,8 +251,17 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # `packages` is pinned because the action's default is "tools
+      # platform-tools", and Google removed the obsolete `tools` package from
+      # their SDK repository in September 2026 — sdkmanager then exits 1 with
+      # "Failed to find package 'tools'" and the job dies before any of our
+      # code runs. This worked on 13 Sept and failed on the 16th with no
+      # change at our end. platform-tools is all the build needs; Gradle
+      # resolves its own build-tools and platform.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install npm deps
         run: npm ci
