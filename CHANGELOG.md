@@ -6,6 +6,13 @@ All notable changes to V-Tune are documented here. The format is based on
 
 ## [1.3.0] — unreleased
 
+### Fixed
+- **A purchase made on the website now unlocks the app by itself.** Buying
+  through vtune-app.com goes via Paddle, which RevenueCat never heard about —
+  so the unlock had to be granted by hand, and until it was, someone who had
+  paid quietly ran down the rest of their trial. Found it on the first paying
+  customer. Refunds and chargebacks take the unlock back the same way.
+
 ### Added
 - **A waterfall view in the Spectrum Analyser.** Ten seconds of the spectrum
   as a heatmap, on the same frequency axis as the curve and behind it, with
