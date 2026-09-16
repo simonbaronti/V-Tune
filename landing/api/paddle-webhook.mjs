@@ -157,14 +157,14 @@ function verifySignature(rawBody, header, secrets) {
   return { ok: false, reason: `no configured secret matched (tried ${secrets.length})` };
 }
 
-async function revenueCat(path, body, key) {
+async function revenueCat(method, path, body, key) {
   const res = await fetch(`${RC_API}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: JSON.stringify(body ?? {}),
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
     throw new Error(`RevenueCat ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -175,14 +175,22 @@ async function revenueCat(path, body, key) {
 /**
  * Grant the unlock.
  *
- * 'lifetime' because V-Tune is a one-time purchase, and granting against an
- * app user id RevenueCat hasn't seen yet creates the subscriber — which is
- * the normal case here, since someone can buy on the website before they've
- * ever opened the app signed in.
+ * Two calls, and the first one matters. The promotional endpoint won't
+ * create a subscriber it has never heard of — it 404s with "The subscriber
+ * was not found" — and that is the normal case here, because someone can buy
+ * on the website before they have ever opened the app signed in. A plain GET
+ * on the subscriber is RevenueCat's get-or-create, so it brings the record
+ * into existence for the grant that follows.
+ *
+ * 'lifetime' because V-Tune is a one-time purchase. Re-granting is harmless,
+ * which is what makes it safe for Paddle to retry this endpoint.
  */
-function grant(appUserId, entitlement, key) {
+async function grant(appUserId, entitlement, key) {
+  const id = encodeURIComponent(appUserId);
+  await revenueCat('GET', `/subscribers/${id}`, null, key);
   return revenueCat(
-    `/subscribers/${encodeURIComponent(appUserId)}/entitlements/${encodeURIComponent(entitlement)}/promotional`,
+    'POST',
+    `/subscribers/${id}/entitlements/${encodeURIComponent(entitlement)}/promotional`,
     { duration: 'lifetime' },
     key,
   );
@@ -190,6 +198,7 @@ function grant(appUserId, entitlement, key) {
 
 function revoke(appUserId, entitlement, key) {
   return revenueCat(
+    'POST',
     `/subscribers/${encodeURIComponent(appUserId)}/entitlements/${encodeURIComponent(entitlement)}/revoke_promotionals`,
     {},
     key,
