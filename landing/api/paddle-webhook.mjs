@@ -15,6 +15,11 @@
  * ── Environment (Vercel → Project → Settings → Environment Variables) ──
  *   PADDLE_WEBHOOK_SECRET   Paddle → Notifications → your destination.
  *                           Required. Without it every request is rejected.
+ *   PADDLE_WEBHOOK_SECRET_SANDBOX
+ *                           Optional. The sandbox destination's own secret —
+ *                           sandbox and live are separate environments and
+ *                           do not share one. Either may be a comma-
+ *                           separated list if a destination gets rotated.
  *   REVENUECAT_SECRET_KEY   RevenueCat → Project → API keys → *secret*.
  *                           NOT one of the public SDK keys in src/pro/config.ts;
  *                           this one can grant entitlements to anybody.
@@ -89,13 +94,35 @@ const MAX_SIGNATURE_AGE_S = 5 * 60;
 const REVOKING_ACTIONS = new Set(['refund', 'chargeback']);
 
 /**
+ * Every webhook secret we'll accept, in the order they're tried.
+ *
+ * Paddle's sandbox and live are separate environments with separate
+ * notification destinations, each with its own secret — so testing a
+ * purchase against a live-only secret can never verify, however correct
+ * everything else is. Both may be set, and either may hold a comma-separated
+ * list if a destination is ever rotated or replaced.
+ */
+function webhookSecrets() {
+  return [process.env.PADDLE_WEBHOOK_SECRET, process.env.PADDLE_WEBHOOK_SECRET_SANDBOX]
+    .flatMap((v) => (v ? String(v).split(',') : []))
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+/**
  * Verify Paddle's `Paddle-Signature: ts=...;h1=...` header.
  *
  * This is the whole security of the endpoint. Skip it and the URL becomes a
  * free lifetime unlock for anyone who finds it.
+ *
+ * Returns a reason rather than a bare false, because "rejected" has several
+ * quite different causes — a stale replay and a mismatched secret want
+ * opposite responses, and guessing between them from the outside is exactly
+ * the sort of thing that wastes an afternoon.
  */
-function signatureValid(rawBody, header, secret) {
-  if (!header || !secret) return false;
+function verifySignature(rawBody, header, secrets) {
+  if (!header) return { ok: false, reason: 'no Paddle-Signature header' };
+  if (secrets.length === 0) return { ok: false, reason: 'no webhook secret configured' };
 
   let ts = null;
   let h1 = null;
@@ -107,21 +134,27 @@ function signatureValid(rawBody, header, secret) {
     if (key === 'ts') ts = value;
     else if (key === 'h1') h1 = value;
   }
-  if (!ts || !h1) return false;
+  if (!ts || !h1) return { ok: false, reason: 'malformed signature header' };
 
   const ageS = Math.abs(Date.now() / 1000 - Number(ts));
-  if (!Number.isFinite(ageS) || ageS > MAX_SIGNATURE_AGE_S) return false;
+  if (!Number.isFinite(ageS)) return { ok: false, reason: 'unparseable timestamp' };
+  if (ageS > MAX_SIGNATURE_AGE_S) {
+    return { ok: false, reason: `timestamp stale by ${Math.round(ageS)}s` };
+  }
 
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(`${ts}:${rawBody}`)
-    .digest('hex');
-
-  // Constant-time, and length-checked first because timingSafeEqual throws
-  // on a length mismatch rather than returning false.
-  const a = Buffer.from(expected, 'utf8');
-  const b = Buffer.from(h1, 'utf8');
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const given = Buffer.from(h1, 'utf8');
+  for (let i = 0; i < secrets.length; i++) {
+    const expected = Buffer.from(
+      crypto.createHmac('sha256', secrets[i]).update(`${ts}:${rawBody}`).digest('hex'),
+      'utf8',
+    );
+    // Length-checked first because timingSafeEqual throws on a mismatch
+    // rather than returning false.
+    if (expected.length === given.length && crypto.timingSafeEqual(expected, given)) {
+      return { ok: true, secretIndex: i };
+    }
+  }
+  return { ok: false, reason: `no configured secret matched (tried ${secrets.length})` };
 }
 
 async function revenueCat(path, body, key) {
@@ -187,11 +220,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET;
   const rcKey = process.env.REVENUECAT_SECRET_KEY;
   const entitlement = process.env.RC_ENTITLEMENT_ID || 'pro';
 
-  if (!webhookSecret || !rcKey) {
+  if (webhookSecrets().length === 0 || !rcKey) {
     // Misconfigured rather than unauthorised. 500 so Paddle retries once the
     // variables are in place, instead of dropping a real purchase.
     console.error('paddle-webhook: PADDLE_WEBHOOK_SECRET or REVENUECAT_SECRET_KEY missing');
@@ -210,8 +242,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unreadable body' });
   }
 
-  if (!signatureValid(raw, req.headers['paddle-signature'], webhookSecret)) {
-    console.warn(`paddle-webhook: bad or stale signature (body via ${via})`);
+  const secrets = webhookSecrets();
+  const check = verifySignature(raw, req.headers['paddle-signature'], secrets);
+  if (!check.ok) {
+    // Deliberately descriptive, and deliberately free of anything secret:
+    // lengths and shapes, never values. Enough to tell a wrong secret from a
+    // truncated paste from a replay, without putting a credential in a log.
+    console.warn(
+      `paddle-webhook: rejected — ${check.reason}. body via ${via}, ${raw.length} bytes; ` +
+        `secrets configured: ${secrets
+          .map((sec, i) => `#${i} len=${sec.length} ntfset=${sec.startsWith('pdl_ntfset_')}`)
+          .join(', ') || 'none'}`,
+    );
     return res.status(401).json({ error: 'Bad signature' });
   }
 
