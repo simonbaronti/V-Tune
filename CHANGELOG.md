@@ -4,14 +4,7 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
-## [1.3.0] — unreleased
-
-### Fixed
-- **A purchase made on the website now unlocks the app by itself.** Buying
-  through vtune-app.com goes via Paddle, which RevenueCat never heard about —
-  so the unlock had to be granted by hand, and until it was, someone who had
-  paid quietly ran down the rest of their trial. Found it on the first paying
-  customer. Refunds and chargebacks take the unlock back the same way.
+## [1.3.0] — 2026-09-16
 
 ### Added
 - **A waterfall view in the Spectrum Analyser.** Ten seconds of the spectrum
@@ -52,11 +45,16 @@ All notable changes to V-Tune are documented here. The format is based on
   so landscape is a tablet's better orientation, not its worse one.
 
 ### Fixed
+- **A purchase made on the website now unlocks the app by itself.** Buying
+  through vtune-app.com goes via Paddle, which RevenueCat never heard about —
+  so the unlock had to be granted by hand, and until it was, someone who had
+  paid quietly ran down the rest of their trial. Found it on the first paying
+  customer. Refunds and chargebacks take the unlock back the same way.
 - **The sharp keys are readable in light mode again.** A piano black key is
   drawn dark whichever theme you're in, but its label was taking a theme
   colour — so in light mode it was near-black text on a near-black key.
 
-## [1.2.2] — unreleased
+## [1.2.2] — 2026-09-13
 
 ### Added
 - **The mobile note picker now slides over the tuner instead of squashing
