@@ -4,6 +4,51 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.0] — unreleased
+
+### Added
+- **A waterfall view in the Spectrum Analyser.** Ten seconds of the spectrum
+  as a heatmap, on the same frequency axis as the curve and behind it, with
+  colour standing in for power — so you can see how long each partial
+  actually sustains after the strike, not just how loud it is right now.
+  Asked for by a handpan maker who reads the same thing off a desktop
+  spectrogram alongside V-Tune.
+- **Isolation windows carry through to the waterfall** as lanes, so you can
+  bracket one partial and watch that one decay while the strobe reads it.
+- **BRIGHT** and **TAIL** set the two ends of the colour ramp. BRIGHT is the
+  saturation point — everything above it paints the hot end — so lowering it
+  brings more of the signal into the top of the ramp. TAIL is how quiet a
+  partial may get before it goes black. Between them they're the same pair of
+  controls a desktop spectrogram calls brightness and dynamic range, which is
+  what makes the colours usable on a quiet instrument rather than leaving the
+  whole image in the blues. **SOFT** blurs the heatmap across frequency,
+  never across time, since blurring time would smear the decay.
+  Both re-render the ten seconds already on screen, so you can find the right
+  setting against a strike that has already happened.
+- **A piano keyboard under the analyser.** Drawn against the frequency axis
+  rather than as evenly-spaced keys, so every key sits beneath the partials
+  it names and the whole thing stretches and slides with the zoom. The keys
+  your strobe bands are targeting are tinted, so you can see at a glance
+  which note each one is on. Note names appear as the width allows — every
+  white key when there's room, thinning to the octave Cs when zoomed out.
+- **The analyser's range is now 60 Hz – 4.3 kHz**, down from 20 Hz – 5 kHz.
+  Still comfortably wider than any handpan's fundamental-to-upper-partial
+  span, and narrow enough that the keyboard's keys are readable rather than
+  a 7px smear.
+- **The analyser can be resized.** Drag the handle at its top edge. One
+  height, kept whether the waterfall is on or off — turning it on doesn't
+  resize the panel under you. The strobe keeps a guaranteed share, and the
+  band labels scale with it.
+- **A phone held sideways is asked to turn back.** V-Tune stacks three strobe
+  bands, the analyser and the picker, and a phone in landscape hasn't the
+  height for it. Phones only: a tablet's wide layout switches on at 1024px,
+  so landscape is a tablet's better orientation, not its worse one.
+
+### Fixed
+- **The sharp keys are readable in light mode again.** A piano black key is
+  drawn dark whichever theme you're in, but its label was taking a theme
+  colour — so in light mode it was near-black text on a near-black key.
+
 ## [1.2.2] — unreleased
 
 ### Added

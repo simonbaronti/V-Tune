@@ -28,6 +28,12 @@ const SHARPS = [
   { idx: 10, col: 12 },  // A#  between A and B
 ];
 
+/** A piano black key is drawn dark in both themes, so its label can't take a
+ *  theme colour — in light mode --text-secondary is a dark grey, which put
+ *  near-black text on a near-black key and made the sharps unreadable. */
+const SHARP_KEY_BG = '#0a0a12';
+const SHARP_KEY_TEXT = '#b8b8c8';
+
 export function PitchDial() {
   const currentNote = useTunerStore((s) => s.currentNote);
   const autoDetect = useTunerStore((s) => s.autoDetect);
@@ -93,7 +99,8 @@ export function PitchDial() {
   // which octave the dial happens to be displaying.
   const detectedPitchClass = detectedMidi !== null ? detectedMidi % 12 : -1;
 
-  // ── Piano-keyboard button (chromatic mode) ────────────────────────────
+
+  // ── Piano-keyboard button (chromatic mode) ──────────────────────────
   const NoteButton = ({ idx, isSharp, gridCol }: { idx: number; isSharp: boolean; gridCol: number }) => {
     const noteName = NOTE_NAMES[idx];
     const isActive = idx === currentNoteIdx;
@@ -102,13 +109,13 @@ export function PitchDial() {
     const background = isActive
       ? 'var(--accent-blue)'
       : isSharp
-        ? '#0a0a12'
+        ? SHARP_KEY_BG
         : 'var(--bg-tertiary)';
 
     const color = isActive
       ? '#fff'
       : isSharp
-        ? 'var(--text-secondary)'
+        ? SHARP_KEY_TEXT
         : 'var(--text-primary)';
 
     const borderColor = isActive ? 'var(--accent-blue)' : 'var(--border)';

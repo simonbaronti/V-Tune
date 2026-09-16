@@ -64,8 +64,12 @@ export const MAX_ISOLATIONS = 2;
 /** Frequency limits of the spectrum analyser's view. Live here rather than
  * in the component so anything driving the view (the Gu-port chip) can ask
  * for "all the way out" without importing the analyser. */
-export const SPECTRUM_MIN_FREQ = 20;
-export const SPECTRUM_MAX_FREQ = 5000;
+// 60 Hz to 4.3 kHz — 6.2 octaves, comfortably wider than any handpan's
+// fundamental-to-upper-partial span, and narrow enough that the piano
+// keyboard under the analyser has drawable keys. At the old 20-5000 the
+// keys were ~7px and unreadable.
+export const SPECTRUM_MIN_FREQ = 60;
+export const SPECTRUM_MAX_FREQ = 4300;
 
 /** The view range the analyser has last been asked to show. The analyser
  * owns its own zoom/pan (component state, redrawn every frame); this is how
@@ -132,6 +136,20 @@ export interface TunerState {
   displaySmoothing: number;
   strobeSpeed: number;
   showSpectrum: boolean;
+  /** Waterfall (heatmap over time) behind the spectrum curve. */
+  showWaterfall: boolean;
+  /** How much the waterfall's colour is blurred across frequency, 0-1. */
+  waterfallSoftness: number;
+  /** dB at which the waterfall's colour ramp bottoms out. Lower = a decay
+   *  stays visible further down before it goes black. */
+  waterfallFloor: number;
+  /** dB at which the ramp saturates — everything above paints the hot end.
+   *  Lower = brighter, because more of the signal reaches the top. */
+  waterfallTop: number;
+  /** User-set analyser height in CSS px. One value, not one per mode:
+   *  toggling the waterfall shouldn't resize the panel under you. The
+   *  default applies on first run and the drag handle owns it after that. */
+  analyserHeight: number;
   readoutSmoothing: number;
   micGainDb: number;
   /** Pitch-pipe output level, 0-1. Shipped at 0.15 until 1.2.1, which was
@@ -224,6 +242,11 @@ export interface TunerState {
   setDisplaySmoothing: (value: number) => void;
   setStrobeSpeed: (speed: number) => void;
   setShowSpectrum: (show: boolean) => void;
+  setShowWaterfall: (show: boolean) => void;
+  setWaterfallSoftness: (v: number) => void;
+  setWaterfallFloor: (db: number) => void;
+  setWaterfallTop: (db: number) => void;
+  setAnalyserHeight: (px: number) => void;
   setReadoutSmoothing: (value: number) => void;
   setMicGainDb: (value: number) => void;
   setPipeVolume: (value: number) => void;
@@ -441,6 +464,11 @@ export const useTunerStore = create<TunerState>()(
   displaySmoothing: 0.20,
   strobeSpeed: 1,
   showSpectrum: true,
+  showWaterfall: false,
+  waterfallSoftness: 0.35,
+  waterfallFloor: -85,
+  waterfallTop: -20,
+  analyserHeight: 200,
   readoutSmoothing: 0.70,
   micGainDb: 0,
   pipeVolume: 0.45,
@@ -578,6 +606,11 @@ export const useTunerStore = create<TunerState>()(
   setDisplaySmoothing: (value) => set({ displaySmoothing: value }),
   setStrobeSpeed: (speed) => set({ strobeSpeed: speed }),
   setShowSpectrum: (show) => set({ showSpectrum: show }),
+  setShowWaterfall: (show) => set({ showWaterfall: show }),
+  setWaterfallSoftness: (v) => set({ waterfallSoftness: Math.max(0, Math.min(1, v)) }),
+  setWaterfallFloor: (db) => set({ waterfallFloor: Math.max(-115, Math.min(-40, db)) }),
+  setWaterfallTop: (db) => set({ waterfallTop: Math.max(-70, Math.min(-5, db)) }),
+  setAnalyserHeight: (px) => set({ analyserHeight: px }),
   setReadoutSmoothing: (value) => set({ readoutSmoothing: value }),
   setMicGainDb: (value) => set({ micGainDb: value }),
   setPipeVolume: (value) => set({ pipeVolume: Math.max(0, Math.min(1, value)) }),
@@ -813,6 +846,11 @@ export const useTunerStore = create<TunerState>()(
         humFilter: state.humFilter,
         selectedScaleId: state.selectedScaleId,
         showSpectrum: state.showSpectrum,
+        showWaterfall: state.showWaterfall,
+        waterfallSoftness: state.waterfallSoftness,
+        waterfallFloor: state.waterfallFloor,
+        waterfallTop: state.waterfallTop,
+        analyserHeight: state.analyserHeight,
         openAccordion: state.openAccordion,
         // menuOpen is intentionally NOT persisted — the menu always loads
         // open (so the controls are visible on launch) and the 10s auto-hide

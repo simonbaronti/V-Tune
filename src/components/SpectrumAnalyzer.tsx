@@ -7,7 +7,7 @@ import {
   SPECTRUM_MAX_FREQ,
 } from '../store/tunerStore';
 import { getAnalyserNode, getAudioContext, setAnalyserFftSize, setAnalyserSmoothing } from '../audio/AudioEngine';
-import { frequencyToNote, getDisplayName } from '../utils/notes';
+import { frequencyToNote, getDisplayName, NOTE_NAMES } from '../utils/notes';
 import { micLiveness, mixRgba } from './bgSignal';
 
 // How long the finger has to sit still before a touch-drag becomes an
@@ -26,6 +26,117 @@ const MAX_LOG_SPAN = Math.log10(MAX_FREQ) - Math.log10(MIN_FREQ);
 const MIN_LOG_SPAN = 0.008;
 const DB_FLOOR = -100;
 const DB_CEIL = -10;
+
+// ── Waterfall ───────────────────────────────────────────────────────────────
+// A heatmap of the spectrum over time: same frequency axis as the curve above
+// it, scrolling downward, colour standing in for power. It answers the one
+// question the curve can't — how long does each partial actually sustain —
+// which is what a maker is listening for after the strike.
+
+/** Seconds from the top of the waterfall to the bottom. */
+const WF_SECONDS = 10;
+
+/**
+ * The dB range the colour ramp spans.
+ *
+ * Fixed, deliberately. Auto-scaling to whatever is loudest right now would
+ * mean a decaying partial keeps its colour as it fades — the scale chases it
+ * down — and the decay, the entire point of the view, becomes invisible.
+ * A fixed range makes colour mean the same level everywhere, so a partial
+ * visibly cools as it dies and two strikes can be compared.
+ */
+/** Widest the softness control blurs across frequency, in pixels. */
+const WF_MAX_BLUR_PX = 6;
+
+/**
+ * How far the analyser can be dragged.
+ *
+ * The floor is where the view stops saying anything: below about this the dB
+ * labels run into each other and the waterfall has too few rows to show a
+ * decay. The ceiling is expressed as "leave this much for everything else" —
+ * three strobe bands plus the isolation readouts — rather than as a fraction
+ * of the screen, because what has to stay usable is a fixed amount of
+ * furniture, not a proportion of it.
+ */
+/** Axis furniture below the plot: the frequency numbers, then the keyboard. */
+const FREQ_LABEL_H = 17;
+const KEYBOARD_H = 30;
+const AXIS_H = FREQ_LABEL_H + KEYBOARD_H;
+
+// Raised with the keyboard: the axis furniture now costs a permanent 47px,
+// so the old 140 floor left under 100px of actual plot.
+const MIN_PANEL_PX = 180;
+const MAX_PANEL_PX = 700;
+
+/**
+ * Strobe left standing at full stretch — three bands at ~55px, which with the
+ * labels scaling stays readable.
+ *
+ * Applied against the space actually measured rather than against the
+ * viewport. A fixed "reserve everything else" figure can't work: the chrome
+ * around these two differs between the desktop and mobile layouts, and a
+ * number tuned on desktop collapsed the strobe to nothing in landscape.
+ */
+const MIN_STROBE_PX = 165;
+
+/** Smallest usable span between the ramp's floor and its saturation point.
+ *  Any less and the colours step rather than gradate. */
+const WF_MIN_SPAN_DB = 10;
+
+/**
+ * The range rows are *stored* against — deliberately wider than anything the
+ * colour ramp shows.
+ *
+ * Storage and display are separate so the floor control can re-map the last
+ * ten seconds as you drag it. Quantise at capture time against the displayed
+ * range instead and the history is baked at whatever floor was set when each
+ * row arrived, so dragging would only affect rows that hadn't happened yet.
+ */
+const WF_STORE_MIN = -120;
+const WF_STORE_SPAN = 120;
+
+/**
+ * Colour ramp, cold to hot. Runs dark at the bottom in both themes — a light
+ * floor inverts the reading and quiet partials would look like loud ones.
+ *
+ * This is a jet-style ramp, chosen for familiarity: it's what Overtone
+ * Analyzer shows, and the maker who asked for this view reads that daily, so
+ * blue-cyan-green-yellow-red already means something to him.
+ *
+ * The known cost: jet's *luminance* isn't monotonic. Saturated orange is
+ * darker than yellow, so a partial at 90% of the range paints dimmer than one
+ * at 80%, and only the hue ordering carries the level reliably. If ranking
+ * the loudest partials by eye turns out to be hard, an inferno-style ramp
+ * (dark -> purple -> red -> orange -> yellow -> white) climbs in brightness
+ * the whole way; it's a change to this table and nothing else.
+ */
+const WF_STOPS: Array<[number, number, number, number]> = [
+  [0.0, 12, 14, 28],
+  [0.18, 22, 46, 140],
+  [0.38, 0, 150, 190],
+  [0.58, 40, 190, 90],
+  [0.75, 240, 220, 60],
+  [0.9, 240, 100, 30],
+  [1.0, 255, 246, 236],
+];
+
+/** Scratch buffer for heat() — module scope so it isn't reallocated per
+ *  render, and so the draw callbacks don't close over a stale one. */
+const wfRgb: [number, number, number] = [0, 0, 0];
+
+function heat(t: number, out: [number, number, number]): void {
+  const v = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  for (let i = 1; i < WF_STOPS.length; i++) {
+    const [p1, r1, g1, b1] = WF_STOPS[i];
+    if (v > p1 && i < WF_STOPS.length - 1) continue;
+    const [p0, r0, g0, b0] = WF_STOPS[i - 1];
+    const k = p1 === p0 ? 0 : (v - p0) / (p1 - p0);
+    out[0] = r0 + (r1 - r0) * k;
+    out[1] = g0 + (g1 - g0) * k;
+    out[2] = b0 + (b1 - b0) * k;
+    return;
+  }
+}
 
 function freqToX(freq: number, width: number, minF: number, maxF: number): number {
   const logMin = Math.log10(minF);
@@ -64,6 +175,44 @@ function formatFreq(f: number): string {
   return `${Math.round(f)}`;
 }
 
+
+/** Semitones above/below A4 → frequency, at whatever A the user has set. */
+function midiToFreq(midi: number, refFreq: number): number {
+  return refFreq * Math.pow(2, (midi - 69) / 12);
+}
+
+const WHITE_SET = new Set([0, 2, 4, 5, 7, 9, 11]);
+const isWhite = (midi: number) => WHITE_SET.has(((midi % 12) + 12) % 12);
+
+/**
+ * Where a white key ends, in semitones.
+ *
+ * On the black-key pitch itself where there is one — which is what makes a
+ * black key straddle the two whites either side of it, as on a real
+ * instrument, instead of being pinned to one white's right-hand edge. Where
+ * two whites are adjacent (E-F, B-C) the boundary falls halfway between.
+ *
+ * It also evens the whites out: 1.5 and 2 semitones rather than 1 and 2, so
+ * E and B stop looking like half-keys.
+ */
+function whiteEdges(midi: number): [number, number] {
+  let prev = midi - 1;
+  while (!isWhite(prev)) prev--;
+  let next = midi + 1;
+  while (!isWhite(next)) next++;
+  return [
+    midi - prev === 2 ? midi - 1 : midi - 0.5,
+    next - midi === 2 ? midi + 1 : midi + 0.5,
+  ];
+}
+
+/** Black-key width, in semitones. A real piano's black is a little over half
+ *  a white; at these spans that lands close. */
+const BLACK_KEY_SEMITONES = 0.8;
+const KEY_WHITE = '#eceef4';
+const KEY_BLACK = '#14141c';
+const KEY_EDGE = 'rgba(0, 0, 0, 0.45)';
+
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
@@ -75,6 +224,117 @@ export function SpectrumAnalyzer() {
   const fftSize = useTunerStore((s) => s.fftSize);
   const fftSmoothing = useTunerStore((s) => s.fftSmoothing);
   const isolations = useTunerStore((s) => s.isolations);
+  const showWaterfall = useTunerStore((s) => s.showWaterfall);
+  const waterfallSoftness = useTunerStore((s) => s.waterfallSoftness);
+  const waterfallFloor = useTunerStore((s) => s.waterfallFloor);
+  const waterfallTop = useTunerStore((s) => s.waterfallTop);
+  const analyserHeight = useTunerStore((s) => s.analyserHeight);
+
+  // The waterfall needs vertical room to say anything — ten seconds squeezed
+  // into a phone-sized strip is a smear. Gated on the space available rather
+  // than on the platform, because iPadOS reports itself as iOS and a tablet
+  // is the device this suits best.
+  // No space gate. This was once withheld below 700x600 on the grounds that
+  // ten seconds squeezed into a phone-sized strip is a smear — true, but the
+  // drag handle below hands that judgement to whoever is holding the phone,
+  // which is the better place for it.
+  const waterfallOn = showWaterfall;
+
+  // Height is committed to the store on release rather than on every pointer
+  // move: the store persists to localStorage on each set, and a drag would
+  // otherwise write sixty times a second.
+  const [dragHeight, setDragHeight] = useState<number | null>(null);
+  const gripRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // The ceiling has to come from the layout, not from a guess about it. A
+  // fixed "leave this much" figure was tuned on desktop and collapsed the
+  // strobe to nothing in landscape, because the chrome around these two
+  // differs between the layouts.
+  //
+  // The strobe's wrapper and this canvas are the only two elements in the
+  // column that flex; everything else — our header and grip, the isolation
+  // readouts, the quick-pick bar on mobile — is fixed. So their *sum* is the
+  // budget the two of them share, it doesn't change as the split does, and
+  // measuring it can't chase its own tail.
+  const [maxCanvas, setMaxCanvas] = useState(MAX_PANEL_PX);
+  const measureSpace = useCallback(() => {
+    const wrapper = rootRef.current?.parentElement;
+    const column = wrapper?.parentElement;
+    const strobeWrap = wrapper?.previousElementSibling as HTMLElement | null;
+    const canvas = canvasRef.current;
+    if (!wrapper || !column || !strobeWrap || !canvas) return;
+    const h = (el: Element) => el.getBoundingClientRect().height;
+
+    // Every term here is independent of how the space is currently split, so
+    // one reading is correct whenever it's taken. Deriving the cap from the
+    // strobe and canvas sizes instead looked equivalent but wasn't: it needs
+    // the layout to have settled first, and a reading taken mid-settle stuck
+    // at the wrong value and never corrected.
+    let fixedSiblings = 0;
+    for (const child of column.children) {
+      if (child !== wrapper && child !== strobeWrap) fixedSiblings += h(child);
+    }
+    const ourChrome = h(wrapper) - h(canvas);
+    setMaxCanvas(
+      Math.max(70, Math.round(h(column) - MIN_STROBE_PX - fixedSiblings - ourChrome)),
+    );
+  }, []);
+  useEffect(() => {
+    measureSpace();
+    // Observed rather than measured once: a single reading taken before the
+    // layout has settled is wrong and never corrects itself. Watching both
+    // elements converges instead — the budget is the same whatever the split,
+    // so re-measuring returns the same number and React stops re-rendering.
+    const strobeWrap = rootRef.current?.parentElement?.previousElementSibling;
+    const ro = new ResizeObserver(measureSpace);
+    if (strobeWrap) ro.observe(strobeWrap);
+    if (canvasRef.current) ro.observe(canvasRef.current);
+    window.addEventListener('resize', measureSpace);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measureSpace);
+    };
+  }, [measureSpace]);
+
+  // Applied on every render, not just while dragging: a height set on a
+  // desktop follows the user to a phone, where it can be taller than the
+  // whole screen.
+  const minH = Math.min(MIN_PANEL_PX, Math.max(70, Math.round(maxCanvas * 0.6)));
+  const maxH = Math.max(minH, Math.min(MAX_PANEL_PX, maxCanvas));
+  // Deliberately not per-mode. Turning the waterfall on used to grow the
+  // panel to a size that suited it, which meant the toggle moved everything
+  // else on screen as a side effect of asking for a different view.
+  const storedHeight = analyserHeight;
+  const panelHeight = Math.max(minH, Math.min(maxH, dragHeight ?? storedHeight));
+
+  const clampHeight = (px: number) => Math.max(minH, Math.min(maxH, px));
+
+
+  const onGripDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    measureSpace();
+    gripRef.current = { startY: e.clientY, startH: storedHeight };
+    setDragHeight(storedHeight);
+  };
+  const onGripMove = (e: React.PointerEvent) => {
+    const g = gripRef.current;
+    if (!g) return;
+    // The panel is anchored at the bottom, so dragging the grip upward has to
+    // make it taller — hence start minus current, not the other way round.
+    setDragHeight(clampHeight(g.startH + (g.startY - e.clientY)));
+  };
+  const onGripUp = (e: React.PointerEvent) => {
+    const g = gripRef.current;
+    if (!g) return;
+    gripRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const finalH = clampHeight(g.startH + (g.startY - e.clientY));
+    useTunerStore.getState().setAnalyserHeight(finalH);
+    setDragHeight(null);
+  };
 
   // A zoom request can be waiting before we even mount — arming the Gu-port
   // chip turns the analyser on and asks for a range in the same breath — so
@@ -125,6 +385,203 @@ export function SpectrumAnalyzer() {
   // freq/note readout that follows the cursor across the spectrum.
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
 
+  // ── Waterfall state ───────────────────────────────────────────────────────
+  // Rows are kept as quantised dB (one byte per bin) rather than only as
+  // painted pixels, so zooming re-renders the history against the new
+  // frequency axis instead of throwing away the last ten seconds. At a few
+  // hundred rows that's under a megabyte.
+  const wfOffRef = useRef<HTMLCanvasElement | null>(null);
+  const wfValsRef = useRef<Float32Array | null>(null);
+  const wfBlurRef = useRef<Float32Array | null>(null);
+  const wfRowsRef = useRef<Uint8Array[]>([]);
+  const wfHeadRef = useRef(0);
+  const wfFilledRef = useRef(0);
+  const wfLastRowRef = useRef(0);
+  const wfBinsRef = useRef<{ binCount: number; freqPerBin: number }>({ binCount: 0, freqPerBin: 0 });
+  // What the offscreen currently depicts. Any mismatch forces a full redraw.
+  const wfPaintedRef = useRef<{
+    w: number; rows: number; minF: number; maxF: number;
+    soft: number; floor: number; top: number;
+  }>({ w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 });
+
+  /** Paint one stored row across the frequency axis at `y` on the offscreen. */
+  const wfPaintRow = useCallback((
+    octx: CanvasRenderingContext2D,
+    row: Uint8Array,
+    y: number,
+    w: number,
+    minF: number,
+    maxF: number,
+    softness: number,
+    floorDb: number,
+    topDb: number,
+  ) => {
+    const { binCount, freqPerBin } = wfBinsRef.current;
+    if (!binCount || !freqPerBin) return;
+
+    if (!wfValsRef.current || wfValsRef.current.length !== w) {
+      wfValsRef.current = new Float32Array(w);
+      wfBlurRef.current = new Float32Array(w);
+    }
+    const vals = wfValsRef.current;
+
+    for (let x = 0; x < w; x++) {
+      // Take the loudest bin falling in this pixel. Averaging would smear a
+      // narrow partial into the noise around it, which at the top of the
+      // range — where many bins share a pixel — is most of them.
+      const b0 = Math.max(0, Math.floor(xToFreq(x, w, minF, maxF) / freqPerBin));
+      const b1 = Math.min(binCount - 1, Math.ceil(xToFreq(x + 1, w, minF, maxF) / freqPerBin));
+      let v = 0;
+      for (let b = b0; b <= b1; b++) if (row[b] > v) v = row[b];
+      vals[x] = v;
+    }
+
+    // Soften across frequency only — never across time. Blurring vertically
+    // would smear the decay into the rows around it, and the decay is the
+    // whole reason this view exists. A running-sum box blur, twice, which is
+    // close enough to a gaussian to look like one.
+    const radius = Math.round(softness * WF_MAX_BLUR_PX);
+    let src = vals;
+    if (radius > 0) {
+      const tmp = wfBlurRef.current!;
+      for (let pass = 0; pass < 2; pass++) {
+        const dst = pass === 0 ? tmp : vals;
+        const from = pass === 0 ? vals : tmp;
+        let sum = 0;
+        const span = radius * 2 + 1;
+        for (let x = -radius; x <= radius; x++) sum += from[Math.min(w - 1, Math.max(0, x))];
+        for (let x = 0; x < w; x++) {
+          dst[x] = sum / span;
+          sum -= from[Math.min(w - 1, Math.max(0, x - radius))];
+          sum += from[Math.min(w - 1, Math.max(0, x + radius + 1))];
+        }
+      }
+      src = vals;
+    }
+
+    const img = octx.createImageData(w, 1);
+    const px = img.data;
+    // Guarded: if the two controls meet, the span goes to zero and every
+    // level paints the same colour.
+    const rampSpan = Math.max(WF_MIN_SPAN_DB, topDb - floorDb);
+    for (let x = 0; x < w; x++) {
+      const db = WF_STORE_MIN + (src[x] / 255) * WF_STORE_SPAN;
+      heat((db - floorDb) / rampSpan, wfRgb);
+      const o = x * 4;
+      px[o] = wfRgb[0];
+      px[o + 1] = wfRgb[1];
+      px[o + 2] = wfRgb[2];
+      px[o + 3] = 255;
+    }
+    octx.putImageData(img, 0, y);
+  }, []);
+
+  /** Repaint every stored row — after a zoom, a resize, or first paint. */
+  const wfRepaint = useCallback((w: number, rows: number, minF: number, maxF: number, soft: number, floorDb: number, topDb: number) => {
+    const off = wfOffRef.current;
+    if (!off) return;
+    const octx = off.getContext('2d');
+    if (!octx) return;
+    heat(0, wfRgb);
+    octx.fillStyle = `rgb(${wfRgb[0]}, ${wfRgb[1]}, ${wfRgb[2]})`;
+    octx.fillRect(0, 0, w, rows);
+    const ring = wfRowsRef.current;
+    const filled = wfFilledRef.current;
+    const head = wfHeadRef.current;
+    for (let y = 0; y < Math.min(filled, rows); y++) {
+      const idx = (head - 1 - y + ring.length * 2) % ring.length;
+      wfPaintRow(octx, ring[idx], y, w, minF, maxF, soft, floorDb, topDb);
+    }
+    wfPaintedRef.current = { w, rows, minF, maxF, soft, floor: floorDb, top: topDb };
+  }, [wfPaintRow]);
+
+  /**
+   * Keep the waterfall's offscreen buffer current, and hand it back to be
+   * drawn as the panel's background.
+   *
+   * The row cadence is derived from the panel height so that one row is
+   * exactly one pixel and the full ten seconds spans it — no resampling, and
+   * the slope of a decay is honest rather than stretched.
+   */
+  const wfUpdate = useCallback((
+    // null while audio is off: the buffer still exists and paints its floor,
+    // so the panel reads as an empty ten seconds rather than a blank box.
+    data: { smooth: Float32Array; binCount: number; freqPerBin: number } | null,
+    w: number,
+    rows: number,
+    minF: number,
+    maxF: number,
+    soft: number,
+    floorDb: number,
+    topDb: number,
+  ): HTMLCanvasElement | null => {
+    if (w < 1 || rows < 1) return null;
+
+    // (Re)allocate the ring when the height or the FFT size changes. Both
+    // invalidate the history, so start it over rather than show a seam.
+    const bins = wfBinsRef.current;
+    if (data && (wfRowsRef.current.length !== rows || bins.binCount !== data.binCount)) {
+      wfRowsRef.current = Array.from({ length: rows }, () => new Uint8Array(data.binCount));
+      wfHeadRef.current = 0;
+      wfFilledRef.current = 0;
+      wfBinsRef.current = { binCount: data.binCount, freqPerBin: data.freqPerBin };
+      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 };
+    }
+    if (data) bins.freqPerBin = data.freqPerBin;
+
+    let off = wfOffRef.current;
+    if (!off || off.width !== w || off.height !== rows) {
+      off = document.createElement('canvas');
+      off.width = w;
+      off.height = rows;
+      wfOffRef.current = off;
+      wfPaintedRef.current = { w: 0, rows: 0, minF: 0, maxF: 0, soft: -1, floor: 0, top: 0 };
+    }
+    const octx = off.getContext('2d');
+    if (!octx) return null;
+
+    const painted = wfPaintedRef.current;
+    if (
+      painted.w !== w || painted.rows !== rows
+      || painted.minF !== minF || painted.maxF !== maxF
+      || painted.soft !== soft || painted.floor !== floorDb || painted.top !== topDb
+    ) {
+      // Zoom, resize or a softness change — repaint the stored history
+      // against the new settings rather than throwing the last ten seconds
+      // away, which is why rows are kept as dB and not just as pixels.
+      wfRepaint(w, rows, minF, maxF, soft, floorDb, topDb);
+    }
+
+    const now = performance.now();
+    const interval = (WF_SECONDS * 1000) / rows;
+    if (data && now - wfLastRowRef.current >= interval) {
+      wfLastRowRef.current = now;
+      const { smooth, binCount } = data;
+      const ring = wfRowsRef.current;
+      const row = ring[wfHeadRef.current];
+      for (let i = 0; i < binCount; i++) {
+        // Deliberately the *ungated* level. Feeding this the threshold-gated
+        // data — which is what it did first — meant a partial decaying past
+        // the threshold line didn't fade out, it dropped to black mid-tail.
+        // The gate exists to clean up the curve; on a decay it amputates it.
+        // The floor control below is this view's own noise gate.
+        const v = isFinite(smooth[i]) ? smooth[i] : WF_STORE_MIN;
+        const t = (v - WF_STORE_MIN) / WF_STORE_SPAN;
+        row[i] = t <= 0 ? 0 : t >= 1 ? 255 : (t * 255) | 0;
+      }
+      wfHeadRef.current = (wfHeadRef.current + 1) % rows;
+      wfFilledRef.current = Math.min(wfFilledRef.current + 1, rows);
+
+      // Scroll what's there down a pixel and paint the new row on top, so
+      // "now" is the top edge — where the live curve is drawn — and history
+      // falls away beneath it.
+      octx.drawImage(off, 0, 0, w, rows - 1, 0, 1, w, rows - 1);
+      wfPaintRow(octx, row, 0, w, minF, maxF, soft, floorDb, topDb);
+    }
+
+    return off;
+  }, [wfRepaint, wfPaintRow]);
+
   // Mirror of dragState so the rAF draw loop can read it without forcing
   // re-renders on every move.
   const dragStateRef = useRef(dragState);
@@ -157,6 +614,8 @@ export function SpectrumAnalyzer() {
 
     const w = rect.width;
     const h = rect.height;
+    // Plot area — everything above the frequency numbers and the keyboard.
+    const plotH = h - AXIS_H;
 
     const [minF, maxF] = viewRangeRef.current;
     const currentThreshold = thresholdRef.current;
@@ -176,8 +635,17 @@ export function SpectrumAnalyzer() {
     ctx.fillStyle = specBg;
     ctx.fillRect(0, 0, w, h);
 
-    // Grid lines
-    ctx.strokeStyle = specGrid;
+    // The waterfall is the panel's background, with the live curve riding
+    // over it. Drawn from last frame's buffer — the FFT for this frame isn't
+    // read until further down, and one frame of lag at 60fps isn't visible.
+    const wfOn = store.showWaterfall;
+    if (wfOn && wfOffRef.current) {
+      ctx.drawImage(wfOffRef.current, 0, 0, w, plotH);
+    }
+
+    // Grid lines. Over the heatmap the theme's own grid colour disappears,
+    // so the furniture switches to a light wash that reads on either.
+    ctx.strokeStyle = wfOn ? 'rgba(255, 255, 255, 0.12)' : specGrid;
     ctx.lineWidth = 0.5;
     const gridFreqs = [20, 50, 100, 200, 500, 1000, 2000, 5000];
     for (const gf of gridFreqs) {
@@ -187,27 +655,27 @@ export function SpectrumAnalyzer() {
       ctx.moveTo(gx, 0);
       ctx.lineTo(gx, h);
       ctx.stroke();
-      ctx.fillStyle = specGridLabel;
+      ctx.fillStyle = wfOn ? 'rgba(226, 226, 240, 0.85)' : specGridLabel;
       ctx.font = '12px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${formatFreq(gf)}`, gx, h - 4);
+      ctx.fillText(`${formatFreq(gf)}`, gx, plotH + 13);
     }
 
     // dB grid
     for (let db = -90; db <= -10; db += 10) {
-      const gy = dbToY(db, h - 20, DB_FLOOR, DB_CEIL);
+      const gy = dbToY(db, plotH, DB_FLOOR, DB_CEIL);
       ctx.beginPath();
       ctx.moveTo(0, gy);
       ctx.lineTo(w, gy);
       ctx.stroke();
-      ctx.fillStyle = specGridLabel;
+      ctx.fillStyle = wfOn ? 'rgba(226, 226, 240, 0.7)' : specGridLabel;
       ctx.font = '10px "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
       ctx.fillText(`${db}`, 2, gy - 2);
     }
 
     // Threshold line
-    const threshY = dbToY(currentThreshold, h - 20, DB_FLOOR, DB_CEIL);
+    const threshY = dbToY(currentThreshold, plotH, DB_FLOOR, DB_CEIL);
     ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
@@ -255,29 +723,39 @@ export function SpectrumAnalyzer() {
         }
       }
 
+      // Feed the waterfall from the same gated data the curve is drawn from,
+      // so the two always agree about what's above the noise floor.
+      if (wfOn) {
+        // `raw` rather than `smooth`: see the capture loop.
+        wfUpdate({ smooth: raw, binCount, freqPerBin }, Math.round(w), Math.round(plotH),
+          minF, maxF, store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
+      }
+
       // Draw spectrum fill
       ctx.beginPath();
-      ctx.moveTo(0, h - 20);
+      ctx.moveTo(0, plotH);
       let firstPoint = true;
       for (let i = 1; i < binCount; i++) {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(smooth[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(smooth[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
-          ctx.moveTo(x, h - 20);
+          ctx.moveTo(x, plotH);
           ctx.lineTo(x, y);
           firstPoint = false;
         } else {
           ctx.lineTo(x, y);
         }
       }
-      ctx.lineTo(w, h - 20);
+      ctx.lineTo(w, plotH);
       ctx.closePath();
 
+      // Thinner fill over the waterfall — at the opaque weight it works
+      // against a flat panel it would bury the history underneath it.
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
-      grad.addColorStop(0.5, 'rgba(59, 130, 246, 0.2)');
+      grad.addColorStop(0, wfOn ? 'rgba(160, 200, 255, 0.20)' : 'rgba(59, 130, 246, 0.5)');
+      grad.addColorStop(0.5, wfOn ? 'rgba(160, 200, 255, 0.08)' : 'rgba(59, 130, 246, 0.2)');
       grad.addColorStop(1, 'rgba(59, 130, 246, 0.02)');
       ctx.fillStyle = grad;
       ctx.fill();
@@ -289,7 +767,7 @@ export function SpectrumAnalyzer() {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(smooth[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(smooth[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
           ctx.moveTo(x, y);
           firstPoint = false;
@@ -297,7 +775,7 @@ export function SpectrumAnalyzer() {
           ctx.lineTo(x, y);
         }
       }
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+      ctx.strokeStyle = wfOn ? 'rgba(235, 245, 255, 0.95)' : 'rgba(59, 130, 246, 0.8)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -308,7 +786,7 @@ export function SpectrumAnalyzer() {
         const freq = i * freqPerBin;
         if (freq < minF || freq > maxF) continue;
         const x = freqToX(freq, w, minF, maxF);
-        const y = dbToY(peaks[i], h - 20, DB_FLOOR, DB_CEIL);
+        const y = dbToY(peaks[i], plotH, DB_FLOOR, DB_CEIL);
         if (firstPoint) {
           ctx.moveTo(x, y);
           firstPoint = false;
@@ -381,7 +859,7 @@ export function SpectrumAnalyzer() {
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(bx, 0);
-      ctx.lineTo(bx, h - 20);
+      ctx.lineTo(bx, plotH);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -403,16 +881,16 @@ export function SpectrumAnalyzer() {
       const lx = freqToX(Math.max(minF, isoMin), w, minF, maxF);
       const rx = freqToX(Math.min(maxF, isoMax), w, minF, maxF);
       ctx.fillStyle = opts.pending ? `rgba(${rgb}, 0.18)` : `rgba(${rgb}, 0.10)`;
-      ctx.fillRect(lx, 0, rx - lx, h - 20);
+      ctx.fillRect(lx, 0, rx - lx, plotH);
 
       ctx.strokeStyle = opts.pending ? `rgba(${rgb}, 0.7)` : `rgba(${rgb}, 0.9)`;
       ctx.lineWidth = 2;
       if (opts.pending) ctx.setLineDash([4, 4]);
       ctx.beginPath();
       ctx.moveTo(lx, 0);
-      ctx.lineTo(lx, h - 20);
+      ctx.lineTo(lx, plotH);
       ctx.moveTo(rx, 0);
-      ctx.lineTo(rx, h - 20);
+      ctx.lineTo(rx, plotH);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -486,7 +964,7 @@ export function SpectrumAnalyzer() {
         ctx.setLineDash([2, 3]);
         ctx.beginPath();
         ctx.moveTo(hx, 0);
-        ctx.lineTo(hx, h - 20);
+        ctx.lineTo(hx, plotH);
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -523,6 +1001,85 @@ export function SpectrumAnalyzer() {
       }
     }
 
+    if (wfOn && (!analyser || !actx)) {
+      wfUpdate(null, Math.round(w), Math.round(plotH), minF, maxF,
+        store.waterfallSoftness, store.waterfallFloor, store.waterfallTop);
+    }
+
+
+    // ── Piano keyboard ────────────────────────────────────────────────────
+    // Drawn against the frequency axis rather than as evenly-spaced keys, so
+    // every key sits exactly under the partials it names and the whole thing
+    // stretches and slides with the zoom. The cost is that white keys come
+    // out unequal — C spans two semitones before D, E only one before F —
+    // which is what a real keyboard's geometry actually looks like once it's
+    // projected onto a log-frequency scale.
+    {
+      const kbTop = plotH + FREQ_LABEL_H;
+      const lowMidi = Math.floor(69 + 12 * Math.log2(minF / refFreq)) - 1;
+      const highMidi = Math.ceil(69 + 12 * Math.log2(maxF / refFreq)) + 1;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.fillRect(0, kbTop, w, KEYBOARD_H);
+
+      // Which keys a strobe band is sitting on — the reason for the keyboard
+      // is reading a partial's note off the axis, so say where the targets are.
+      const bandMidis = new Set(
+        store.bands.map((b) => Math.round(69 + 12 * Math.log2(b.frequency / refFreq))),
+      );
+
+      // Whites first, then blacks over the top, exactly as they overlap.
+      for (let m = lowMidi; m <= highMidi; m++) {
+        if (!isWhite(m)) continue;
+        const [lo, hi] = whiteEdges(m);
+        const x0 = freqToX(midiToFreq(lo, refFreq), w, minF, maxF);
+        const x1 = freqToX(midiToFreq(hi, refFreq), w, minF, maxF);
+        if (x1 < 0 || x0 > w) continue;
+        ctx.fillStyle = KEY_WHITE;
+        ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H);
+        if (bandMidis.has(m)) {
+          ctx.fillStyle = 'rgba(6, 182, 212, 0.45)';
+          ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H);
+        }
+        ctx.strokeStyle = KEY_EDGE;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x0 + 0.25, kbTop + 0.25, x1 - x0 - 0.5, KEYBOARD_H - 0.5);
+
+        // Labels only where they fit, so zooming reveals them rather than
+        // the view starting out as a wall of overlapping text.
+        const kw = x1 - x0;
+        const name = getDisplayName(NOTE_NAMES[((m % 12) + 12) % 12], currentNaming);
+        const octave = Math.floor(m / 12) - 1;
+        const isC = ((m % 12) + 12) % 12 === 0;
+        const label = kw >= 15 ? `${name}${octave}` : isC && kw >= 9 ? `${name}${octave}` : null;
+        if (label) {
+          ctx.fillStyle = isC ? 'rgba(10, 10, 20, 0.95)' : 'rgba(10, 10, 20, 0.6)';
+          ctx.font = `${isC ? 'bold ' : ''}8px "JetBrains Mono", monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, x0 + kw / 2, kbTop + KEYBOARD_H - 4);
+        }
+      }
+
+      for (let m = lowMidi; m <= highMidi; m++) {
+        if (isWhite(m)) continue;
+        // Centred on its own pitch, which is also the seam between the two
+        // whites — so it overlaps both by the same amount.
+        const half = BLACK_KEY_SEMITONES / 2;
+        const x0 = freqToX(midiToFreq(m - half, refFreq), w, minF, maxF);
+        const x1 = freqToX(midiToFreq(m + half, refFreq), w, minF, maxF);
+        if (x1 < 0 || x0 > w) continue;
+        ctx.fillStyle = bandMidis.has(m) ? 'rgba(6, 182, 212, 0.9)' : KEY_BLACK;
+        ctx.fillRect(x0, kbTop, x1 - x0, KEYBOARD_H * 0.62);
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, kbTop);
+      ctx.lineTo(w, kbTop);
+      ctx.stroke();
+    }
+
     // Range info
     ctx.fillStyle = '#A1A1A1';
     ctx.font = '12px "JetBrains Mono", monospace';
@@ -532,7 +1089,7 @@ export function SpectrumAnalyzer() {
     ctx.fillText(`${formatFreq(maxF)} Hz`, w - 4, 12);
 
     animRef.current = requestAnimationFrame(draw);
-  }, [bands]);
+  }, [bands, wfUpdate]);
 
   useEffect(() => {
     animRef.current = requestAnimationFrame(draw);
@@ -585,6 +1142,7 @@ export function SpectrumAnalyzer() {
     const y = e.clientY - rect.top;
     const h = rect.height;
     const w = rect.width;
+    const plotH = h - AXIS_H;
 
     // 1. Existing isolation handles (highest priority — most visually obvious)
     const hit = findIsoHandleAt(x, w);
@@ -604,7 +1162,7 @@ export function SpectrumAnalyzer() {
     }
 
     // 2. Threshold line
-    const threshY = dbToY(threshold, h - 20, DB_FLOOR, DB_CEIL);
+    const threshY = dbToY(threshold, plotH, DB_FLOOR, DB_CEIL);
     if (Math.abs(y - threshY) < 10) {
       setDragState({
         type: 'threshold',
@@ -660,7 +1218,7 @@ export function SpectrumAnalyzer() {
     if (dragState.type === 'threshold') {
       const dy = e.clientY - dragState.startY;
       const dbRange = DB_CEIL - DB_FLOOR;
-      const dbDelta = -(dy / (rect.height - 20)) * dbRange;
+      const dbDelta = -(dy / (rect.height - AXIS_H)) * dbRange;
       setThreshold(Math.max(-90, Math.min(-10, Math.round(dragState.startThreshold + dbDelta))));
     } else if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
       const x = e.clientX - rect.left;
@@ -802,6 +1360,7 @@ export function SpectrumAnalyzer() {
       const y = t.clientY - rect.top;
       const w = rect.width;
       const h = rect.height;
+      const plotH = h - AXIS_H;
 
       // Iso handle resize wins
       const hit = findIsoHandleAt(x, w, 18);
@@ -823,7 +1382,7 @@ export function SpectrumAnalyzer() {
 
       // Threshold line — same hit zone as the mouse path. Wider on touch
       // (16px vs the mouse's 10px) since fingers are less precise.
-      const threshY = dbToY(threshold, h - 20, DB_FLOOR, DB_CEIL);
+      const threshY = dbToY(threshold, plotH, DB_FLOOR, DB_CEIL);
       if (Math.abs(y - threshY) < 16) {
         e.preventDefault();
         setDragState({
@@ -920,7 +1479,7 @@ export function SpectrumAnalyzer() {
         e.preventDefault();
         const dy = t.clientY - dragState.startY;
         const dbRange = DB_CEIL - DB_FLOOR;
-        const dbDelta = -(dy / (rect.height - 20)) * dbRange;
+        const dbDelta = -(dy / (rect.height - AXIS_H)) * dbRange;
         setThreshold(Math.max(-90, Math.min(-10, Math.round(dragState.startThreshold + dbDelta))));
       } else if (dragState.type === 'iso-resize-left' || dragState.type === 'iso-resize-right') {
         e.preventDefault();
@@ -993,15 +1552,51 @@ export function SpectrumAnalyzer() {
 
   return (
     <div
+      ref={rootRef}
       className="flex flex-col shrink-0"
       style={{ borderTop: '1px solid var(--border)' }}
       data-spectrum-analyser
     >
+      {/* Drag to resize. Sits above the header so it's the panel's top edge —
+          the analyser is anchored to the bottom of the column, so pulling up
+          grows it into the space the strobe was using, which is the trade the
+          user is actually making. */}
+      <div
+        onPointerDown={onGripDown}
+        onPointerMove={onGripMove}
+        onPointerUp={onGripUp}
+        onPointerCancel={onGripUp}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize the analyser"
+        title="Drag to resize"
+        className="w-full flex items-center justify-center shrink-0"
+        style={{
+          height: 11,
+          cursor: 'ns-resize',
+          touchAction: 'none',
+          background: 'var(--bg-panel)',
+        }}
+      >
+        <span
+          style={{
+            width: 34,
+            height: 3,
+            borderRadius: 2,
+            background: dragHeight !== null ? 'var(--accent-blue)' : 'var(--text-dim)',
+            opacity: dragHeight !== null ? 1 : 0.5,
+          }}
+        />
+      </div>
+
       {/* Single-row header: title + inline smooth slider + clear-iso + close.
           Everything is text-[10px]/min-w-0 so it stays on one line at narrow
           widths instead of wrapping. */}
       <div
-        className="flex items-center gap-2 px-2 py-1 min-w-0"
+        // Wraps rather than squeezing: with three sliders and two buttons this
+        // row doesn't fit a phone on one line, and shrinking them all to
+        // nothing makes every one of them unusable instead of just stacking.
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1 min-w-0"
         style={{ background: 'var(--bg-panel)' }}
       >
         <span
@@ -1011,7 +1606,7 @@ export function SpectrumAnalyzer() {
           SPECTRUM ANALYSER
         </span>
         <label
-          className="flex items-center gap-1.5 text-[9px] flex-1 min-w-0"
+          className="flex items-center gap-1.5 text-[9px] flex-1 min-w-[110px]"
           style={{ color: 'var(--text-dim)' }}
         >
           <span className="whitespace-nowrap">SMOOTH</span>
@@ -1029,6 +1624,93 @@ export function SpectrumAnalyzer() {
             {Math.round(fftSmoothing * 100)}%
           </span>
         </label>
+        {waterfallOn && (
+          <label
+            className="flex items-center gap-1.5 text-[9px] shrink-0"
+            style={{ color: 'var(--text-dim)' }}
+            title="Where the colour ramp saturates. Drag right to lower it, so more of the signal reaches the hot end."
+          >
+            <span className="whitespace-nowrap">BRIGHT</span>
+            <input
+              type="range"
+              min="-70"
+              max="-5"
+              step="1"
+              // Same rtl inversion as TAIL, so on both controls "more to the
+              // right" means more of what the label promises.
+              value={waterfallTop}
+              onChange={(e) =>
+                useTunerStore.getState().setWaterfallTop(parseFloat(e.target.value))
+              }
+              className="w-12 h-1"
+              style={{ accentColor: 'var(--accent-blue)', direction: 'rtl' }}
+            />
+            <span className="tabular-nums w-7 text-right" style={{ color: 'var(--text-secondary)' }}>
+              {waterfallTop}
+            </span>
+          </label>
+        )}
+        {waterfallOn && (
+          <label
+            className="flex items-center gap-1.5 text-[9px] shrink-0"
+            style={{ color: 'var(--text-dim)' }}
+            title="How quiet a partial may get before it goes black. Drag right to follow a decay further down."
+          >
+            <span className="whitespace-nowrap">TAIL</span>
+            <input
+              type="range"
+              min="-115"
+              max="-40"
+              step="1"
+              // direction:rtl does the inverting, so dragging right lowers
+              // the floor and "more" reads as a longer tail. The value itself
+              // stays in its own units — negating it here as well put it
+              // outside the slider's range and pinned it to the end.
+              value={waterfallFloor}
+              onChange={(e) =>
+                useTunerStore.getState().setWaterfallFloor(parseFloat(e.target.value))
+              }
+              className="w-12 h-1"
+              style={{ accentColor: 'var(--accent-blue)', direction: 'rtl' }}
+            />
+            <span className="tabular-nums w-7 text-right" style={{ color: 'var(--text-secondary)' }}>
+              {waterfallFloor}
+            </span>
+          </label>
+        )}
+        {waterfallOn && (
+          <label
+            className="flex items-center gap-1.5 text-[9px] shrink-0"
+            style={{ color: 'var(--text-dim)' }}
+            title="Blur the heatmap across frequency. Never across time — that would smear the decay."
+          >
+            <span className="whitespace-nowrap">SOFT</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={waterfallSoftness}
+              onChange={(e) =>
+                useTunerStore.getState().setWaterfallSoftness(parseFloat(e.target.value))
+              }
+              className="w-12 h-1"
+              style={{ accentColor: 'var(--accent-blue)' }}
+            />
+          </label>
+        )}
+        <button
+            onClick={() => useTunerStore.getState().setShowWaterfall(!showWaterfall)}
+            aria-pressed={showWaterfall}
+            title={showWaterfall ? 'Hide the waterfall' : 'Show power over the last 10 seconds'}
+            className="text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap shrink-0"
+            style={{
+              color: showWaterfall ? 'var(--accent-blue)' : 'var(--text-dim)',
+              background: showWaterfall ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)',
+            }}
+          >
+            WATERFALL
+        </button>
         {isolations.length > 0 && (
           <button
             onClick={() => useTunerStore.getState().clearIsolations()}
@@ -1050,8 +1732,8 @@ export function SpectrumAnalyzer() {
       <canvas
         ref={canvasRef}
         data-tour="spectrum-canvas"
-        className="w-full h-[120px] lg:h-[140px]"
-        style={{ cursor: getCursor(), touchAction: 'none' }}
+        className="w-full shrink-0"
+        style={{ height: panelHeight, cursor: getCursor(), touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
