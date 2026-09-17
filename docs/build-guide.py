@@ -57,7 +57,7 @@ _register_fonts()
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
-GUIDE_VERSION = '1.2.2'
+GUIDE_VERSION = '1.3.0'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
@@ -461,7 +461,7 @@ def build(out_path: Path):
         ('5.  The pitch pipe (♪)', 'Per-band reference tones, three click states'),
         ('6.  The tuning & scale controls', 'Chromatic and scale modes, PURE vs EQUAL'),
         ('7.  Mobile quick-pick panel', 'The slide-up controls on phones / tablets'),
-        ('8.  Spectrum Analyser + ISO', 'See the full spectrum, isolate frequencies'),
+        ('8.  Analyser, waterfall & ISO', 'See the full spectrum, isolate frequencies'),
         ('9.  Keyboard shortcuts', 'Play the picker from a computer keyboard'),
         ('10. Settings', 'Every knob, what it does'),
         ('11. Stopwatch', 'Time your tuning sessions'),
@@ -977,19 +977,33 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
+    story.append(Paragraph('Hold your phone upright', s['h2']))
+    story.append(Paragraph(
+        'Turn a phone sideways and V-Tune asks for it back. Three strobe '
+        'bands, the analyser and the picker are stacked vertically, and a '
+        'phone in landscape simply hasn’t the height for them. This applies '
+        'to <b>phones only</b> — a tablet switches to the wide layout at '
+        '1024px, so landscape is a tablet’s better orientation, not its '
+        'worse one.',
+        s['body'],
+    ))
+
     story.append(Spacer(1, 40))
 
     # ── 8. Spectrum Analyser + ISO ────────────────────────────────────
-    story.append(Paragraph('8. Spectrum Analyser & Isolation windows', s['h1']))
-    story.append(Paragraph('See the full frequency content, then isolate the bits you care about', s['h1_sub']))
+    story.append(Paragraph('8. Spectrum Analyser, waterfall &amp; Isolation windows', s['h1']))
+    story.append(Paragraph('See the full frequency content, watch it decay, then isolate the bits you care about', s['h1_sub']))
     story.append(HRule(50, length=36))
 
     story.append(Paragraph(
         'Toggle the <b>Spectrum Analyser</b> with its icon (equaliser bars) '
         'in the teal utility bar. It appears under the strobes as a '
-        'frequency-domain view across the audible range — a real-time '
+        'frequency-domain view from <b>60 Hz to 4.3 kHz</b> — a real-time '
         'picture of every harmonic your instrument is producing, with two '
-        'isolation bands beneath it for fine-tuning partials.',
+        'isolation bands beneath it for fine-tuning partials. That range is '
+        'comfortably wider than any handpan\u2019s fundamental-to-upper-partial '
+        'span, and narrow enough that the keyboard along the bottom stays '
+        'readable rather than a smear.',
         s['body'],
     ))
     story.append(Paragraph(
@@ -1047,6 +1061,83 @@ def build(out_path: Path):
         'watch the peak float inside the bracket, tight enough that nothing '
         'else in the shell wanders in. Tap it again to restore the default '
         'windows and the full view. See section 6.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('The waterfall', s['h2']))
+    story.append(Paragraph(
+        'The spectrum curve tells you how loud each partial is <i>right now</i>. '
+        'It says nothing about how long any of them lasts. Turn on '
+        '<b>WATERFALL</b> in the analyser\u2019s control strip and the last '
+        '<b>ten seconds</b> are painted as a heatmap behind the curve, on the '
+        'same frequency axis, with colour standing in for power. The newest '
+        'moment is the top line; everything older slides down and off the '
+        'bottom. A partial that rings on draws a long vertical streak. One '
+        'that dies on the strike draws a dash.',
+        s['body'],
+    ))
+    story.append(Paragraph(
+        'One row is exactly one pixel tall, and the full ten seconds spans '
+        'whatever height the panel currently is. Nothing is resampled, so the '
+        'slope of a decay is honest — two notes\u2019 sustain can be compared by '
+        'eye, not just by feel.',
+        s['body_secondary'],
+    ))
+    story.append(Paragraph(
+        'Isolation windows carry through as lanes, so you can bracket one '
+        'partial, watch that one decay, and read the strobe for it at the '
+        'same time.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('Reading the colours: BRIGHT, TAIL and SOFT', s['h2']))
+    story.append(Paragraph(
+        'A quiet instrument recorded at a sensible level puts almost '
+        'everything in the cold end of the ramp, which looks like nothing is '
+        'happening. Two controls set the ends of that ramp, and between them '
+        'they are what make the colours usable:',
+        s['body'],
+    ))
+    story.append(settings_table([
+        ('BRIGHT', 'The saturation point. Everything above it paints the hot '
+                   'end of the ramp, so <b>lowering it brings more of the '
+                   'signal into the top</b> — the move to make on a soft '
+                   'instrument. Desktop spectrograms call this brightness.'),
+        ('TAIL', 'How quiet a partial may get before it goes black. Raise it '
+                 'to <b>follow a decay further down</b> into the noise. This '
+                 'is the dynamic range of the picture.'),
+        ('SOFT', 'Blurs the heatmap <b>across frequency only, never across '
+                 'time</b> — smearing time would flatten the very decay you '
+                 'are trying to read. Useful for turning a grainy shell into '
+                 'readable bands.'),
+    ], s))
+    story.append(Paragraph(
+        'All three re-render the ten seconds already on screen, so you can '
+        'find the right setting against a strike that has already happened '
+        'rather than hitting the instrument again and again.',
+        s['body_secondary'],
+    ))
+
+    story.append(Paragraph('The keyboard', s['h2']))
+    story.append(Paragraph(
+        'A piano keyboard runs along the bottom of the analyser. It is drawn '
+        '<i>against the frequency axis</i> rather than as evenly spaced keys, '
+        'so every key sits beneath the partials it names, and the whole thing '
+        'stretches and slides with the zoom. Keys your strobe bands are '
+        'targeting are tinted, so a glance tells you which note each band is '
+        'on. Note names appear as the width allows — every white key when '
+        'there is room, thinning to the octave Cs when zoomed out.',
+        s['body'],
+    ))
+
+    story.append(Paragraph('Resizing the analyser', s['h2']))
+    story.append(Paragraph(
+        'Drag the handle at the analyser\u2019s top edge to make it taller or '
+        'shorter. The strobe above always keeps a guaranteed share of the '
+        'screen, so you cannot drag it away, and the band labels scale with '
+        'whatever is left. It is <b>one height, kept whether the waterfall is '
+        'on or off</b> — switching the waterfall on does not resize the panel '
+        'under you.',
         s['body'],
     ))
 
