@@ -1,0 +1,125 @@
+# Build the signed Android APK for a tag that already has a release, and
+# upload it there.
+#
+# Why this exists separately from release.yml: when one platform's job fails,
+# re-running it is not an option. A re-run uses the workflow file from the
+# commit that triggered the original run, so a broken step stays broken — and
+# the fix, by definition, lands after the tag. That is exactly what happened
+# to 1.3.0: Google deleted the obsolete `tools` SDK package in September 2026,
+# the Android job died, and the release shipped with every desktop artifact
+# and no APK.
+#
+# Running this from the default branch uses THIS file (fixed), while checking
+# out the tag's source — so the APK is genuinely that version's build, not a
+# rebuild of main.
+#
+# Deliberately Android-only. Re-running the desktop matrix would regenerate
+# latest.json and the updater signatures on a feed live apps are polling; the
+# APK needs none of that.
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and upload to (e.g. v1.3.0)'
+        required: true
+        type: string
+
+jobs:
+  android:
+    name: Android (APK) for ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      # The release must already exist — this job uploads into it, it doesn't
+      # create one. Checking first turns a late `gh release upload` failure
+      # into an immediate, legible one.
+      - name: Check the release and version agree with the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release view "$TAG" --json tagName >/dev/null
+          want="${TAG#v}"
+          got=$(sed -nE 's/.*versionName "([^"]+)".*/\1/p' android/app/build.gradle | head -1)
+          if [ "$want" != "$got" ]; then
+            echo "✗ $TAG checks out android versionName $got — wrong source"
+            exit 1
+          fi
+          echo "✓ release $TAG exists; android versionName $got"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Capacitor 8 compiles its Android library against source release 21.
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # `packages` is pinned because the action's default is "tools
+      # platform-tools", and Google removed the obsolete `tools` package from
+      # their SDK repository in September 2026 — sdkmanager then exits 1 with
+      # "Failed to find package 'tools'" and the job dies before any of our
+      # code runs. platform-tools is all the build needs; Gradle resolves its
+      # own build-tools and platform.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Capacitor sync into android/
+        run: npx cap sync android
+
+      - name: Restore + validate keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p android/keystore
+          printf '%s' "$KEYSTORE_B64" | base64 -d > android/keystore/v-tune-release.jks
+          if keytool -list -keystore android/keystore/v-tune-release.jks -storepass "$KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "✓ keystore decoded + opened OK"
+          else
+            echo "✗ keystore invalid after decode — re-create ANDROID_KEYSTORE_BASE64"
+            exit 1
+          fi
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          VTUNE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Verify signature
+        working-directory: android/app/build/outputs/apk/release
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME"/build-tools -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose app-release.apk
+
+      # --clobber so a second run replaces the asset rather than 422ing.
+      - name: Upload APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "V-Tune-${TAG}.apk"
+          gh release upload "$TAG" "V-Tune-${TAG}.apk" --clobber
+          echo "✓ uploaded V-Tune-${TAG}.apk to $TAG"
