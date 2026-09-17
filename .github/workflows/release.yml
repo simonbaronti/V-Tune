@@ -7,7 +7,12 @@
 #   desktop (matrix) → macOS (universal, signed + notarized), Windows, Linux
 #                      via tauri-action: builds, signs the updater artifacts,
 #                      uploads installers + .sig, and merges latest.json
-#   android          → signed APK, uploaded to the draft release
+#   android          → signed APK, uploaded to the draft release. Like
+#                      iOS, does NOT gate `publish`. If it fails, build
+#                      the APK afterwards with android-apk.yml —
+#                      `gh workflow run android-apk.yml -f tag=vX.Y.Z` —
+#                      which re-runs cannot do, since a re-run uses the
+#                      workflow file from the commit that triggered it.
 #   ios              → fastlane: builds the Capacitor app, uploads to
 #                      TestFlight, submits for beta review + external group.
 #                      Does NOT gate `publish` — an Apple-side hiccup must not
@@ -369,13 +374,28 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   publish:
     name: Publish release
+    # Still waits for android, so a good APK lands before the release goes
+    # public — but doesn't inherit its failure. 1.3.0 shipped with no user
+    # guide and an empty updater changelog purely because the Android job
+    # died, and this job was chained behind it. desktop stays a hard gate:
+    # latest.json and every installer come from it, so publishing without it
+    # would un-draft an empty release.
     needs: [create-release, desktop, android]
+    if: ${{ !cancelled() && needs.create-release.result == 'success' && needs.desktop.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Say it here rather than leaving it to be noticed weeks later on the
+      # release page. `gh workflow run android-apk.yml -f tag=<tag>` builds
+      # that tag's APK and uploads it into this release.
+      - name: Note a missing APK
+        if: needs.android.result != 'success'
+        run: |
+          echo "::warning title=No APK::The Android job did not succeed, so this release has no APK. Build it with: gh workflow run android-apk.yml -f tag=$GITHUB_REF_NAME"
 
       # tauri-action leaves latest.json's "notes" empty. Inject this version's
       # CHANGELOG section (markdown stripped to plain text) so the in-app

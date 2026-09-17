@@ -54,6 +54,28 @@ interface TourStep {
 const LG_MEDIA = '(min-width: 1024px)';   // desktop
 const NARROW_MEDIA = '(max-width: 1023px)'; // phone + portrait tablet
 
+/**
+ * Open whichever container the controls live in at this width.
+ *
+ * The desktop menu and the mobile picker hold the same controls behind
+ * different chrome, so "which one to open" is a breakpoint question rather
+ * than something each step should have to know. Without this, any step
+ * reached with the panel shut spotlights a target sitting off-canvas.
+ */
+function openPanel(): void {
+  const s = useTunerStore.getState();
+  if (window.matchMedia(LG_MEDIA).matches) s.setMenuOpen(true);
+  else s.setQuickPickOpen(true);
+}
+
+/** The inverse, for targets in the main column that the mobile picker would
+ *  otherwise cover. Desktop needs nothing: its menu sits beside the column,
+ *  not over it. */
+function closePanelOnNarrow(): void {
+  if (window.matchMedia(LG_MEDIA).matches) return;
+  useTunerStore.getState().setQuickPickOpen(false);
+}
+
 const STEPS: TourStep[] = [
   {
     id: 'welcome',
@@ -84,6 +106,7 @@ const STEPS: TourStep[] = [
   // ── Utility (teal) icon bar ────────────────────────────────────────
   {
     id: 'utility',
+    onEnter: openPanel,
     targets: ['tour-utility'],
     title: 'Your utility menu',
     body: 'This teal bar is where you reach Settings, the Stopwatch, the Spectrum Analyser, light / dark mode, and pinning the menu open. Let’s try each — tap Next.',
@@ -91,6 +114,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'settings-open',
+    onEnter: openPanel,
     targets: ['tour-settings'],
     title: 'Settings',
     body: 'Tap the gear to open your settings.',
@@ -102,8 +126,13 @@ const STEPS: TourStep[] = [
     id: 'modal-input',
     targets: ['modal-input'],
     title: 'Input',
-    body: 'Your input settings live here — microphone, sensitivity and hum. Go ahead and pick your microphone from the dropdown.',
+    body: 'Your input settings live here — microphone, sensitivity and hum. Pick your microphone from the dropdown, or tap Next.',
     advanceWhen: (s, snap) => s.inputDeviceId !== snap.inputDeviceId,
+    // Next as well as the predicate, because this is the one step whose
+    // action the user may be unable to perform: decline the microphone
+    // prompt and the dropdown has nothing to pick, so a predicate-only step
+    // strands the tour here with no way forward.
+    manualAdvance: true,
   },
   {
     id: 'modal-tuning',
@@ -138,6 +167,7 @@ const STEPS: TourStep[] = [
   // ── Back to the utility bar ────────────────────────────────────────
   {
     id: 'stopwatch-icon',
+    onEnter: openPanel,
     targets: ['tour-stopwatch'],
     title: 'Stopwatch',
     body: 'Tap to reveal a timing aid that tracks how long you’ve been tuning.',
@@ -145,6 +175,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'stopwatch-panel',
+    onEnter: closePanelOnNarrow,
     targets: ['tour-stopwatch-panel'],
     title: 'Your stopwatch',
     body: 'Here it is — start, stop and reset it here. Tap Next to carry on.',
@@ -152,6 +183,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'spectrum-icon',
+    onEnter: openPanel,
     targets: ['sa-toggle'],
     title: 'Spectrum analyser',
     body: 'Tap to reveal the analyser — with two isolation windows for fine-tuning partials.',
@@ -159,6 +191,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'spectrum-panel',
+    onEnter: closePanelOnNarrow,
     targets: ['tour-spectrum-panel'],
     title: 'The analyser',
     body: 'It appears under the strobes, with two isolation windows and their bands, ready to fine-tune partials. Tap Next.',
@@ -166,6 +199,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'pin',
+    onEnter: openPanel,
     targets: ['tour-pin'],
     title: 'Pin it open',
     body: 'Tap the pin to keep the menu open (no auto-hide) — try it, or tap Next.',
@@ -175,6 +209,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'theme',
+    onEnter: openPanel,
     targets: ['tour-theme'],
     title: 'Light / dark',
     body: 'This toggles light and dark mode — try it, or tap Next to continue.',
@@ -185,6 +220,7 @@ const STEPS: TourStep[] = [
   // ── Tuning (desktop lives in the menu) + scale + go ────────────────
   {
     id: 'tuning-desktop',
+    onEnter: openPanel,
     targets: ['tour-tuning'],
     title: 'Tuning',
     body: 'This is where your tuning options live — reference pitch (A4), tolerance and auto-detect.',
@@ -193,6 +229,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'scale',
+    onEnter: openPanel,
     targets: ['tour-scale'],
     title: 'Choose a scale',
     body: 'This is where you pick the scale you’re tuning. Go ahead and choose one from the dropdown.',
@@ -200,6 +237,7 @@ const STEPS: TourStep[] = [
   },
   {
     id: 'lets-go',
+    onEnter: openPanel,
     targets: ['lets-go'],
     title: "Let's go!",
     body: 'That’s it — all that’s left is to start tuning. Tap Let’s Go!',
@@ -211,6 +249,10 @@ const STEPS: TourStep[] = [
 
 const HIGHLIGHT_PAD = 6; // pixels of breathing room around target rect
 const TOOLTIP_GAP = 12;  // gap between spotlight and tooltip
+// How long a step may fail to resolve its target before the card is shown
+// centre-screen anyway. Long enough to cover a modal or drawer animating,
+// short enough that nobody is left staring at a dimmed screen.
+const STRANDED_MS = 700;
 
 interface Box { left: number; top: number; right: number; bottom: number; }
 
@@ -226,20 +268,41 @@ function unionRect(rects: DOMRect[]): Box | null {
   return { left, top, right, bottom };
 }
 
-/** Pick the best visible element when multiple share the same data-tour
- *  (e.g. the Let's Go button exists in both ControlBar and QuickPitchBar
- *  but only one is rendered at a given breakpoint). */
+/**
+ * How much of an element the user can actually see, in square pixels.
+ *
+ * Having a width and a height says nothing about being visible here. A
+ * closed drawer keeps its children fully measurable: the desktop menu
+ * animates to `width: 0` while its contents keep their own width and spill
+ * off the right-hand edge, and the mobile picker slides below the fold. Both
+ * report a healthy box at coordinates nobody can see — which is how the
+ * spotlight ended up clamped to a few pixels against the viewport edge, or
+ * to a negative width, while the tooltip pointed at it.
+ */
+function onScreenArea(el: Element): number {
+  const r = (el as HTMLElement).getBoundingClientRect();
+  if (r.width <= 0 || r.height <= 0) return 0;
+  if (window.getComputedStyle(el as HTMLElement).visibility === 'hidden') return 0;
+  const w = Math.max(0, Math.min(window.innerWidth, r.right) - Math.max(0, r.left));
+  const h = Math.max(0, Math.min(window.innerHeight, r.bottom) - Math.max(0, r.top));
+  return w * h;
+}
+
+/** Pick the most visible element when several share the same data-tour —
+ *  Let's Go, the pin and the scale picker each exist in both ControlBar and
+ *  QuickPitchBar. Null when every copy is off screen, which the caller reads
+ *  as "not resolved yet" rather than spotlighting empty space. */
 function findVisibleByDataTour(id: string): Element | null {
-  const matches = document.querySelectorAll(`[data-tour="${id}"]`);
-  for (const el of matches) {
-    const r = (el as HTMLElement).getBoundingClientRect();
-    const visible =
-      r.width > 0 &&
-      r.height > 0 &&
-      window.getComputedStyle(el as HTMLElement).visibility !== 'hidden';
-    if (visible) return el;
+  let best: Element | null = null;
+  let bestArea = 0;
+  for (const el of document.querySelectorAll(`[data-tour="${id}"]`)) {
+    const area = onScreenArea(el);
+    if (area > bestArea) {
+      best = el;
+      bestArea = area;
+    }
   }
-  return matches[0] ?? null;
+  return best;
 }
 
 export function OnboardingTour() {
@@ -247,6 +310,11 @@ export function OnboardingTour() {
   const proStatus = useProStore((s) => s.status);
   const [stepIdx, setStepIdx] = useState(0);
   const [boxes, setBoxes] = useState<DOMRect[]>([]);
+  // True once the current step has gone STRANDED_MS without resolving a
+  // target. Without it an unresolvable step renders a full-screen blocker
+  // and no card at all — no title, no Next, no Skip — which on a phone is
+  // unescapable, since Esc is the only other way out.
+  const [stranded, setStranded] = useState(false);
   // The frame we'd ideally place the tooltip near.
   const [unionBox, setUnionBox] = useState<Box | null>(null);
   const [viewport, setViewport] = useState({
@@ -340,7 +408,9 @@ export function OnboardingTour() {
   useEffect(() => {
     if (!tourActive || !step) return;
     let raf = 0;
-    const tick = () => {
+    let emptySince = 0;
+    setStranded(false);
+    const measure = () => {
       const rects: DOMRect[] = [];
       for (const id of step.targets) {
         const el = findVisibleByDataTour(id);
@@ -348,6 +418,22 @@ export function OnboardingTour() {
       }
       setBoxes(rects);
       setUnionBox(unionRect(rects));
+      if (rects.length === 0) {
+        if (emptySince === 0) emptySince = performance.now();
+        if (performance.now() - emptySince > STRANDED_MS) setStranded(true);
+      } else {
+        emptySince = 0;
+        setStranded(false);
+      }
+    };
+    // Measure once up front rather than waiting on the first frame. A
+    // backgrounded page gets no animation frames at all, so a step entered
+    // while hidden — switch away mid-tour and come back — would otherwise
+    // paint a dimmed screen with no cutout and no card until something
+    // scheduled one.
+    measure();
+    const tick = () => {
+      measure();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -449,7 +535,7 @@ export function OnboardingTour() {
 
   // ── Spotlight rect (with padding & viewport clamping) ──────────────
   const u = unionBox;
-  const spotlight = u
+  const clamped = u
     ? {
         left: Math.max(0, u.left - HIGHLIGHT_PAD),
         top: Math.max(0, u.top - HIGHLIGHT_PAD),
@@ -457,12 +543,21 @@ export function OnboardingTour() {
         bottom: Math.min(viewport.h, u.bottom + HIGHLIGHT_PAD),
       }
     : null;
+  // Belt and braces behind findVisibleByDataTour: anything off screen clamps
+  // to a sliver against the viewport edge or turns inside out (a negative
+  // width), and either reads as the tour pointing at the wrong thing.
+  const spotlight =
+    clamped && clamped.right > clamped.left && clamped.bottom > clamped.top
+      ? clamped
+      : null;
 
   // ── Tooltip placement (try below → above → right → left, pick what fits)
   const TT_W = Math.min(340, viewport.w - 24);
   const TT_H_EST = 160; // generous estimate; final box auto-sizes
-  let ttLeft = 12;
-  let ttTop = 12;
+  // Centre-screen is where the card sits when there is no spotlight to
+  // anchor it to; the branches below move it beside one when there is.
+  let ttLeft = Math.max(12, viewport.w / 2 - TT_W / 2);
+  let ttTop = Math.max(12, viewport.h / 2 - TT_H_EST / 2);
   if (spotlight) {
     const spaceBelow = viewport.h - spotlight.bottom;
     const spaceAbove = spotlight.top;
@@ -576,11 +671,13 @@ export function OnboardingTour() {
           />
         ))}
 
-      {/* Tooltip card. Hidden while the current target is momentarily
+      {/* Tooltip card. Held back while the current target is momentarily
           unmeasurable (e.g. the settings modal animating closed) so it
-          doesn't flash to the default top-left "welcome" position before the
-          next step's spotlight resolves. */}
-      {spotlight && (
+          doesn't flash to centre-screen before the next step's spotlight
+          resolves — but shown regardless once that stops looking momentary,
+          so a step that can't find its target is still readable and still
+          has a way out. */}
+      {(spotlight || stranded) && (
       <div
         role="dialog"
         aria-label="Onboarding tour"
@@ -677,7 +774,7 @@ export function OnboardingTour() {
           >
             Skip tour
           </button>
-          {step.manualAdvance ? (
+          {step.manualAdvance || stranded ? (
             <button
               onClick={advance}
               style={{
