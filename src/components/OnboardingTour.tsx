@@ -310,11 +310,15 @@ export function OnboardingTour() {
   const proStatus = useProStore((s) => s.status);
   const [stepIdx, setStepIdx] = useState(0);
   const [boxes, setBoxes] = useState<DOMRect[]>([]);
-  // True once the current step has gone STRANDED_MS without resolving a
-  // target. Without it an unresolvable step renders a full-screen blocker
-  // and no card at all — no title, no Next, no Skip — which on a phone is
+  // The step, if any, that has gone STRANDED_MS without resolving a target.
+  // Without this an unresolvable step renders a full-screen blocker and no
+  // card at all — no title, no Next, no Skip — which on a phone is
   // unescapable, since Esc is the only other way out.
-  const [stranded, setStranded] = useState(false);
+  //
+  // Held as a step id rather than a boolean so it resets itself: moving to
+  // another step makes the comparison below false on its own, with no
+  // synchronous state reset on the way into the effect.
+  const [strandedStep, setStrandedStep] = useState<string | null>(null);
   // The frame we'd ideally place the tooltip near.
   const [unionBox, setUnionBox] = useState<Box | null>(null);
   const [viewport, setViewport] = useState({
@@ -357,6 +361,7 @@ export function OnboardingTour() {
   }, [tourActive]);
 
   const step = effectiveSteps[stepIdx] ?? null;
+  const stranded = step !== null && strandedStep === step.id;
 
   // ── Tour entry / exit side effects ──────────────────────────────────
   // Reset the relevant slices of app state to a known baseline so the
@@ -409,7 +414,6 @@ export function OnboardingTour() {
     if (!tourActive || !step) return;
     let raf = 0;
     let emptySince = 0;
-    setStranded(false);
     const measure = () => {
       const rects: DOMRect[] = [];
       for (const id of step.targets) {
@@ -420,10 +424,10 @@ export function OnboardingTour() {
       setUnionBox(unionRect(rects));
       if (rects.length === 0) {
         if (emptySince === 0) emptySince = performance.now();
-        if (performance.now() - emptySince > STRANDED_MS) setStranded(true);
+        if (performance.now() - emptySince > STRANDED_MS) setStrandedStep(step.id);
       } else {
         emptySince = 0;
-        setStranded(false);
+        setStrandedStep(null);
       }
     };
     // Measure once up front rather than waiting on the first frame. A

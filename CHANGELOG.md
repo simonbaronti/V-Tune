@@ -4,27 +4,50 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.1] — 2026-09-20
 
 ### Changed
 - **The strobe Speed control is now a multiple of a conventional strobe.**
-  A mechanical strobe drifts its pattern one turn per second for every hertz
-  a note is out, and that is what other tuners mean by the number — LinoTune
-  defines its roll speed "relative to a conventional strobe". V-Tune's did
-  not: the old numbers came out around a third of a real strobe, so the
-  fastest setting read roughly normal and the obvious request was for
-  something faster. The presets are now 0.5x, 1x, 2x, 5x and 10x, 1x being
-  the real thing, which also puts the top of the range where LinoTune's is.
-  A Speed you had chosen is converted to its closest equivalent.
+  A mechanical strobe drifts its pattern one full turn per second for every
+  hertz a note is out — speed is the size of the error, direction is its
+  sign, and holding still is what in tune looks like. That is what every
+  strobe tuner means by the number. V-Tune's meant nothing in particular:
+  the old settings worked out at roughly a third of a real strobe, so the
+  fastest one read about normal and the obvious request was for something
+  faster. The presets are now 0.5x, 1x, 2x, 5x and 10x, with 1x the real
+  thing — which also puts the top of the range where other tuners put
+  theirs. **Expect the strobe to be livelier after this update**; a Speed
+  you had chosen is carried over to its closest equivalent.
+- **The user guide covers 1.3.0.** The waterfall and its BRIGHT, TAIL and
+  SOFT controls, the keyboard, the resize handle, and the analyser's real
+  60 Hz – 4.3 kHz range. It is attached to the release again, as is the
+  Android APK — 1.3.0 went out without either, because the job that
+  attaches them was chained behind an Android build that a change at
+  Google's end had broken.
 
 ### Fixed
 - **The strobe ran at the speed of your screen.** Drift was added once per
   animation frame with no reference to elapsed time, so the same note on the
   same instrument, equally out of tune, drifted twice as fast on a 120 Hz
   ProMotion iPhone as on a 60 Hz phone — and neither matched what the number
-  on the button claimed. It is now integrated against real elapsed time, so
-  every device reads the same. The isolation bands carried their own copy of
-  the same formula and had the same fault; both now share one definition.
+  on the button claimed. It is measured against real elapsed time now, so
+  every device reads alike. The isolation bands kept their own copy of the
+  same formula and had the same fault; both now work from one definition.
+- **The onboarding tour pointed at parts of the screen you couldn't see.**
+  A closed drawer keeps its contents fully measurable — the desktop menu
+  animates to no width while everything inside it spills off the right-hand
+  edge, and the mobile picker slides below the fold — so the tour picked
+  those targets happily and the spotlight collapsed into a sliver against
+  the edge of the screen, or inverted. Eleven of its nineteen steps point at
+  something inside one of those two containers. The tour now opens the menu
+  when a step needs it and always picks whichever copy of a control is
+  actually on screen.
+- **The tour could strand you.** A step that couldn't find its target drew a
+  dimmed screen with no card on it at all — no title, no Next, no Skip — and
+  Esc was the only way out, which on a phone is no way out. The card now
+  appears anyway, with a Next. Separately, the Input step only moved on when
+  the microphone selection changed, so anyone who declined the microphone
+  prompt had nothing to pick and nowhere to go; it has a Next too.
 
 ## [1.3.0] — 2026-09-16
 

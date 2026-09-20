@@ -57,7 +57,7 @@ _register_fonts()
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
-GUIDE_VERSION = '1.3.0'
+GUIDE_VERSION = '1.3.1'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
@@ -1255,7 +1255,11 @@ def build(out_path: Path):
         ('Blur',
          'Edge softness of the bars — sharp when locked, automatically softer when way out of tune. This sets the ceiling on that softness.'),
         ('Speed',
-         'How fast the strobe reacts: 0.5× / 1× / 2× / 3× / 5×. Higher = livelier, lower = calmer / easier to read.'),
+         'Drift rate, as a multiple of a conventional strobe: 0.5× / 1× / 2× / 5× / 10×. '
+         '<b>1× is a real strobe</b> — the pattern turns once a second for every hertz the '
+         'note is out, which is the reading itself. Go above it to make a small error on a '
+         'high partial obvious; below it for low notes, where a conventional strobe already '
+         'moves faster than the eye wants.'),
     ], s))
 
     story.append(Paragraph('Accessibility Options', s['h2']))
