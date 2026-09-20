@@ -109,3 +109,81 @@ export function migrateStrobeSpeed(old: number): number {
     Math.abs(s - conventional) < Math.abs(best - conventional) ? s : best,
   );
 }
+
+/**
+ * How unsteady a pitch is, which is what a strobe's bar sharpness has always
+ * meant.
+ *
+ * Three things a strobe band tells you at once, and they are independent:
+ * contrast is how strong the partial is, movement is how far off the pitch
+ * is and in which direction, and sharpness is how much the pitch is moving
+ * about while you watch it. V-Tune had the first two and used blur for a
+ * fourth thing — distance from the target — which the movement already says,
+ * and which meant the bars washed out exactly when you most needed to read
+ * them.
+ *
+ * Unsteadiness is the more useful signal, and on a handpan it is diagnostic:
+ * a note that warbles has partials beating against each other or a note field
+ * fighting itself, and a tuner needs to see that. A note 40 cents flat but
+ * rock-steady is a clean hammer adjustment and should stay crisp while it
+ * slides; a note dead on pitch but wobbling should not look healthy.
+ *
+ * Measured as mean absolute deviation about the *median* rather than a
+ * standard deviation: a strike's attack throws the odd wild reading, and the
+ * median shrugs those off where a mean would let one of them fuzz the band.
+ */
+
+/** Readings kept per band. Nine at ~60fps is about 150ms — long enough to
+ *  see a warble, short enough to settle quickly once the note steadies. */
+const JITTER_WINDOW = 9;
+
+/** Deviation at which the bars are fully washed out. A steady note sits far
+ *  inside a cent; a warbling one swings several. */
+const JITTER_FULL_CENTS = 6;
+
+/** EMA on the measure itself, so the bars breathe rather than flicker. */
+const JITTER_SMOOTHING = 0.88;
+
+export class PitchJitter {
+  private readonly buf = new Map<string, number[]>();
+  private readonly level = new Map<string, number>();
+
+  /** Forget a band's history. Call on a fresh strike, so the steadiness of
+   *  the note before it can't vouch for this one. */
+  reset(id: string): void {
+    this.buf.delete(id);
+    this.level.delete(id);
+  }
+
+  /** Feed one cents reading; returns the band's unsteadiness, 0 to 1. */
+  push(id: string, cents: number): number {
+    let b = this.buf.get(id);
+    if (!b) {
+      b = [];
+      this.buf.set(id, b);
+    }
+    b.push(cents);
+    if (b.length > JITTER_WINDOW) b.shift();
+
+    let level = this.level.get(id) ?? 0;
+    // Below three readings there is no spread worth calling a measurement;
+    // hold whatever we had rather than reporting a confident zero.
+    if (b.length >= 3) {
+      const sorted = [...b].sort((x, y) => x - y);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      let dev = 0;
+      for (const c of b) dev += Math.abs(c - median);
+      const mad = dev / b.length;
+      const target = Math.min(1, mad / JITTER_FULL_CENTS);
+      level = level * JITTER_SMOOTHING + target * (1 - JITTER_SMOOTHING);
+      this.level.set(id, level);
+    }
+    return level;
+  }
+
+  /** The current value without feeding a reading — for frames where the
+   *  band has no confident signal and the last look should simply persist. */
+  peek(id: string): number {
+    return this.level.get(id) ?? 0;
+  }
+}

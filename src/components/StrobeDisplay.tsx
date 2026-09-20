@@ -3,7 +3,7 @@ import { useTunerStore } from '../store/tunerStore';
 import { getDisplayName, formatHz } from '../utils/notes';
 import { playTone, stopTone, playBeep } from '../audio/PitchPipe';
 import { micLiveness, mixRgba, type Rgba } from './bgSignal';
-import { frameDelta, strobeAdvanceFromPhaseDelta } from '../utils/strobe';
+import { frameDelta, strobeAdvanceFromPhaseDelta, PitchJitter } from '../utils/strobe';
 import { getAudioContext } from '../audio/AudioEngine';
 
 // How long the colour + cents readout stays on screen after signal drops
@@ -52,6 +52,8 @@ export function StrobeDisplay() {
   const bgDarkRef = useRef(0);
   const frameMaxAmpRef = useRef(0);
   const medianBufferRef = useRef<Map<string, number[]>>(new Map());
+  // Pitch unsteadiness per band — what drives how sharp the bars look.
+  const jitterRef = useRef(new PitchJitter());
   const lastSignalTimeRef = useRef<Map<string, number>>(new Map());
   const inTuneStateRef = useRef<Map<string, boolean>>(new Map());
   // Tracks when the band first "wanted" to change state — debounces flips
@@ -328,6 +330,7 @@ export function StrobeDisplay() {
         smoothedFillRef.current.delete(band.id);
         readoutCentsRef.current.delete(band.id);
         medianBufferRef.current.set(band.id, []);
+        jitterRef.current.reset(band.id);
         inTuneStateRef.current.set(band.id, false);
         inTuneChangeStartRef.current.delete(band.id);
         // Pitch-pipe beep mode: fire one reference beep per fresh strike.
@@ -349,10 +352,17 @@ export function StrobeDisplay() {
         medianBufferRef.current.set(band.id, []);
       }
       const buf = medianBufferRef.current.get(band.id)!;
-      if (signalPresent && band.magnitude > magThreshold) {
+      const confident = signalPresent && band.magnitude > magThreshold;
+      if (confident) {
         buf.push(centsOff);
         if (buf.length > 7) buf.shift();
       }
+      // Unsteadiness is measured from the raw per-frame reading, not the
+      // smoothed one — smoothing is there to calm the readout, and would
+      // iron flat the very wobble this is trying to see.
+      const jitter = confident
+        ? jitterRef.current.push(band.id, centsOff)
+        : jitterRef.current.peek(band.id);
       const medianCents = buf.length > 0
         ? [...buf].sort((a, b) => a - b)[Math.floor(buf.length / 2)]
         : centsOff;
@@ -460,16 +470,18 @@ export function StrobeDisplay() {
       if (displayedAmp > 0.01) {
         // Alternating colored / black rectangles. Each "cycle" is barWidth
         // wide and split 50/50 between a coloured bar and a black gap.
-        // Edge blur scales with how far off pitch we are: a slight feather
-        // even when locked, ramping to a heavy wash that nearly merges
-        // adjacent bars when way out (LinoTune-style). The BLUR slider
-        // (strobeSoftness) scales the whole range, so BLUR=0 keeps bars crisp.
+        // Edge blur tracks how UNSTEADY the pitch is, not how far off it is:
+        // the movement already says how far off, and blurring on distance
+        // washed the bars out exactly when they most needed reading. A note
+        // well flat but rock-steady now stays crisp while it slides; one
+        // sitting on pitch but warbling goes soft, which is the warning it
+        // should be. The BLUR slider (strobeSoftness) scales the whole
+        // range, so BLUR=0 keeps bars crisp regardless.
         const barAlpha = Math.min(1, displayedAmp * strobeIntensity);
         ctx.fillStyle = `hsla(${color.h}, ${color.s}%, ${color.l}%, ${barAlpha})`;
         const bw = barWidth * 0.5;
 
-        const FADE_RANGE = 60; // cents past tolerance over which blur reaches max
-        const fadeT = Math.max(0, Math.min(1, (Math.abs(smoothedCents) - tolerance) / FADE_RANGE));
+        const fadeT = jitter;
         const minBlur = Math.min(1.8, barWidth * 0.05) * strobeSoftness; // slight feather in tune
         const maxBlur = Math.min(40, barWidth * 0.6) * strobeSoftness;   // near-merge when way off
         const blurPx = minBlur + (maxBlur - minBlur) * fadeT;

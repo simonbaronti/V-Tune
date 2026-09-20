@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTunerStore, ISO_COLORS, type IsolationWindow } from '../store/tunerStore';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
-import { frameDelta, strobeAdvanceFromHz } from '../utils/strobe';
+import { frameDelta, strobeAdvanceFromHz, PitchJitter } from '../utils/strobe';
 import { micLiveness, mixRgba, isoRefinedFreq } from './bgSignal';
 
 // Must match the analysis hop in public/audio-worklet-processor.js so the
@@ -57,6 +57,8 @@ function IsolationBandItem({
   const accumulatedPhaseRef = useRef(0);
   // See StrobeDisplay: the bars advance in real seconds, not per frame.
   const lastFrameRef = useRef<number | null>(null);
+  // ...and their sharpness tracks pitch unsteadiness, same as the main bands.
+  const jitterRef = useRef(new PitchJitter());
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -164,9 +166,20 @@ function IsolationBandItem({
         const bw = barWidth * 0.5;
         ctx.fillStyle = `hsla(${colorHue}, ${colorSat}%, ${colorLight}%, ${Math.min(1, intensity)})`;
 
-        const FADE_RANGE = 50;
+        // Sharpness follows how unsteady the peak's pitch is, matching the
+        // main strobe bands — an isolated partial that warbles is exactly
+        // the thing you bracketed a window around to look at.
+        //
+        // Measured against the reference pitch, not the nearest note: a peak
+        // wandering across the midpoint between two notes flips its
+        // nearest-note cents from +50 to -50, and feeding that in would read
+        // a boundary crossing as a violent wobble. Distance from a fixed
+        // anchor has no such seam, and its spread is the same quantity.
+        const fadeT = jitterRef.current.push(
+          iso.id,
+          1200 * Math.log2((peakFreq as number) / refFreq),
+        );
         const minSoft = Math.min(0.05, softness);
-        const fadeT = Math.max(0, Math.min(1, (absCents - tolNow) / FADE_RANGE));
         const effectiveSoft = minSoft + (softness - minSoft) * fadeT;
         const blurPx = effectiveSoft * Math.min(10, barWidth * 0.25);
 

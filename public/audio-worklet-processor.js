@@ -230,13 +230,23 @@ class TunerProcessor extends AudioWorkletProcessor {
       if (magnitudes[i] > threshold &&
           magnitudes[i] > magnitudes[i - 1] &&
           magnitudes[i] > magnitudes[i + 1]) {
-        // Parabolic interpolation for sub-bin accuracy
-        const alpha = magnitudes[i - 1];
-        const beta = magnitudes[i];
-        const gamma = magnitudes[i + 1];
-        const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
+        // Parabolic interpolation for sub-bin accuracy, fitted to the LOG
+        // magnitudes. A window's mainlobe is bell-shaped in dB, not in
+        // linear amplitude, so fitting a parabola to the raw magnitudes
+        // biases the vertex toward the centre bin — a systematic pull of a
+        // few hundredths of a bin, always in the same direction, which at
+        // these buffer lengths is a fraction of a hertz that never averages
+        // out. In the log domain the fit matches the shape it is modelling.
+        const EPS = 1e-12; // keeps log() finite on a zeroed bin
+        const alpha = Math.log(magnitudes[i - 1] + EPS);
+        const beta = Math.log(magnitudes[i] + EPS);
+        const gamma = Math.log(magnitudes[i + 1] + EPS);
+        const denom = alpha - 2 * beta + gamma;
+        // denom === 0 means the three points are collinear — no vertex to
+        // find, so take the bin centre rather than dividing by zero.
+        const p = denom !== 0 ? (0.5 * (alpha - gamma)) / denom : 0;
         const freq = (i + p) * binWidth;
-        const mag = beta - 0.25 * (alpha - gamma) * p;
+        const mag = Math.exp(beta - 0.25 * (alpha - gamma) * p);
         peaks.push({ freq, magnitude: mag, db: 20 * Math.log10(mag / maxMag) });
       }
     }
