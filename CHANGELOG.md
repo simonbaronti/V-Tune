@@ -4,6 +4,28 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **The strobe Speed control is now a multiple of a conventional strobe.**
+  A mechanical strobe drifts its pattern one turn per second for every hertz
+  a note is out, and that is what other tuners mean by the number — LinoTune
+  defines its roll speed "relative to a conventional strobe". V-Tune's did
+  not: the old numbers came out around a third of a real strobe, so the
+  fastest setting read roughly normal and the obvious request was for
+  something faster. The presets are now 0.5x, 1x, 2x, 5x and 10x, 1x being
+  the real thing, which also puts the top of the range where LinoTune's is.
+  A Speed you had chosen is converted to its closest equivalent.
+
+### Fixed
+- **The strobe ran at the speed of your screen.** Drift was added once per
+  animation frame with no reference to elapsed time, so the same note on the
+  same instrument, equally out of tune, drifted twice as fast on a 120 Hz
+  ProMotion iPhone as on a 60 Hz phone — and neither matched what the number
+  on the button claimed. It is now integrated against real elapsed time, so
+  every device reads the same. The isolation bands carried their own copy of
+  the same formula and had the same fault; both now share one definition.
+
 ## [1.3.0] — 2026-09-16
 
 ### Added

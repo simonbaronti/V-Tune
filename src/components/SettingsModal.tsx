@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTunerStore } from '../store/tunerStore';
+import { STROBE_SPEEDS } from '../utils/strobe';
 import { useProStore } from '../pro/proStore';
 import { Capacitor } from '@capacitor/core';
 import { enumerateDevices, setMicGainDb, startAudio, stopAudio } from '../audio/AudioEngine';
@@ -367,8 +368,11 @@ export function SettingsModal() {
               </span>
             </Row>
 
-            <Row title="Speed" description="How fast the strobe pattern reacts">
-              {[0.5, 1, 2, 3, 5].map((s) => (
+            <Row
+              title="Speed"
+              description="Drift rate, as a multiple of a conventional strobe. 1x is the real thing"
+            >
+              {STROBE_SPEEDS.map((s) => (
                 <button
                   key={s}
                   onClick={() => useTunerStore.getState().setStrobeSpeed(s)}

@@ -3,6 +3,8 @@ import { useTunerStore } from '../store/tunerStore';
 import { getDisplayName, formatHz } from '../utils/notes';
 import { playTone, stopTone, playBeep } from '../audio/PitchPipe';
 import { micLiveness, mixRgba, type Rgba } from './bgSignal';
+import { frameDelta, strobeAdvanceFromPhaseDelta } from '../utils/strobe';
+import { getAudioContext } from '../audio/AudioEngine';
 
 // How long the colour + cents readout stays on screen after signal drops
 const HOLD_MS = 3500;
@@ -30,6 +32,10 @@ export function StrobeDisplay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const accumulatedPhasesRef = useRef<Map<string, number>>(new Map());
+  // Timestamp of the previous frame, so the strobe advances in real seconds
+  // rather than once per frame — the latter made the drift rate a function
+  // of the display's refresh rate. Null until the first frame has been seen.
+  const lastFrameRef = useRef<number | null>(null);
   const smoothedCentsRef = useRef<Map<string, number>>(new Map());
   // Eased 0..1 "locked" amount per band — fades the dark-green background
   // wash in/out. Driven by the debounced isInTune state (not raw cents), so
@@ -257,6 +263,9 @@ export function StrobeDisplay() {
     const { bandHeight, startY } = getBandLayout(h, numBands);
     const signalPresent = rmsLevel > 0.005;
     const now = performance.now();
+    const dt = frameDelta(now, lastFrameRef.current);
+    lastFrameRef.current = now;
+    const sampleRate = getAudioContext()?.sampleRate ?? 44100;
 
     for (let i = 0; i < numBands; i++) {
       const band = bands[i];
@@ -267,7 +276,9 @@ export function StrobeDisplay() {
         accumulatedPhasesRef.current.set(band.id, 0);
       }
       const prevPhase = accumulatedPhasesRef.current.get(band.id)!;
-      const newPhase = prevPhase + band.phaseDelta * 0.5 * strobeSpeed;
+      const newPhase =
+        prevPhase +
+        strobeAdvanceFromPhaseDelta(band.phaseDelta, sampleRate, strobeSpeed, dt);
       accumulatedPhasesRef.current.set(band.id, newPhase);
 
       const amplitude = Math.min(1, band.magnitude * 50);

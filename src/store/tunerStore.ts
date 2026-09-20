@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { noteToFrequency, NOTE_NAMES, type NoteInfo, type NoteNaming } from '../utils/notes';
+import { migrateStrobeSpeed } from '../utils/strobe';
 
 export interface BandConfig {
   id: string;
@@ -802,7 +803,7 @@ export const useTunerStore = create<TunerState>()(
       // every "wait, why did this reset?" setting is sticky.
       // ─────────────────────────────────────────────────────────────────
       name: 'v-tune-store',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
 
       // → v3: new default experience — Spectrum Analyser on with two
@@ -821,6 +822,16 @@ export const useTunerStore = create<TunerState>()(
               ...iso,
               colorIndex: iso.colorIndex ?? (i % ISO_COLORS.length),
             }));
+          }
+        }
+        // → v4: Speed became a multiple of a conventional strobe. The old
+        // numbers counted animation frames, so they meant different drift
+        // rates on 60 Hz and 120 Hz displays and ran about a third of a real
+        // strobe on the common case. Convert rather than reset, so a
+        // deliberate choice survives.
+        if (version < 4) {
+          if (typeof s.strobeSpeed === 'number') {
+            s.strobeSpeed = migrateStrobeSpeed(s.strobeSpeed);
           }
         }
         return s;

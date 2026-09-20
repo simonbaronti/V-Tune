@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useTunerStore, ISO_COLORS, type IsolationWindow } from '../store/tunerStore';
 import { frequencyToNote, getDisplayName } from '../utils/notes';
-import { getAudioContext } from '../audio/AudioEngine';
+import { frameDelta, strobeAdvanceFromHz } from '../utils/strobe';
 import { micLiveness, mixRgba, isoRefinedFreq } from './bgSignal';
 
 // Must match the analysis hop in public/audio-worklet-processor.js so the
 // isolation band's strobe motion uses the exact same phase-rate physics as
 // the main strobe bands (which read phaseDelta straight from the worklet).
-const HOP_SIZE = 512;
 
 /**
  * Row of strobe-style tuning bands, one per active spectrum-analyser
@@ -56,6 +55,8 @@ function IsolationBandItem({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef(0);
   const accumulatedPhaseRef = useRef(0);
+  // See StrobeDisplay: the bars advance in real seconds, not per frame.
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,6 +68,11 @@ function IsolationBandItem({
         animRef.current = requestAnimationFrame(draw);
         return;
       }
+
+      // Taken before any of the early returns below, so a frame that bails
+      // out doesn't hand its elapsed time to the next one to integrate twice.
+      const dt = frameDelta(performance.now(), lastFrameRef.current);
+      lastFrameRef.current = performance.now();
 
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
@@ -136,22 +142,18 @@ function IsolationBandItem({
       ctx.fillStyle = PAL.bg;
       ctx.fillRect(0, 0, w, h);
 
-      // Phase animation — IDENTICAL physics to the main strobe bands.
-      // The main bands advance by the worklet's measured phase rate:
-      //   phaseDelta = 2π · (signalHz − targetHz) · hopSize / sampleRate
-      //   phase += phaseDelta · 0.5 · strobeSpeed   (per frame)
-      // We reproduce that here from the isolation peak's Hz error against
-      // its nearest ET note. This makes the bar motion (a) scale with the
-      // real Hz detuning so it speeds up the further out of tune you are,
-      // (b) be frequency-aware (a given cents error drifts faster at high
-      // notes than low), and (c) run frame-based like the main strobe —
-      // replacing the old frequency-independent cents·0.05·dt proxy that
-      // read slow and barely changed with sharpness/flatness.
-      const sampleRate = getAudioContext()?.sampleRate ?? 44100;
+      // Phase animation — IDENTICAL physics to the main strobe bands, and
+      // now in the same units: at speed 1 the bars drift one cycle per second
+      // per Hz of error, which is what a conventional strobe does. Driving it
+      // from the peak's Hz error against its nearest ET note keeps the motion
+      // scaled to the real detuning and frequency-aware — a given cents error
+      // drifts faster at high notes than low, exactly as on the main bands.
       if (active && peakFreq !== null) {
-        const freqError = peakFreq - nearestNoteFreq;
-        const phaseDelta = (2 * Math.PI * freqError * HOP_SIZE) / sampleRate;
-        accumulatedPhaseRef.current += phaseDelta * 0.5 * speed;
+        accumulatedPhaseRef.current += strobeAdvanceFromHz(
+          peakFreq - nearestNoteFreq,
+          speed,
+          dt,
+        );
       }
       const phase = accumulatedPhaseRef.current;
 
