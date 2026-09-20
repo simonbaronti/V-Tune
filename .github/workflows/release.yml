@@ -15,9 +15,11 @@
 #                      workflow file from the commit that triggered it.
 #   ios              → fastlane: builds the Capacitor app, uploads to
 #                      TestFlight, submits for beta review + external group.
-#                      Does NOT gate `publish` — an Apple-side hiccup must not
-#                      block the desktop/Android release. Re-run just this job
-#                      from the Actions UI if it fails.
+#                      Does NOT gate `publish`, and does NOT fail the run —
+#                      it fails every release at get_provisioning_profile
+#                      while signing is manual, and a release that is red
+#                      every time teaches you to ignore the red. A failure
+#                      still shows as a warning in the run summary.
 #   publish          → attaches the user-guide PDF, then publishes (un-drafts)
 #
 # The desktop apps poll
@@ -355,7 +357,15 @@ jobs:
         run: |
           printf '%s' "$CERT_B64" | base64 -d > "$RUNNER_TEMP/ios-dist.p12"
 
+      # continue-on-error, plus the warning below, rather than letting this
+      # fail the run. It fails every single release at get_provisioning_profile
+      # — "Could not find a matching code signing identity for type 'AppStore'"
+      # — because the distribution certificate is in secrets but no matching
+      # App Store profile is, and iOS ships by a manual Xcode archive anyway.
+      # A red cross on every release trains you to ignore the one that matters.
       - name: Build + upload to TestFlight (fastlane)
+        id: fastlane
+        continue-on-error: true
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
@@ -368,6 +378,17 @@ jobs:
         run: |
           export IOS_DIST_CERT_P12_PATH="$RUNNER_TEMP/ios-dist.p12"
           bundle exec fastlane ios beta
+
+      # Keep the outcome visible. The run goes green because iOS gates
+      # nothing, but a failure still shows up in the summary rather than
+      # being silently swallowed.
+      - name: Say whether iOS shipped
+        run: |
+          if [ "${{ steps.fastlane.outcome }}" = "failure" ]; then
+            echo "::warning title=iOS not uploaded::fastlane did not upload $GITHUB_REF_NAME to TestFlight. Expected while signing is manual — archive from Xcode (npm run cap:ios, then Product > Archive). Check the log above if it failed for some other reason."
+          else
+            echo "iOS uploaded to TestFlight."
+          fi
 
   # ───────────────────────────────────────────────────────────────────
   # Publish — attach the user guide, then un-draft the release.
