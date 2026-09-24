@@ -31,8 +31,10 @@ against its own target instead.
   stored or transmitted. No ads, no analytics. Tuning works fully offline.
 - Platforms: iPhone/iPad (App Store), Android (direct APK), macOS 11+,
   Windows 10/11, Linux (AppImage/.deb), and browsers including Safari 16.4+.
-- Built-in scales: Kurd, Amara, Pygmy, Low Pygmy, Aegean, Ashakiran,
-  Aavartan, Equinox, Nordlys — plus chromatic and a typed target in hertz.
+- Built-in scales: Kurd, Amara (also known as Celtic in the handpan
+  community), Pygmy, Low Pygmy, Aegean, Ashakiran, Aavartan, Equinox,
+  Nordlys — plus chromatic and a typed target in hertz. More are added
+  over time.
 
 ## Pages
 
