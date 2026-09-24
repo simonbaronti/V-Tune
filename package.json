@@ -23,7 +23,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "tauri:build:mac": "set -a && . ./src-tauri/.env.notarize && set +a && tauri build --target universal-apple-darwin"
+    "tauri:build:mac": "set -a && . ./src-tauri/.env.notarize && set +a && tauri build --target universal-apple-darwin",
+    "guide": "python3 docs/build-guide.py && python3 docs/build-guide.py --lang es",
+    "guide:strings": "python3 docs/build-guide.py --collect"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",

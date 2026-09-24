@@ -72,6 +72,7 @@
         link('/#download', 'Download') +
         link('/pricing.html', 'Pricing') +
         link('/V-Tune-User-Guide.pdf', 'User Guide') +
+        link('/V-Tune-User-Guide-ES.pdf', 'Guía (ES)') +
         link('/terms.html', 'Terms') +
         link('/privacy.html', 'Privacy') +
         link('/refunds.html', 'Refunds') +

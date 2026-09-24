@@ -11,6 +11,9 @@ accent headings, mono band labels — so it reads as a companion to the
 app rather than a generic Word-style doc.
 """
 
+import json
+import os
+import sys
 from pathlib import Path
 
 from reportlab.lib.colors import HexColor, Color
@@ -54,6 +57,65 @@ def _register_fonts():
 
 
 _register_fonts()
+
+
+# ── Languages ─────────────────────────────────────────────────────────
+# The English text in this file is the source of truth. A translation is a
+# JSON map from the exact English string to its replacement, in
+# docs/guide-strings.<lang>.json.
+#
+# Rather than thread a language argument through 166 Paragraph calls, the
+# name `Paragraph` is shadowed below with a wrapper that translates on the
+# way through. One interception point, no call sites to keep in step, and no
+# way for a new paragraph to be added later and quietly skip translation.
+#
+# Two rules the translations follow, both worth knowing before editing one:
+#
+#   - Anything the app actually prints on screen stays in English, because
+#     the app is English-only and the reader is looking at it while they
+#     read this. So the guide says BRIGHT, TAIL, Let's Go — and explains
+#     them in the target language around the untouched label.
+#   - Markup inside a string (<b>, <font>, &nbsp;) has to survive intact.
+#     It is ReportLab markup, not content.
+LANG = 'en'
+
+# Contents-page column split, per language. The total is the 160mm of text
+# width; a language whose section titles run long takes more of it from the
+# descriptions, which have slack.
+TOC_COLUMNS_MM = {
+    'en': [60 * mm, 100 * mm],
+    'es': [66 * mm, 94 * mm],
+}
+TOC_GUTTER = 8  # points between the two columns
+_CATALOGUE = {}
+_COLLECT = False
+_COLLECTED = []
+_MISSING = []
+
+
+def tr(text):
+    """One user-facing string, in the language being built."""
+    if _COLLECT and text not in _COLLECTED:
+        _COLLECTED.append(text)
+    if LANG == 'en':
+        return text
+    hit = _CATALOGUE.get(text)
+    if hit:
+        return hit
+    # Fall back to English and say so. A guide with one English paragraph in
+    # it is a bug to fix; a guide with a blank space where a paragraph was
+    # is a bug nobody notices until a reader does.
+    if text not in _MISSING:
+        _MISSING.append(text)
+    return text
+
+
+_Paragraph = Paragraph
+
+
+def Paragraph(text, style, **kw):  # noqa: F811 — deliberate shadow, see above
+    return _Paragraph(tr(text), style, **kw)
+
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
@@ -109,9 +171,9 @@ def paint_background(canv: rl_canvas.Canvas, doc):
     # Header label (small, dim)
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 7.5)
-    canv.drawString(MARGIN, PAGE_H - 9 * mm, 'V-TUNE — USER GUIDE')
+    canv.drawString(MARGIN, PAGE_H - 9 * mm, tr('V-TUNE — USER GUIDE'))
     canv.drawRightString(PAGE_W - MARGIN, PAGE_H - 9 * mm,
-                         'Precision strobe tuner for handpans')
+                         tr('Precision strobe tuner for handpans'))
 
     # Bottom rule + page number
     canv.setStrokeColor(BORDER)
@@ -141,14 +203,14 @@ def paint_cover(canv: rl_canvas.Canvas, doc):
 
     canv.setFillColor(CYAN)
     canv.setFont('V-Sans', 16)
-    canv.drawString(MARGIN, PAGE_H - 70 * mm, 'User Guide')
+    canv.drawString(MARGIN, PAGE_H - 70 * mm, tr('User Guide'))
 
     canv.setFillColor(TEXT_SEC)
     canv.setFont('V-Sans', 11)
     canv.drawString(MARGIN, PAGE_H - 80 * mm,
-                    'A precision strobe tuner for handpans')
+                    tr('A precision strobe tuner for handpans'))
     canv.drawString(MARGIN, PAGE_H - 86 * mm,
-                    'and other multi-modal instruments.')
+                    tr('and other multi-modal instruments.'))
 
     # ── Hero strobe display — fills the centre, mimics the real UI ───────
     # (note, frequency, multiplier, cents, colour)
@@ -212,15 +274,15 @@ def paint_cover(canv: rl_canvas.Canvas, doc):
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 9)
     canv.drawString(MARGIN, stripe_bottom - 16,
-                    'The three-band strobe display — still + green when locked, '
-                    'drifting + red when out of tune.')
+                    tr('The three-band strobe display — still + green when locked, '
+                       'drifting + red when out of tune.'))
 
     # ── Footer (clear of the hero) ──────────────────────────────────────
     canv.setFillColor(TEXT_DIM)
     canv.setFont('V-Sans', 8)
     canv.drawString(MARGIN, 7 * mm, f'{SITE}  ·  v{GUIDE_VERSION}')
     canv.drawRightString(PAGE_W - MARGIN, 7 * mm,
-                         'FFT peak detection + phase-rate Goertzel analysis')
+                         tr('FFT peak detection + phase-rate Goertzel analysis'))
 
     canv.restoreState()
 
@@ -383,8 +445,8 @@ def para(text, style):
 
 def bullets(items, styles):
     return [
-        Paragraph(f'<font color="#06b6d4">•</font>&nbsp;&nbsp;{t}',
-                  styles['bullet'])
+        _Paragraph(f'<font color="#06b6d4">•</font>&nbsp;&nbsp;{tr(t)}',
+                   styles['bullet'])
         for t in items
     ]
 
@@ -393,8 +455,8 @@ def feature_row(name, desc, styles):
     """Two-column row used in settings tables: label on the left in
     mono-ish, description on the right in body."""
     return [
-        Paragraph(f'<b>{name}</b>', styles['body']),
-        Paragraph(desc, styles['body_secondary']),
+        _Paragraph(f'<b>{tr(name)}</b>', styles['body']),
+        _Paragraph(tr(desc), styles['body_secondary']),
     ]
 
 
@@ -473,12 +535,18 @@ def build(out_path: Path):
         row = Table(
             [[Paragraph(left, s['toc']),
               Paragraph(f'<font color="#a8a8b8">{right}</font>', s['toc'])]],
-            colWidths=[60 * mm, 100 * mm], hAlign='LEFT',
+            # The two columns had no gutter between them at all, which
+            # English got away with because its section titles are short.
+            # Translations are not so lucky — Spanish runs the title right up
+            # against the description. A gutter fixes it for every language,
+            # and the split widens where the titles need it.
+            colWidths=TOC_COLUMNS_MM.get(LANG, TOC_COLUMNS_MM['en']), hAlign='LEFT',
         )
         row.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (0, -1), TOC_GUTTER),
+            ('RIGHTPADDING', (1, 0), (1, -1), 0),
             ('TOPPADDING', (0, 0), (-1, -1), 1),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
@@ -694,10 +762,13 @@ def build(out_path: Path):
     ))
     story.append(Paragraph(
         'The bars are green in tune and red out of tune, and their '
-        '<i>blur</i> tracks how far off you are: crisp and sharp when locked, '
-        'blurring more the further out of tune you drift (and during the '
-        'unstable attack transient of a fresh strike). Settings <font name="V-Sym">→</font> Blur sets '
-        'the ceiling on that softness.',
+        '<i>sharpness</i> tracks how <i>steady</i> the pitch is — not how far off '
+        'it is, which the movement already tells you. A note well flat but '
+        'rock-steady stays crisp while it slides; a note sitting on pitch but '
+        'warbling goes soft, which is the warning it should be. On a handpan a '
+        'warble usually means partials beating against each other, so it is '
+        'worth seeing. Expect softness during the attack of a fresh strike too, '
+        'before the pitch settles. Settings <font name="V-Sym">→</font> Blur sets the ceiling on it.',
         s['body_secondary'],
     ))
 
@@ -1253,7 +1324,9 @@ def build(out_path: Path):
         ('Brightness',
          'How vivid the red/green strobe bars are. Lower for ambient lighting, higher for stage / sunlight.'),
         ('Blur',
-         'Edge softness of the bars — sharp when locked, automatically softer when way out of tune. This sets the ceiling on that softness.'),
+         'Edge softness of the bars. They soften as the pitch becomes <b>unsteady</b>, '
+         'not as it goes further out of tune — a steady note stays crisp however flat '
+         'it is. This sets the ceiling on that softness; at 0 the bars stay sharp always.'),
         ('Speed',
          'Drift rate, as a multiple of a conventional strobe: 0.5× / 1× / 2× / 5× / 10×. '
          '<b>1× is a real strobe</b> — the pattern turns once a second for every hertz the '
@@ -1492,8 +1565,73 @@ def build(out_path: Path):
     doc.build(story)
 
 
+def _load_catalogue(here, lang):
+    path = here / f'guide-strings.{lang}.json'
+    if not path.exists():
+        raise SystemExit(
+            f'No translation catalogue at {path}.\n'
+            f'Build it with:  python3 docs/build-guide.py --collect'
+        )
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
 if __name__ == '__main__':
     here = Path(__file__).resolve().parent
-    out = here / 'V-Tune-User-Guide.pdf'
+    args = sys.argv[1:]
+
+    # --collect walks the whole guide and writes out every string that asked
+    # to be translated, in the order a reader meets them. Run it after any
+    # edit to the English text: new strings appear as empty values, so what
+    # needs translating is whatever is still empty.
+    if '--collect' in args:
+        _COLLECT = True
+        build(Path(os.devnull))
+        out = here / 'guide-strings.pot.json'
+        existing = {}
+        for lang_file in sorted(here.glob('guide-strings.*.json')):
+            if lang_file.name.endswith('.pot.json'):
+                continue
+            existing[lang_file.stem.split('.')[-1]] = json.loads(
+                lang_file.read_text(encoding='utf-8'))
+        out.write_text(
+            json.dumps({t: '' for t in _COLLECTED}, indent=2, ensure_ascii=False),
+            encoding='utf-8')
+        print(f'Collected {len(_COLLECTED)} strings -> {out}')
+        for lang, cat in existing.items():
+            todo = [t for t in _COLLECTED if not cat.get(t)]
+            gone = [t for t in cat if t not in _COLLECTED]
+            print(f'  {lang}: {len(_COLLECTED) - len(todo)}/{len(_COLLECTED)} translated'
+                  + (f', {len(todo)} to do' if todo else '')
+                  + (f', {len(gone)} no longer used' if gone else ''))
+        raise SystemExit(0)
+
+    lang = 'en'
+    if '--lang' in args:
+        lang = args[args.index('--lang') + 1]
+
+    if lang != 'en':
+        LANG = lang
+        _CATALOGUE = _load_catalogue(here, lang)
+        out = here / f'V-Tune-User-Guide-{lang.upper()}.pdf'
+    else:
+        out = here / 'V-Tune-User-Guide.pdf'
+
     build(out)
     print(f'Wrote {out}  ({out.stat().st_size / 1024:.1f} KB)')
+
+    # Write straight into the site as well. These two copies drifted apart
+    # once already — vtune-app.com served the 1.2.1 guide for two releases,
+    # because the site's copy was a manual duplicate nobody remembered to
+    # refresh. Building both at once is the only version of this that stays
+    # true without anyone having to remember.
+    site = here.parent / 'landing' / out.name
+    if site.parent.is_dir():
+        site.write_bytes(out.read_bytes())
+        print(f'   and {site}')
+    if _MISSING:
+        print(f'\n  ⚠ {len(_MISSING)} string(s) fell back to English:')
+        for t in _MISSING[:8]:
+            print(f'    · {t[:88]}')
+        if len(_MISSING) > 8:
+            print(f'    … and {len(_MISSING) - 8} more')
+        print(f'  Re-run with --collect to refresh guide-strings.pot.json.')

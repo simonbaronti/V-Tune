@@ -107,7 +107,8 @@ jobs:
           | iOS | TestFlight beta: https://testflight.apple.com/join/b6pCcWQ7 |
 
           Desktop apps (macOS / Windows / Linux) update themselves in-app from here on.
-          The full [User Guide](V-Tune-User-Guide.pdf) is attached.
+          The full User Guide is attached, in [English](V-Tune-User-Guide.pdf)
+          and [Spanish](V-Tune-User-Guide-ES.pdf).
 
           - Web app: https://v-tune-handpan.vercel.app
           - Full changelog: https://github.com/simonbaronti/V-Tune/blob/main/CHANGELOG.md
@@ -442,7 +443,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" docs/V-Tune-User-Guide.pdf --clobber
+          gh release upload "$GITHUB_REF_NAME" \
+            docs/V-Tune-User-Guide.pdf \
+            docs/V-Tune-User-Guide-ES.pdf --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false
           echo "── published assets ──"
           gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name'
