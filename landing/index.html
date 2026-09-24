@@ -3,21 +3,40 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>V-Tune — Precision Strobe Tuner for Handpans</title>
+<title>Precision Strobe Tuner for Handpans — V-Tune</title>
 <meta name="description" content="V-Tune is a precision strobe tuner built for handpans and other multi-modal instruments. Read every partial independently." />
 
 <!-- Open Graph / social -->
 <meta property="og:title" content="V-Tune — Precision Strobe Tuner for Handpans" />
 <meta property="og:description" content="Read every partial of your handpan independently. Download for every platform." />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://vtune-app.com" />
+<meta property="og:url" content="https://vtune-app.com/" />
+<meta property="og:site_name" content="V-Tune" />
+<link rel="canonical" href="https://vtune-app.com/" />
 <meta name="theme-color" content="#08080c" />
 
+<!-- Favicons. The .ico is what Google's favicon crawler falls back to when
+     it can't use the declared icon, and its absence is why search results
+     showed a blank globe: an SVG-only declaration left nothing for it to
+     land on. Order matters — browsers take the last one they understand,
+     so the SVG stays last for the ones that prefer it. -->
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
 <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/site.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "V-Tune",
+  "alternateName": "V-Tune Handpan Tuner",
+  "url": "https://vtune-app.com/"
+}
+</script>
 <script src="/site.js" defer></script>
 
 <style>
