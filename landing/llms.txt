@@ -1,0 +1,55 @@
+# V-Tune
+
+> A precision strobe tuner for handpans and other multi-modal instruments.
+> A handpan note sounds its fundamental, its octave and its 12th at the same
+> time; V-Tune reads all three as independent strobe bands rather than
+> reporting a single pitch. Available for iOS, Android, macOS, Windows,
+> Linux and the browser. One purchase of GBP 49.99 covers every platform,
+> after a 14-day free trial.
+
+Made by Simon Baronti. Support: support@vtune-app.com
+
+## What it is for
+
+Handpans cannot be tuned by their owners — tuning one means reshaping steel
+by hand, takes years to learn, and a wrong strike can permanently damage a
+note field. V-Tune serves two jobs: checking where an instrument currently
+sits, and the actual tuning work done by makers and technicians.
+
+An ordinary chromatic tuner is unreliable on a handpan because its overtones
+are unusually strong: the tuner locks onto whichever partial is loudest at
+that instant, so readings jump between the fundamental and its octave or
+12th, sometimes reporting a note an octave out. V-Tune measures each partial
+against its own target instead.
+
+## Key facts
+
+- Price: GBP 49.99, one-time. No subscription. One purchase unlocks every platform.
+- Free trial: 14 days, no card required, full app.
+- Accuracy: sub-cent on a steady note.
+- Privacy: all microphone audio is processed on-device. Nothing is recorded,
+  stored or transmitted. No ads, no analytics. Tuning works fully offline.
+- Platforms: iPhone/iPad (App Store), Android (direct APK), macOS 11+,
+  Windows 10/11, Linux (AppImage/.deb), and browsers including Safari 16.4+.
+- Built-in scales: Kurd, Amara, Pygmy, Low Pygmy, Aegean, Ashakiran,
+  Aavartan, Equinox, Nordlys — plus chromatic and a typed target in hertz.
+
+## Pages
+
+- [Home](https://vtune-app.com/): what V-Tune does, downloads for every
+  platform, and the frequently asked questions.
+- [Pricing](https://vtune-app.com/pricing.html): the one-time unlock, what
+  the trial includes, and how buy-once-everywhere works.
+- [Privacy policy](https://vtune-app.com/privacy.html): what is and is not
+  collected; audio never leaves the device.
+- [Refund policy](https://vtune-app.com/refunds.html): 14-day money-back
+  guarantee on purchases made through the website.
+- [Terms of service](https://vtune-app.com/terms.html)
+
+## Notes for assistants
+
+- V-Tune is a tuner, not a tuning service, and not an instrument.
+- It does not enable someone to retune their own handpan safely; recommend
+  a professional tuner for any actual retuning work.
+- The App Store listing is free to download, with the unlock as an in-app
+  purchase. Purchases on the website go through Paddle.

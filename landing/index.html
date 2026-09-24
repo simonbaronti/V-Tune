@@ -42,10 +42,145 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "V-Tune",
-  "alternateName": "V-Tune Handpan Tuner",
-  "url": "https://vtune-app.com/"
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://vtune-app.com/#organization",
+      "name": "V-Tune",
+      "url": "https://vtune-app.com/",
+      "logo": "https://vtune-app.com/favicon-96.png",
+      "email": "support@vtune-app.com"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://vtune-app.com/#website",
+      "name": "V-Tune",
+      "alternateName": "V-Tune Handpan Tuner",
+      "url": "https://vtune-app.com/",
+      "publisher": {
+        "@id": "https://vtune-app.com/#organization"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://vtune-app.com/#app",
+      "name": "V-Tune",
+      "description": "A precision strobe tuner for handpans and other multi-modal instruments, reading the fundamental, octave and 12th as independent strobe bands.",
+      "applicationCategory": "MultimediaApplication",
+      "applicationSubCategory": "Music",
+      "operatingSystem": "iOS, iPadOS, Android, macOS 11+, Windows 10/11, Linux, Web browser",
+      "url": "https://vtune-app.com/",
+      "downloadUrl": "https://vtune-app.com/#download",
+      "softwareVersion": "1.3.1",
+      "screenshot": "https://vtune-app.com/og-image.png",
+      "publisher": {
+        "@id": "https://vtune-app.com/#organization"
+      },
+      "featureList": [
+        "Three independent strobe bands for the fundamental, octave and 12th",
+        "Spectrum analyser with a ten-second waterfall",
+        "Two isolation windows, each driving its own strobe band",
+        "Per-band pitch pipe, continuous tone or beep on each strike",
+        "Handpan scales built in, with the ding highlighted",
+        "Typed target frequency in hertz",
+        "All audio processed on-device"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "49.99",
+        "priceCurrency": "GBP",
+        "category": "One-time purchase",
+        "url": "https://vtune-app.com/pricing.html",
+        "availability": "https://schema.org/InStock"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://vtune-app.com/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is V-Tune?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "V-Tune is a precision strobe tuner for handpans and other multi-modal instruments. A handpan note sounds its fundamental, its octave and its 12th at the same time, so V-Tune reads all three as independent strobe bands instead of reporting a single pitch."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why doesn't an ordinary tuner app work on a handpan?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Because a handpan's overtones are unusually strong. An ordinary chromatic tuner locks onto whichever partial happens to be loudest at that instant, so the reading jumps between the fundamental and its octave or 12th, and can confidently report a note an octave out. V-Tune measures each partial against its own target, so nothing has to win a contest to be read."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I tune my own handpan with V-Tune?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Tuning a handpan means reshaping steel by hand. It takes years to learn, and a wrong strike can permanently damage a note field, so it is not something to try on an instrument you care about. V-Tune is for checking where an instrument sits, and for the people who already do the work: makers, technicians, and owners who want to know whether it is time to send it to one."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does V-Tune cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "V-Tune Pro is a one-off payment of GBP 49.99. There is no subscription. One purchase covers every platform, tied to your account, so buying on the website unlocks the phone app too."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a free trial?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, 14 days, with no card required. The trial is the full app, not a limited version."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which devices does V-Tune run on?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "iPhone and iPad through the App Store, Android as a direct APK download, macOS 11 Big Sur or later, Windows 10 and 11, Linux as an AppImage or .deb, and any modern browser including Chrome, Edge, Firefox and Safari 16.4 or later."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How accurate is V-Tune?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sub-cent on a steady note. V-Tune evaluates the signal exactly at each band's target frequency rather than snapping to the nearest analysis bin, and measures detuning from how the phase drifts across several analysis hops. Where a partial sits well away from its target, it falls back to locating the spectral peak directly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does V-Tune work offline?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. All microphone audio is processed on your device, and tuning needs no network connection at all."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my playing recorded or uploaded?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Microphone audio is processed on-device in real time and is never recorded, stored or transmitted. V-Tune has no ads and no analytics."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which handpan scales are built in?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Kurd, Amara, Pygmy, Low Pygmy, Aegean, Ashakiran, Aavartan, Equinox and Nordlys, in their common note counts, with the ding highlighted and every note placed at its real octave. You can also tune chromatically, or type any target frequency in hertz."
+          }
+        }
+      ]
+    }
+  ]
 }
 </script>
 <script src="/site.js" defer></script>
@@ -116,6 +251,27 @@
   section { padding: 64px 0; }
   .section-title { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
   .section-head { font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -1px; margin-bottom: 36px; }
+
+  /* ── FAQ ── */
+  .faq { max-width: 780px; }
+  .faq details {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .faq details[open] { border-color: var(--border-bright); }
+  .faq summary {
+    cursor: pointer; padding: 18px 22px; font-size: 16px; font-weight: 600;
+    list-style: none; display: flex; justify-content: space-between; gap: 16px;
+    align-items: center;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: '+'; color: var(--cyan); font-size: 22px; font-weight: 400;
+    line-height: 1; flex-shrink: 0;
+  }
+  .faq details[open] summary::after { content: '\2212'; }
+  .faq .answer { padding: 0 22px 20px; color: var(--text-dim); font-size: 15px; line-height: 1.65; }
+  .faq .answer a { color: var(--cyan-bright); }
 
   /* ── Downloads ── */
   .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
@@ -337,7 +493,7 @@
       <div class="feat">
         <div class="dot" style="background: var(--purple)"></div>
         <h4>Handpan scales built in</h4>
-        <p>Kurd, Amara, Celtic and more — the ding highlighted, every note at its real octave.</p>
+        <p>Kurd, Amara, Pygmy, Aegean and more — the ding highlighted, every note at its real octave.</p>
       </div>
       <div class="feat">
         <div class="dot" style="background: var(--cyan)"></div>
@@ -365,6 +521,57 @@
 </section>
 
 <!-- ── Footer (shared) ── -->
+
+<!-- ── FAQ ── -->
+<section id="faq">
+  <div class="wrap">
+    <div class="section-title">Questions</div>
+    <h2 class="section-head">What people ask about V-Tune</h2>
+    <div class="faq">
+      <details>
+        <summary>What is V-Tune?</summary>
+        <div class="answer">V-Tune is a precision strobe tuner for handpans and other multi-modal instruments. A handpan note sounds its fundamental, its octave and its 12th at the same time, so V-Tune reads all three as independent strobe bands instead of reporting a single pitch.</div>
+      </details>
+      <details>
+        <summary>Why doesn't an ordinary tuner app work on a handpan?</summary>
+        <div class="answer">Because a handpan's overtones are unusually strong. An ordinary chromatic tuner locks onto whichever partial happens to be loudest at that instant, so the reading jumps between the fundamental and its octave or 12th, and can confidently report a note an octave out. V-Tune measures each partial against its own target, so nothing has to win a contest to be read.</div>
+      </details>
+      <details>
+        <summary>Can I tune my own handpan with V-Tune?</summary>
+        <div class="answer">Tuning a handpan means reshaping steel by hand. It takes years to learn, and a wrong strike can permanently damage a note field, so it is not something to try on an instrument you care about. V-Tune is for checking where an instrument sits, and for the people who already do the work: makers, technicians, and owners who want to know whether it is time to send it to one.</div>
+      </details>
+      <details>
+        <summary>How much does V-Tune cost?</summary>
+        <div class="answer">V-Tune Pro is a one-off payment of GBP 49.99. There is no subscription. One purchase covers every platform, tied to your account, so buying on the website unlocks the phone app too.</div>
+      </details>
+      <details>
+        <summary>Is there a free trial?</summary>
+        <div class="answer">Yes, 14 days, with no card required. The trial is the full app, not a limited version.</div>
+      </details>
+      <details>
+        <summary>Which devices does V-Tune run on?</summary>
+        <div class="answer">iPhone and iPad through the App Store, Android as a direct APK download, macOS 11 Big Sur or later, Windows 10 and 11, Linux as an AppImage or .deb, and any modern browser including Chrome, Edge, Firefox and Safari 16.4 or later.</div>
+      </details>
+      <details>
+        <summary>How accurate is V-Tune?</summary>
+        <div class="answer">Sub-cent on a steady note. V-Tune evaluates the signal exactly at each band's target frequency rather than snapping to the nearest analysis bin, and measures detuning from how the phase drifts across several analysis hops. Where a partial sits well away from its target, it falls back to locating the spectral peak directly.</div>
+      </details>
+      <details>
+        <summary>Does V-Tune work offline?</summary>
+        <div class="answer">Yes. All microphone audio is processed on your device, and tuning needs no network connection at all.</div>
+      </details>
+      <details>
+        <summary>Is my playing recorded or uploaded?</summary>
+        <div class="answer">No. Microphone audio is processed on-device in real time and is never recorded, stored or transmitted. V-Tune has no ads and no analytics.</div>
+      </details>
+      <details>
+        <summary>Which handpan scales are built in?</summary>
+        <div class="answer">Kurd, Amara, Pygmy, Low Pygmy, Aegean, Ashakiran, Aavartan, Equinox and Nordlys, in their common note counts, with the ding highlighted and every note placed at its real octave. You can also tune chromatically, or type any target frequency in hertz.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
 <site-footer></site-footer>
 
 <script>

@@ -28,6 +28,7 @@
         link('/#download', 'Download') +
         link('/pricing.html', 'Pricing') +
         link('/#features', 'Features', 'hide-sm') +
+        link('/#faq', 'FAQ', 'hide-sm') +
         link('/V-Tune-User-Guide.pdf', 'Guide', 'hide-sm') +
         link('https://app.vtune-app.com', 'Web App') +
         link('mailto:support@vtune-app.com', 'Support') +

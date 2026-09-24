@@ -35,7 +35,7 @@ and Availability / App Privacy / This Version.
 >   beep on each strike
 > • Live note indicator — see which note your microphone is picking
 >   up on the pitch wheel, in real time
-> • Pre-saved handpan scales — Kurd, Amara, Celtic, and more — with
+> • Pre-saved handpan scales — Kurd, Amara, Pygmy, Aegean, and more — with
 >   the ding highlighted in purple
 > • Spectrum analyser with shift+drag isolation windows — bracket any
 >   peak in the spectrum and turn it into a dedicated tuning band

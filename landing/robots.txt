@@ -1,10 +1,62 @@
 # vtune-app.com
+
 User-agent: *
 Allow: /
 
-# The sign-in bounce page holds no content and would be a dead end in
-# results; /api/ is the Paddle webhook, which is not a page at all.
-Disallow: /auth-callback.html
+# /api/ is the Paddle webhook — an endpoint, not a page. The sign-in bounce
+# page is NOT disallowed here on purpose: it carries <meta name="robots"
+# content="noindex">, and a crawler has to be allowed to fetch a page in
+# order to read the noindex off it. Disallowing it would leave the URL
+# eligible to appear in results with no description, which is the outcome
+# the noindex exists to prevent.
 Disallow: /api/
+
+# ── AI assistants ────────────────────────────────────────────────────
+# Split deliberately, because these tokens do different jobs and the
+# difference is easy to get backwards:
+#
+#   retrieval bots  fetch a page to answer a question someone is asking
+#                   right now, and cite it. This is how V-Tune gets found
+#                   in ChatGPT, Claude and Perplexity. Blocking these is
+#                   the same as blocking Google.
+#   training bots   collect text to train future models. No citation, no
+#                   traffic — but a model that has read the site can answer
+#                   about it without fetching anything.
+#
+# Everything is allowed below. For a small product that needs to be
+# discovered, being absent from both is the worse outcome. To opt out of
+# training only, change the tokens in the second group to Disallow: / and
+# leave the first group alone.
+
+# Retrieval and citation
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+User-agent: Applebot
+Allow: /
+
+# Training. Google-Extended sits here but also gates Gemini grounding, so
+# disallowing it costs answer visibility as well as training.
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+User-agent: CCBot
+Allow: /
+User-agent: meta-externalagent
+Allow: /
 
 Sitemap: https://vtune-app.com/sitemap.xml
