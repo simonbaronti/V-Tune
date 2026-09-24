@@ -28,7 +28,13 @@
  *   RC_ENTITLEMENT_ID       Optional, defaults to 'pro'.
  *
  * Point Paddle at https://vtune-app.com/api/paddle-webhook and subscribe to
- * `transaction.completed` and `adjustment.created`.
+ * `transaction.completed`, `adjustment.created` AND `adjustment.updated`.
+ *
+ * `adjustment.updated` is not optional. A refund on a live account is created
+ * as `pending_approval` and only becomes `approved` when Paddle reviews it,
+ * and that decision arrives as an update. Subscribe to `created` alone and a
+ * refund will never revoke anything, because the only event you get is the
+ * one that says "somebody has asked".
  */
 import crypto from 'node:crypto';
 
@@ -81,17 +87,42 @@ const PADDLE_API = 'https://api.paddle.com';
 const MAX_SIGNATURE_AGE_S = 5 * 60;
 
 /**
- * Adjustment actions that take the unlock away.
+ * Adjustment actions that take the unlock away — once they are APPROVED.
  *
  * A chargeback costs the money and the fee, so it revokes like a refund.
  * Deliberately narrow beyond those two: `chargeback_warning` is a dispute
  * being opened rather than decided, and revoking on it would lock out a
- * customer who may well win. `credit` is a partial adjustment against an
- * invoice, not a reversal of the sale. The reversal actions
- * (`chargeback_reverse`, `credit_reverse`) mean the money came back — if
- * either ever shows up here, the entitlement needs re-granting, not revoking.
+ * customer who may well win. `credit` is an adjustment against an invoice,
+ * not a reversal of the sale.
  */
 const REVOKING_ACTIONS = new Set(['refund', 'chargeback']);
+
+/**
+ * Actions that hand the unlock back: the money returned to us.
+ *
+ * `chargeback_reverse` is a dispute we won. `credit_reverse` undoes a credit.
+ * Paddle raises these as new adjustments, and separately moves the original
+ * adjustment to status `reversed` — so a reversal can arrive by either road
+ * and both are handled. Re-granting is idempotent, so seeing both is fine.
+ */
+const RESTORING_ACTIONS = new Set(['chargeback_reverse', 'credit_reverse']);
+
+/**
+ * The status that means money has actually moved.
+ *
+ * This is the whole point of the gate. A refund on a live account is created
+ * as `pending_approval` and stays there until Paddle reviews it — which can
+ * take days, and which they may refuse. Acting on creation revoked the unlock
+ * the moment a refund was *requested*, before a penny had moved and while the
+ * customer could still be told no. Paddle then re-raises the adjustment as
+ * `adjustment.updated` carrying `approved` or `rejected`, which is the event
+ * that actually decides it.
+ *
+ * (Sandbox approves refunds automatically every ten minutes, so this reads as
+ * a short delay there rather than a wait for a human.)
+ */
+const MONEY_MOVED = 'approved';
+const REVERSED = 'reversed';
 
 /**
  * Every webhook secret we'll accept, in the order they're tried.
@@ -206,21 +237,107 @@ function revoke(appUserId, entitlement, key) {
 }
 
 /**
- * Find who a refunded transaction belonged to.
+ * Who a refunded transaction belonged to, and what they paid.
  *
  * Paddle's adjustment events carry a transaction id but not the original
  * transaction's custom_data, so the buyer's app user id has to be fetched
- * back. Needs PADDLE_API_KEY; without it refunds are logged and skipped
- * rather than failing the webhook, so the grant path can ship on its own.
+ * back. The total comes along for the ride because it is what separates a
+ * full refund from a partial one — see handleAdjustment.
+ *
+ * Needs PADDLE_API_KEY; without it refunds are logged and skipped rather
+ * than failing the webhook, so the grant path can ship on its own.
  */
-async function appUserIdForTransaction(transactionId, paddleKey) {
+async function transactionFacts(transactionId, paddleKey) {
   if (!paddleKey || !transactionId) return null;
   const res = await fetch(`${PADDLE_API}/transactions/${encodeURIComponent(transactionId)}`, {
     headers: { Authorization: `Bearer ${paddleKey}` },
   });
   if (!res.ok) return null;
   const json = await res.json().catch(() => null);
-  return json?.data?.custom_data?.app_user_id ?? null;
+  const appUserId = json?.data?.custom_data?.app_user_id ?? null;
+  if (!appUserId) return null;
+  // Minor units, as a string, same as every other Paddle amount. Null when
+  // the shape isn't what we expect — the caller treats that as "can't tell".
+  const raw = json?.data?.details?.totals?.total;
+  const total = raw === undefined || raw === null ? null : Number(raw);
+  return { appUserId, total: Number.isFinite(total) ? total : null };
+}
+
+/**
+ * Decide an adjustment, and act on it.
+ *
+ * The rules, in the order they apply:
+ *
+ *   1. A reversal gives the unlock back. Either the new `chargeback_reverse`
+ *      adjustment, or the original one moving to status `reversed`.
+ *   2. Only `refund` and `chargeback` can take it away, and only once
+ *      `approved`. A `pending_approval` refund has moved no money and may
+ *      yet be refused; a `rejected` one never will.
+ *   3. A partial refund keeps the unlock. On a one-time purchase, somebody
+ *      who was given ten pounds back still bought the thing, and taking the
+ *      app away from them would be a worse mistake than the goodwill was
+ *      worth. Full refunds revoke.
+ *
+ * Known gap on (3): several partial refunds that together add up to the
+ * whole price each look partial on their own, so none of them revokes.
+ * Catching that means summing every approved adjustment on the transaction,
+ * which is a second API call for a case that needs someone to refund the
+ * same one-off purchase twice. The partial is logged instead, so it is
+ * visible if it ever happens.
+ */
+async function handleAdjustment(data, entitlement, rcKey, paddleKey) {
+  const { action, status, transaction_id: txnId, id: adjId } = data ?? {};
+
+  const restoring =
+    RESTORING_ACTIONS.has(action) ||
+    (REVOKING_ACTIONS.has(action) && status === REVERSED);
+  const revoking = REVOKING_ACTIONS.has(action) && !restoring;
+
+  if (!restoring && !revoking) {
+    return { ok: true, ignored: `${action}/${status}` };
+  }
+
+  if (revoking && status !== MONEY_MOVED) {
+    console.log(
+      `paddle-webhook: ${action} ${adjId} on txn ${txnId} is ${status}, not ${MONEY_MOVED} — ` +
+        'leaving the unlock alone',
+    );
+    return { ok: true, skipped: `${action} is ${status}` };
+  }
+
+  const facts = await transactionFacts(txnId, paddleKey);
+  if (!facts) {
+    console.warn(
+      `paddle-webhook: ${action} on txn ${txnId} not actioned — no app_user_id ` +
+        '(set PADDLE_API_KEY to enable refund handling)',
+    );
+    return { ok: true, skipped: 'no app_user_id for adjustment' };
+  }
+
+  if (restoring) {
+    await grant(facts.appUserId, entitlement, rcKey);
+    console.log(
+      `paddle-webhook: restored ${entitlement} to ${facts.appUserId} (${action}, txn ${txnId})`,
+    );
+    return { ok: true, restored: facts.appUserId };
+  }
+
+  const refunded = Number(data?.totals?.total);
+  const partial =
+    Number.isFinite(refunded) && facts.total !== null && refunded < facts.total;
+  if (partial) {
+    console.log(
+      `paddle-webhook: partial ${action} on txn ${txnId} ` +
+        `(${refunded} of ${facts.total}) — unlock kept for ${facts.appUserId}`,
+    );
+    return { ok: true, skipped: 'partial refund' };
+  }
+
+  await revoke(facts.appUserId, entitlement, rcKey);
+  console.log(
+    `paddle-webhook: revoked ${entitlement} from ${facts.appUserId} (${action}, txn ${txnId})`,
+  );
+  return { ok: true, revoked: facts.appUserId };
 }
 
 export default async function handler(req, res) {
@@ -290,21 +407,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, granted: appUserId });
     }
 
-    if (type === 'adjustment.created' && REVOKING_ACTIONS.has(data?.action)) {
-      const appUserId = await appUserIdForTransaction(
-        data?.transaction_id,
+    // Both events, because the one that decides a refund is the update.
+    // `adjustment.created` announces a refund that has been *asked for*;
+    // `adjustment.updated` is Paddle coming back with approved or rejected.
+    if (type === 'adjustment.created' || type === 'adjustment.updated') {
+      const result = await handleAdjustment(
+        data,
+        entitlement,
+        rcKey,
         process.env.PADDLE_API_KEY,
       );
-      if (!appUserId) {
-        console.warn(
-          `paddle-webhook: ${data?.action} on txn ${data?.transaction_id} not revoked — ` +
-            'no app_user_id (set PADDLE_API_KEY to enable refund handling)',
-        );
-        return res.status(200).json({ ok: true, skipped: 'no app_user_id for adjustment' });
-      }
-      await revoke(appUserId, entitlement, rcKey);
-      console.log(`paddle-webhook: revoked ${entitlement} from ${appUserId} (${data?.action})`);
-      return res.status(200).json({ ok: true, revoked: appUserId });
+      return res.status(200).json(result);
     }
 
     // Anything else is fine, just not ours. 200 so Paddle stops retrying.
