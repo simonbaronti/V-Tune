@@ -1,0 +1,10 @@
+# vtune-app.com
+User-agent: *
+Allow: /
+
+# The sign-in bounce page holds no content and would be a dead end in
+# results; /api/ is the Paddle webhook, which is not a page at all.
+Disallow: /auth-callback.html
+Disallow: /api/
+
+Sitemap: https://vtune-app.com/sitemap.xml
