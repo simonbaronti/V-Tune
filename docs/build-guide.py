@@ -119,6 +119,12 @@ def Paragraph(text, style, **kw):  # noqa: F811 — deliberate shadow, see above
 
 # Printed on the cover — bump it whenever the guide is rebuilt for a release,
 # so a downloaded PDF says which version of the app it describes.
+# Vertical breathing room between numbered sections. They run one after
+# another with no page breaks, so this is the only thing separating them —
+# big enough to read as a break, small enough not to strand a figure on a
+# page of its own.
+SECTION_GAP = 24
+
 GUIDE_VERSION = '1.3.1'
 SITE = 'vtune-app.com'
 
@@ -325,6 +331,7 @@ def make_styles():
     s['h3'] = ParagraphStyle(
         name='h3', fontName='V-Sans-Bold', fontSize=11, leading=15,
         textColor=TEXT_PRI, spaceBefore=8, spaceAfter=2,
+        keepWithNext=1,
     )
     s['mono'] = ParagraphStyle(
         name='mono', fontName='Courier', fontSize=9.5, leading=13,
@@ -410,7 +417,9 @@ class ColorSwatch(Flowable):
         self.width = w
         self.height = h
         self.color = color
-        self.label = label
+        # Translated here rather than at draw time: the label's width decides
+        # the flowable's layout, and these labels are prose, not UI strings.
+        self.label = tr(label)
 
     def draw(self):
         c = self.canv
@@ -424,6 +433,10 @@ class ColorSwatch(Flowable):
 class HRule(Flowable):
     """Thin cyan rule used as a chapter divider."""
     def __init__(self, width, length=22, color=CYAN, thickness=0.8):
+        # A rule under a heading belongs with whatever follows it —
+        # otherwise heading, subtitle and rule can sit alone at the
+        # bottom of a page with the section's first line overleaf.
+        self.keepWithNext = True
         Flowable.__init__(self)
         self.width = width
         self.length = length
@@ -587,7 +600,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 2. Quick start ────────────────────────────────────────────────
     story.append(Paragraph('2. Quick start', s['h1']))
@@ -607,12 +620,14 @@ def build(out_path: Path):
         story.append(Spacer(1, 2))
 
     story.append(Spacer(1, 14))
-    story.append(Paragraph('Sample strobe band — in tune', s['caption']))
-    story.append(StrobeBandMockup(PAGE_W - 2 * MARGIN, 70,
-                                   note='D3', freq='146.8 Hz',
-                                   cents='+2', tuned=True))
+    story.append(KeepTogether([
+        Paragraph('Sample strobe band — in tune', s['caption']),
+        StrobeBandMockup(PAGE_W - 2 * MARGIN, 70,
+                         note='D3', freq='146.8 Hz',
+                         cents='+2', tuned=True),
+    ]))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 3. The menu & utility bar ─────────────────────────────────────
     story.append(Paragraph('3. The menu & utility bar', s['h1']))
@@ -684,7 +699,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 4. The strobe display ─────────────────────────────────────────
     story.append(Paragraph('4. The strobe display', s['h1']))
@@ -781,7 +796,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(PageBreak())
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 5. Pitch pipe ─────────────────────────────────────────────────
     story.append(Paragraph('5. The pitch pipe (♪)', s['h1']))
@@ -838,7 +853,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 6. The tuning & scale controls ────────────────────────────────
     story.append(Paragraph('6. The tuning & scale controls', s['h1']))
@@ -1009,7 +1024,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 7. Mobile quick-pick panel ────────────────────────────────────
     story.append(Paragraph('7. Mobile quick-pick panel', s['h1']))
@@ -1059,7 +1074,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 8. Spectrum Analyser + ISO ────────────────────────────────────
     story.append(Paragraph('8. Spectrum Analyser, waterfall &amp; Isolation windows', s['h1']))
@@ -1212,7 +1227,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 9. Keyboard shortcuts ─────────────────────────────────────────
     story.append(Paragraph('9. Keyboard shortcuts', s['h1']))
@@ -1261,7 +1276,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 10. Settings ──────────────────────────────────────────────────
     story.append(Paragraph('10. Settings', s['h1']))
@@ -1346,7 +1361,7 @@ def build(out_path: Path):
          '(section 12).'),
     ], s))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 11. Stopwatch ─────────────────────────────────────────────────
     story.append(Paragraph('11. Stopwatch', s['h1']))
@@ -1370,7 +1385,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 12. Theme / notation / tour ───────────────────────────────────
     story.append(Paragraph('12. Theme, notation, and the onboarding tour', s['h1']))
@@ -1427,7 +1442,7 @@ def build(out_path: Path):
         s['body'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 13. V-Tune Pro ────────────────────────────────────────────────
     story.append(Paragraph('13. V-Tune Pro', s['h1']))
@@ -1482,7 +1497,7 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, SECTION_GAP))
 
     # ── 14. Tips & troubleshooting ────────────────────────────────────
     story.append(Paragraph('14. Tips & troubleshooting', s['h1']))
