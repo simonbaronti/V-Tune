@@ -4,6 +4,43 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.2] — 2026-09-26
+
+### Changed
+- **The strobe bars now blur when the pitch is unsteady, not when it's far
+  out of tune.** A strobe band says three things at once: how strong the
+  partial is, how far off it is and which way, and how much the pitch is
+  moving about while you watch it. V-Tune had the first two and spent blur
+  on a fourth — distance from the target — which the movement already tells
+  you, so the bars washed out exactly when they most needed reading. It had
+  the diagnosis backwards both ways, too: a note well flat but rock-steady,
+  which is a clean hammer adjustment, smeared into a wash; a note sitting on
+  pitch but warbling, which usually means partials beating against each
+  other, looked perfectly healthy. A steady note now stays crisp however
+  flat it is, and a warble goes soft — which is the warning it should be.
+  BLUR still sets the ceiling, and 0 still keeps everything sharp.
+- **A Spanish user guide.** Attached to this release alongside the English
+  one, and linked from the site.
+
+### Fixed
+- **Peaks are located about ten times more accurately.** The analyser fitted
+  its interpolating curve to raw magnitudes, but a window's shape is a bell
+  in decibels, not in amplitude — which pulled every estimate the same way,
+  a bias that never averaged out. Measured against a synthetic sweep, the
+  worst case at D3 falls from 4.7 cents to 0.44. That matters when the
+  default tolerance is 5. Only affects readings where a partial sits well
+  away from its target; anything within 25 cents was already sub-cent.
+- **A refund that had only been *asked for* no longer removes the unlock.**
+  Refunds on the website are created pending Paddle's approval, which takes
+  days and which they can refuse — and the unlock was being taken away at
+  the moment of the request. It now waits for the money to actually move, a
+  rejected request costs nobody anything, and a dispute resolved in your
+  favour hands the unlock back. Partial refunds keep it: somebody given ten
+  pounds back still bought the app.
+- **The guide had been out of date on the website for two releases** —
+  vtune-app.com was serving the 1.2.1 edition, with nothing about the
+  waterfall. Both copies are now written by the same build.
+
 ## [1.3.1] — 2026-09-20
 
 ### Changed
