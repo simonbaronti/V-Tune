@@ -434,7 +434,10 @@ jobs:
             grab { print }
           ' CHANGELOG.md | sed -e 's/^### /\n/' -e 's/^- /• /' -e 's/\*\*//g' | sed '/^\[/d')
           gh release download "$GITHUB_REF_NAME" --pattern latest.json --dir /tmp --clobber
-          jq --arg notes "$NOTES" '.notes = ($notes | ltrimstr("\n"))' /tmp/latest.json > /tmp/latest.new.json
+          # sub, not ltrimstr: ltrimstr removes a single newline, and the
+          # awk above leaves two before the first heading, so the updater
+          # dialog opened on a blank line every release.
+          jq --arg notes "$NOTES" '.notes = ($notes | sub("^\n+";""))' /tmp/latest.json > /tmp/latest.new.json
           mv /tmp/latest.new.json /tmp/latest.json
           gh release upload "$GITHUB_REF_NAME" /tmp/latest.json --clobber
           echo "── latest.json notes ──"; jq -r .notes /tmp/latest.json
