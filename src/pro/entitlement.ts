@@ -132,6 +132,52 @@ async function tagCustomerEmail(userId: string, email: string | null): Promise<v
   }
 }
 
+/**
+ * Put the trial's start date on the RevenueCat customer.
+ *
+ * The trial clock is a localStorage key and nothing else, which means that
+ * from the outside there is no way to know whether somebody is on day two or
+ * day thirteen — or how many people are mid-trial at all. Most trials never
+ * create an account either, since none is required, so Supabase can't answer
+ * it and the sign-up date wouldn't be the same question anyway.
+ *
+ * RevenueCat already has a customer for every install, anonymous ones
+ * included, so attaching the date there costs nothing and makes the whole
+ * trial cohort visible and filterable.
+ *
+ * `trial_ends` is worked out when the attribute is written, not read. If
+ * TRIAL_DAYS ever changes it won't rewrite the dates already recorded —
+ * which is the honest behaviour: those people really were given the old
+ * length.
+ *
+ * Anonymous customers count here, so this is not gated on being signed in.
+ * Never allowed to throw: this is reporting, and an unreachable RevenueCat
+ * must not stop somebody tuning.
+ */
+let taggedTrialFor: string | null = null;
+
+async function tagTrialStart(appUserId: string): Promise<void> {
+  if (taggedTrialFor === appUserId) return;
+  try {
+    const started = firstRunDate();
+    const ends = new Date(started.getTime() + TRIAL_DAYS * 86_400_000);
+    const attributes = {
+      trial_started: started.toISOString(),
+      trial_ends: ends.toISOString(),
+    };
+    if (isNative) {
+      if (!nativeConfigured) return;
+      await NativePurchases.setAttributes(attributes);
+    } else {
+      if (!WebPurchases.isConfigured()) return;
+      await WebPurchases.getSharedInstance().setAttributes(attributes);
+    }
+    taggedTrialFor = appUserId;
+  } catch {
+    // Retried on the next refresh, since taggedTrialFor stays unset.
+  }
+}
+
 // ── Offline grace ────────────────────────────────────────────────────────
 // The last answer RevenueCat gave us, so an unreachable server doesn't
 // present the paywall to somebody who has already paid. Falling back to the
@@ -215,6 +261,7 @@ export async function refreshProStatus(): Promise<void> {
   const user = await currentUser();
   await configureRc(user?.id ?? null);
   if (user?.id) await tagCustomerEmail(user.id, user.email ?? null);
+  await tagTrialStart(user?.id ?? 'anonymous');
 
   const paid = await entitlementActive(user?.id ?? 'anonymous');
   if (paid) {
