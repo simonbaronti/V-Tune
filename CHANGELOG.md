@@ -4,6 +4,26 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.3] — 2026-09-29
+
+### Fixed
+- **The desktop app no longer asks you to sign in again when you're
+  offline.** Reported by a handpan maker whose workshop is up a mountain
+  with no internet, and who had been carrying his laptop home to sign in
+  before every session. Sign-in tokens expire after about an hour and
+  renewing one needs a connection, so with no network the app couldn't tell
+  "signed in but can't check right now" from "not signed in" — and asked
+  again. There was already meant to be a 30-day allowance for exactly this,
+  and the bug was what stopped it working. Sign in once now and the app
+  keeps working with no connection at all; any time you are back online it
+  quietly refreshes itself.
+
+### Added
+- The trial's start date is recorded against your RevenueCat customer
+  record, so how far through a trial an install is can be seen at all. It
+  is a date on a record that already existed — nothing new is collected
+  about you, and it is not analytics.
+
 ## [1.3.2] — 2026-09-26
 
 ### Changed
