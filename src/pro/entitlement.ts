@@ -23,7 +23,7 @@ import {
   RC_API_KEY_GOOGLE,
   RC_API_KEY_WEB,
 } from './config';
-import { currentUser, onAuthChange } from './auth';
+import { currentUser, onAuthChange, signOut } from './auth';
 import { useProStore } from './proStore';
 
 // ── Trial clock ──────────────────────────────────────────────────────────
@@ -192,6 +192,49 @@ async function tagTrialStart(appUserId: string): Promise<void> {
 const ENTITLEMENT_CACHE_KEY = 'v-tune-entitlement-cache';
 const OFFLINE_GRACE_DAYS = 30;
 
+/**
+ * The last account we positively identified.
+ *
+ * Supabase access tokens last about an hour, and getSession() refreshes an
+ * expired one over the network. Offline that refresh fails and the session
+ * comes back null — which is indistinguishable from being signed out unless
+ * we write down who was here.
+ *
+ * Without this the offline grace below could never fire for the case it was
+ * built for. The cache is keyed by account, the account resolved to
+ * 'anonymous' the moment the network went away, the key never matched, and
+ * somebody who had paid got the paywall in a workshop with no internet —
+ * which is exactly where a handpan tuner works.
+ *
+ * Only ever used to look up a cached entitlement, never to grant a new one,
+ * and cleared on a deliberate sign-out.
+ */
+const LAST_USER_KEY = 'v-tune-last-user';
+
+interface LastUser {
+  id: string;
+  email: string | null;
+}
+
+function rememberUser(id: string, email: string | null): void {
+  try {
+    localStorage.setItem(LAST_USER_KEY, JSON.stringify({ id, email }));
+  } catch {
+    // Private window or storage disabled — the app still works online.
+  }
+}
+
+function lastKnownUser(): LastUser | null {
+  try {
+    const raw = localStorage.getItem(LAST_USER_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as LastUser;
+    return entry?.id ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
 interface EntitlementCache {
   userId: string;
   pro: boolean;
@@ -199,6 +242,10 @@ interface EntitlementCache {
 }
 
 function rememberEntitlement(userId: string, pro: boolean): void {
+  // An anonymous customer owns nothing worth remembering, and writing its
+  // answer here would overwrite the entry belonging to a real account —
+  // taking the offline grace away from the person who paid for it.
+  if (userId === 'anonymous') return;
   try {
     const entry: EntitlementCache = { userId, pro, at: new Date().toISOString() };
     localStorage.setItem(ENTITLEMENT_CACHE_KEY, JSON.stringify(entry));
@@ -259,6 +306,7 @@ export async function refreshProStatus(): Promise<void> {
   store.set({ status: 'loading' });
 
   const user = await currentUser();
+  if (user?.id) rememberUser(user.id, user.email ?? null);
   await configureRc(user?.id ?? null);
   if (user?.id) await tagCustomerEmail(user.id, user.email ?? null);
   await tagTrialStart(user?.id ?? 'anonymous');
@@ -267,6 +315,23 @@ export async function refreshProStatus(): Promise<void> {
   if (paid) {
     store.set({ status: 'pro', accountEmail: user?.email ?? null });
     return;
+  }
+
+  // Couldn't identify anybody, and nothing says they've paid. Before falling
+  // through to the trial clock, consider that we may simply be offline: an
+  // expired token with no network reads exactly like a signed-out user. If
+  // the last account we did verify is still inside its offline grace, that's
+  // who this is.
+  //
+  // Deliberately after the check above rather than instead of it, so an
+  // account that really has been signed out of, or whose grace has run out,
+  // still falls through to the paywall.
+  if (!user) {
+    const last = lastKnownUser();
+    if (last && cachedEntitlement(last.id)) {
+      store.set({ status: 'pro', accountEmail: last.email });
+      return;
+    }
   }
   if (trialActive()) {
     store.set({
@@ -287,6 +352,24 @@ export function initPro(): void {
   }
   void refreshProStatus();
   onAuthChange(() => void refreshProStatus());
+}
+
+/**
+ * Sign out, and forget the offline identity with it.
+ *
+ * Use this rather than auth's signOut directly: leaving the remembered
+ * account behind would hand the next person on the machine an unlock that
+ * isn't theirs, which is the whole reason the cache is keyed by account.
+ */
+export async function signOutAndForget(): Promise<void> {
+  try {
+    localStorage.removeItem(LAST_USER_KEY);
+    localStorage.removeItem(ENTITLEMENT_CACHE_KEY);
+  } catch {
+    // Nothing stored means nothing to clear.
+  }
+  await signOut();
+  await refreshProStatus();
 }
 
 /** Restore purchases (native store receipt sync), then re-evaluate. */
