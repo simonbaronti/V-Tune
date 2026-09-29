@@ -190,7 +190,21 @@ async function tagTrialStart(appUserId: string): Promise<void> {
 // machine can't inherit their grace, and re-checked online whenever there
 // IS a connection — so a refund still revokes access on the next check.
 const ENTITLEMENT_CACHE_KEY = 'v-tune-entitlement-cache';
-const OFFLINE_GRACE_DAYS = 30;
+/**
+ * How long a verified unlock keeps working with no connection at all.
+ *
+ * Ninety days, not thirty, because of who actually uses this. A handpan is
+ * tuned in a workshop, and workshops are sheds, barns and mountainsides —
+ * the maker who reported the offline bug has no internet where he works at
+ * all. Thirty days meant carrying a laptop somewhere with wifi every month
+ * to prove a purchase he had already made.
+ *
+ * The window costs little. Refunds close after fourteen days, so past that
+ * this is only catching chargebacks, which are rare and which revoke on the
+ * next connection anyway. And it resets on every successful online check,
+ * so it only ever runs down for somebody genuinely off-grid for a quarter.
+ */
+const OFFLINE_GRACE_DAYS = 90;
 
 /**
  * The last account we positively identified.
