@@ -4,6 +4,21 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.4] — 2026-10-10
+
+### Fixed
+- **The Unlock button works on the desktop app.** When a trial ended on
+  Mac, Windows or Linux, the only way forward was a button that did
+  nothing at all when you clicked it — no shop, no message, nothing to
+  suggest the app had even noticed. If you have been stuck staring at that
+  screen, it was not you and it was not your machine. It now opens the
+  shop in your browser, and if your browser refuses to open it says so and
+  tells you where to go instead.
+- **You can buy from the Android download build.** The app was asking
+  Google Play to handle a purchase for a copy that had not come from Play,
+  which can only ever fail. It now sends you to the shop, the same way the
+  desktop and web versions do.
+
 ## [1.3.3] — 2026-09-29
 
 ### Fixed
