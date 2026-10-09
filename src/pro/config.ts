@@ -23,11 +23,18 @@ export const TRIAL_DAYS = 14;
 /** One-time unlock price, display only (the stores/Paddle own the real price). */
 export const PRICE_DISPLAY = '£49.99';
 
-/** Where the web purchase happens (Paddle checkout on the storefront). */
-export const STORE_URL = 'https://vtune-app.com';
+/**
+ * Where the web purchase happens (Paddle checkout on the storefront).
+ *
+ * The pricing page, not the homepage. Someone sent here has already decided
+ * to buy and pressed the button that says so — dropping them at the top of a
+ * marketing page and asking them to find their way to the checkout loses
+ * people who were holding their card.
+ */
+export const STORE_URL = 'https://vtune-app.com/pricing.html';
 
 /** The same address, for telling someone to type it in themselves. */
-export const STORE_HOST = 'vtune-app.com';
+export const STORE_HOST = 'vtune-app.com/pricing';
 
 // Real project values (safe to commit — the anon key is a public client key,
 // protected by Supabase Row Level Security, and designed to ship in apps).

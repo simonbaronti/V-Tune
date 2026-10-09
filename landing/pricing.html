@@ -218,10 +218,23 @@
           btn.addEventListener('click', function (e) {
             e.preventDefault();
             if (!user) {
+              // The sign-in strip is already on screen at this point, so
+              // re-rendering it and scrolling to it changes nothing the eye
+              // can catch: the buyer clicks the big green button and the page
+              // appears to ignore them. Say what is needed, in the place they
+              // are already looking, and put the cursor where it has to go.
               renderSignedOut(true);
+              note.innerHTML =
+                'One step first — enter your email above so the purchase ' +
+                'attaches to your V-Tune account and unlocks every device.';
+              note.style.color = '#fbbf24';
               strip.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              var field = document.getElementById('acct-email');
+              if (field) field.focus({ preventScroll: true });
               return;
             }
+            note.innerHTML = 'Secure checkout by Paddle. VAT/GST added where applicable.';
+            note.style.color = '';
             Paddle.Checkout.open({
               items: [{ priceId: cfg.priceId, quantity: 1 }],
               customer: { email: user.email },
