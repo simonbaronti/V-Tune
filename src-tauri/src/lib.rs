@@ -1,6 +1,10 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    // Opening a URL in the user's real browser. Without this plugin the
+    // webview simply swallows window.open(), which is what left the
+    // paywall's Unlock button doing nothing on desktop.
+    .plugin(tauri_plugin_opener::init())
     .setup(|app| {
       // Desktop-only in-app updater + process (relaunch) plugins.
       #[cfg(desktop)]

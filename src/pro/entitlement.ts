@@ -22,6 +22,7 @@ import {
   RC_API_KEY_APPLE,
   RC_API_KEY_GOOGLE,
   RC_API_KEY_WEB,
+  rcKeyLooksReal,
 } from './config';
 import { currentUser, onAuthChange, signOut } from './auth';
 import { useProStore } from './proStore';
@@ -56,10 +57,6 @@ export function trialActive(): boolean {
 // ── RevenueCat wiring ────────────────────────────────────────────────────
 const isNative = Capacitor.isNativePlatform();
 let nativeConfigured = false;
-
-function rcKeyLooksReal(key: string): boolean {
-  return !key.startsWith('PLACEHOLDER');
-}
 
 /** Configure RC (once) and pin it to the given app user id (or anonymous). */
 async function configureRc(appUserId: string | null): Promise<void> {

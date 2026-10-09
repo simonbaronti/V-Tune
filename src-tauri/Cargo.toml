@@ -23,6 +23,7 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-opener = "2"
 
 # In-app auto-updater — desktop only (iOS/Android update through their
 # stores). `process` provides the relaunch-after-install call.

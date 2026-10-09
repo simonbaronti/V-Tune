@@ -3,26 +3,59 @@
  * trial is over and the unlock hasn't been bought ('locked'), plus a small
  * dismissible trial-countdown banner for the final days ('trial', ≤3 left).
  *
- * One purchase button:
- *   - iOS/Android → the store purchase sheet via RevenueCat (single package)
- *   - Web/desktop → vtune-app.com (Paddle checkout), then Sign in to unlock
+ * One purchase button, which routes to whichever rail this build can
+ * actually complete a purchase on:
+ *   - iOS (and Android once its key is real) → store sheet via RevenueCat
+ *   - everything else → vtune-app.com (Paddle checkout), then Sign in
+ *
+ * "Everything else" is browsers, Tauri desktop, and the direct-APK Android
+ * build — a sideloaded APK cannot use Play Billing, so sending it to the web
+ * storefront is the only route that ends in a purchase rather than an error.
  * Plus Sign in / Restore for existing buyers.
  */
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Purchases as NativePurchases } from '@revenuecat/purchases-capacitor';
-import { PRICE_DISPLAY, STORE_URL } from './config';
+import {
+  PRICE_DISPLAY,
+  RC_API_KEY_APPLE,
+  RC_API_KEY_GOOGLE,
+  STORE_HOST,
+  STORE_URL,
+  rcKeyLooksReal,
+} from './config';
 import { signInWithEmail, verifyEmailCode } from './auth';
 import { refreshProStatus, restorePurchases } from './entitlement';
 import { useProStore } from './proStore';
+import { openExternal } from '../utils/openExternal';
 
 const isNative = Capacitor.isNativePlatform();
 
-/** Buy on this platform: store sheet on native, storefront on web/desktop. */
+/**
+ * Whether the native store sheet can complete a sale here. A placeholder SDK
+ * key means it can't, and the buyer belongs on the web storefront instead of
+ * in front of an error.
+ */
+const nativeStoreReady =
+  isNative &&
+  rcKeyLooksReal(
+    Capacitor.getPlatform() === 'ios' ? RC_API_KEY_APPLE : RC_API_KEY_GOOGLE,
+  );
+
+/** Buy on this platform: store sheet where there is one, storefront otherwise. */
 async function buy(setBusy: (b: boolean) => void, setError: (e: string | null) => void) {
   setError(null);
-  if (!isNative) {
-    window.open(STORE_URL, '_blank');
+  if (!nativeStoreReady) {
+    setBusy(true);
+    const opened = await openExternal(STORE_URL);
+    setBusy(false);
+    // The paywall is a dead end, so a browser that never appears has to be
+    // said out loud — leaving the button silent is the bug that got us here.
+    if (!opened) {
+      setError(
+        `Couldn't open your browser. Go to ${STORE_HOST} to unlock, then come back and sign in.`,
+      );
+    }
     return;
   }
   setBusy(true);
@@ -243,7 +276,7 @@ export function ProGate() {
             >
               {busy ? 'Opening store…' : `Unlock V-Tune Pro — ${PRICE_DISPLAY}`}
             </button>
-            {!isNative && (
+            {!nativeStoreReady && (
               <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
                 The purchase opens on vtune-app.com — sign in here afterwards
                 and V-Tune unlocks.

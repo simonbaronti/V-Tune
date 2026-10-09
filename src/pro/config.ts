@@ -26,6 +26,9 @@ export const PRICE_DISPLAY = '£49.99';
 /** Where the web purchase happens (Paddle checkout on the storefront). */
 export const STORE_URL = 'https://vtune-app.com';
 
+/** The same address, for telling someone to type it in themselves. */
+export const STORE_HOST = 'vtune-app.com';
+
 // Real project values (safe to commit — the anon key is a public client key,
 // protected by Supabase Row Level Security, and designed to ship in apps).
 export const SUPABASE_URL: string =
@@ -47,6 +50,18 @@ export const RC_API_KEY_WEB: string =
 
 /** The entitlement identifier — must match the RevenueCat dashboard. */
 export const ENTITLEMENT_ID = 'pro';
+
+/**
+ * Whether a RevenueCat SDK key is a real one.
+ *
+ * A placeholder key means that store's purchase rail does not exist yet, and
+ * the caller must route the buyer somewhere that works rather than offer a
+ * button that cannot complete. Android has shipped as a direct APK with a
+ * placeholder Google key, so this is live, not hypothetical.
+ */
+export function rcKeyLooksReal(key: string): boolean {
+  return !key.startsWith('PLACEHOLDER');
+}
 
 /** True once real (non-placeholder) config is present for the current layer. */
 export function proConfigLooksReal(): boolean {
