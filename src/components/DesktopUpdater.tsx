@@ -99,7 +99,11 @@ export function DesktopUpdater() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      // Above the Pro gate (z-200), which is otherwise opaque and
+      // non-dismissible: a locked user is exactly the one who may need the
+      // update, and hiding it behind the lock leaves them with no way out
+      // of the app at all. Installing a signed update can only help them.
+      className="fixed inset-0 z-[300] flex items-center justify-center"
       style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(2px)' }}
       onClick={dismissable ? () => setPhase({ kind: 'idle' }) : undefined}
     >
