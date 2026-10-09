@@ -215,6 +215,13 @@
   .btn-primary:hover { background: var(--cyan-bright); text-decoration: none; transform: translateY(-1px); }
   .btn-ghost { background: var(--bg-panel); color: var(--text); border-color: var(--border-bright); }
   .btn-ghost:hover { background: var(--bg-card); border-color: var(--cyan); text-decoration: none; }
+  /* Green, matching the Unlock button inside the app — someone who pressed
+     green there and arrived here should recognise where to press next.
+     Deliberately not --cyan: Download stays the primary action, because the
+     trial is what sells this. */
+  .btn-buy { background: var(--green); color: #04291a; }
+  .btn-buy:hover { background: #2bff95; text-decoration: none; transform: translateY(-1px); }
+  .btn-buy .price { opacity: 0.72; font-weight: 600; }
 
   /* ── Strobe band motif ── */
   .strobe-strip {
@@ -346,6 +353,10 @@
       <a href="#download" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
         Download
+      </a>
+      <a href="/pricing.html" class="btn btn-buy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M3 12h18"/></svg>
+        Buy now <span class="price">£49.99</span>
       </a>
       <a href="https://app.vtune-app.com" class="btn btn-ghost">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
