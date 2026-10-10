@@ -14,6 +14,7 @@
 import { Capacitor } from '@capacitor/core';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { PRO_ENABLED, SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
+import { isTauri } from '../audio/alwaysOnTop';
 
 let client: SupabaseClient | null = null;
 
@@ -48,15 +49,22 @@ export async function signInWithEmail(email: string): Promise<{ error: string | 
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: {
-      // In a browser context (web app, desktop webview, dev server) the link
-      // must come back to THIS origin so supabase-js can pick the session up
-      // from the URL (detectSessionInUrl). Native (Capacitor) can't receive
-      // an http redirect, so it lands on the storefront until the deep link
+      // In a real browser (web app, dev server) the link must come back to
+      // THIS origin so supabase-js can pick the session up from the URL
+      // (detectSessionInUrl). Native (Capacitor) can't receive an http
+      // redirect, so it lands on the storefront until the deep link
       // (app.vtune.tuner://auth) is registered.
+      //
+      // Tauri counts as native here despite being a webview: its origin is
+      // tauri://localhost, which Supabase will not accept as a redirect and
+      // which no mail client can open anyway. Sending it there produced a
+      // link that was dead on arrival; the storefront at least lands
+      // somewhere real, and the typed code is the route that works.
       // TODO(native): switch to the deep link on iOS/Android.
-      emailRedirectTo: Capacitor.isNativePlatform()
-        ? 'https://vtune-app.com/auth-callback.html'
-        : window.location.origin,
+      emailRedirectTo:
+        Capacitor.isNativePlatform() || isTauri()
+          ? 'https://vtune-app.com/auth-callback.html'
+          : window.location.origin,
     },
   });
   return { error: error?.message ?? null };

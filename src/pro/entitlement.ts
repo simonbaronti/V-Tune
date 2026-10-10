@@ -308,13 +308,40 @@ async function entitlementActive(userId: string): Promise<boolean> {
 }
 
 // ── The one refresh the app calls ────────────────────────────────────────
+
+/**
+ * Whether a real status has ever been worked out.
+ *
+ * Only the first run is allowed to show 'loading'. Every later refresh keeps
+ * whatever the UI is already showing until it has a better answer, because
+ * 'loading' is not a neutral state — the paywall renders nothing unless the
+ * status is 'locked', so passing through 'loading' *unmounts the paywall*
+ * and takes its React state with it.
+ *
+ * That is not theoretical. Supabase refreshes its token when the window
+ * comes back to the foreground, every refresh fires the auth listener, and
+ * the listener calls this function. So: someone on the paywall taps Sign in,
+ * types their email, switches to their mail app to fetch the code, comes
+ * back — and the token refresh has quietly rebuilt the paywall from scratch,
+ * putting them back at "enter your email" with the code in their hand. The
+ * app looked like it had forgotten them mid-sign-in, and on desktop (where
+ * the code is the only way in) that was the whole door.
+ */
+let statusResolved = false;
+
+/** Record a settled status. Everything that ends a refresh goes through here. */
+function settle(patch: Partial<Omit<ReturnType<typeof useProStore.getState>, 'set'>>): void {
+  statusResolved = true;
+  useProStore.getState().set(patch);
+}
+
 export async function refreshProStatus(): Promise<void> {
   const store = useProStore.getState();
   if (!PRO_ENABLED) {
     store.set({ status: 'disabled' });
     return;
   }
-  store.set({ status: 'loading' });
+  if (!statusResolved) store.set({ status: 'loading' });
 
   const user = await currentUser();
   if (user?.id) rememberUser(user.id, user.email ?? null);
@@ -324,7 +351,7 @@ export async function refreshProStatus(): Promise<void> {
 
   const paid = await entitlementActive(user?.id ?? 'anonymous');
   if (paid) {
-    store.set({ status: 'pro', accountEmail: user?.email ?? null });
+    settle({ status: 'pro', accountEmail: user?.email ?? null });
     return;
   }
 
@@ -340,19 +367,19 @@ export async function refreshProStatus(): Promise<void> {
   if (!user) {
     const last = lastKnownUser();
     if (last && cachedEntitlement(last.id)) {
-      store.set({ status: 'pro', accountEmail: last.email });
+      settle({ status: 'pro', accountEmail: last.email });
       return;
     }
   }
   if (trialActive()) {
-    store.set({
+    settle({
       status: 'trial',
       trialDaysLeft: trialDaysLeft(),
       accountEmail: user?.email ?? null,
     });
     return;
   }
-  store.set({ status: 'locked', accountEmail: user?.email ?? null });
+  settle({ status: 'locked', accountEmail: user?.email ?? null });
 }
 
 /** Call once on app start: initial check + re-check whenever auth changes. */
