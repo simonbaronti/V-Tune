@@ -125,7 +125,7 @@ def Paragraph(text, style, **kw):  # noqa: F811 — deliberate shadow, see above
 # page of its own.
 SECTION_GAP = 24
 
-GUIDE_VERSION = '1.3.4'
+GUIDE_VERSION = '1.3.5'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a

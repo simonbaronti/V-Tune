@@ -4,6 +4,35 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.5] — 2026-10-10
+
+### Fixed
+- **Signing in no longer forgets you while you fetch the code.** You asked
+  for a code, went to your email to get it, came back — and V-Tune was
+  asking for your email address again, with the code in your hand. On the
+  desktop app the code is the only way in, so this was the whole door.
+- **Buying V-Tune on Android now actually unlocks it.** If you bought
+  through the website and signed in on the Android app, the app couldn't
+  see the purchase and stayed locked. It can see it now. If this happened
+  to you, just sign in again — nothing needs re-buying.
+- **The keyboard works again.** Tabbing to a button and pressing Enter or
+  Space did nothing at all, anywhere in the app, including the Unlock
+  button. Keyboard shortcuts also no longer fire when you hold ⌘ or Ctrl,
+  so ⌘− zooms out instead of quietly moving your reference pitch.
+- **Unlock takes you straight to the purchase page** rather than the
+  homepage, and the sign-in email's link now works on desktop.
+- **Signing in with an account that hasn't bought V-Tune says so**, instead
+  of leaving you looking at an unchanged screen wondering what happened.
+- On the website: the Buy button no longer looks like it ignored you, keeps
+  the email address you've already typed, accepts Enter in the email field,
+  tells you if the checkout can't load, and notices when you've signed in
+  from the link in another tab.
+
+### Security
+- A purchase made against Paddle's **test** environment can no longer grant
+  a real unlock. The webhook now checks which environment an event came
+  from and refuses test events unless the deployment is itself a test one.
+
 ## [1.3.4] — 2026-10-10
 
 ### Fixed
