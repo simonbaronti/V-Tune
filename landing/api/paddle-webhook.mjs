@@ -134,10 +134,31 @@ const REVERSED = 'reversed';
  * list if a destination is ever rotated or replaced.
  */
 function webhookSecrets() {
-  return [process.env.PADDLE_WEBHOOK_SECRET, process.env.PADDLE_WEBHOOK_SECRET_SANDBOX]
-    .flatMap((v) => (v ? String(v).split(',') : []))
-    .map((v) => v.trim())
-    .filter(Boolean);
+  // Tagged with the environment they belong to. Which one verified an event
+  // is not a detail: a sandbox transaction is paid for with a published test
+  // card, and this endpoint grants against the one real RevenueCat key, so
+  // treating the two alike turns `?checkout=test` into a free lifetime
+  // unlock for anyone who types it.
+  return [
+    { env: 'live', raw: process.env.PADDLE_WEBHOOK_SECRET },
+    { env: 'sandbox', raw: process.env.PADDLE_WEBHOOK_SECRET_SANDBOX },
+  ]
+    .flatMap(({ env, raw }) =>
+      (raw ? String(raw).split(',') : []).map((secret) => ({ env, secret: secret.trim() })),
+    )
+    .filter((s) => s.secret);
+}
+
+/**
+ * Whether this deployment may act on sandbox-signed events.
+ *
+ * Off unless asked for. A sandbox destination pointed at production is a
+ * reasonable thing to have configured while testing, but the grant it
+ * produces is indistinguishable from a real one — so the deployment has to
+ * say out loud that it is a test environment before any of it counts.
+ */
+function sandboxGrantsAllowed() {
+  return String(process.env.ALLOW_SANDBOX_GRANTS ?? '').toLowerCase() === 'true';
 }
 
 /**
@@ -176,13 +197,13 @@ function verifySignature(rawBody, header, secrets) {
   const given = Buffer.from(h1, 'utf8');
   for (let i = 0; i < secrets.length; i++) {
     const expected = Buffer.from(
-      crypto.createHmac('sha256', secrets[i]).update(`${ts}:${rawBody}`).digest('hex'),
+      crypto.createHmac('sha256', secrets[i].secret).update(`${ts}:${rawBody}`).digest('hex'),
       'utf8',
     );
     // Length-checked first because timingSafeEqual throws on a mismatch
     // rather than returning false.
     if (expected.length === given.length && crypto.timingSafeEqual(expected, given)) {
-      return { ok: true, secretIndex: i };
+      return { ok: true, secretIndex: i, env: secrets[i].env };
     }
   }
   return { ok: false, reason: `no configured secret matched (tried ${secrets.length})` };
@@ -377,10 +398,23 @@ export default async function handler(req, res) {
     console.warn(
       `paddle-webhook: rejected — ${check.reason}. body via ${via}, ${raw.length} bytes; ` +
         `secrets configured: ${secrets
-          .map((sec, i) => `#${i} len=${sec.length} ntfset=${sec.startsWith('pdl_ntfset_')}`)
+          .map((s, i) => `#${i} ${s.env} len=${s.secret.length} ntfset=${s.secret.startsWith('pdl_ntfset_')}`)
           .join(', ') || 'none'}`,
     );
     return res.status(401).json({ error: 'Bad signature' });
+  }
+
+  // Verified, but by which environment's secret? A sandbox event reaching a
+  // deployment that hasn't declared itself a test environment is refused
+  // outright — grants and revokes both. 200 because this is a permanent
+  // decision, not a hiccup: retrying it would change nothing.
+  if (check.env === 'sandbox' && !sandboxGrantsAllowed()) {
+    console.warn(
+      'paddle-webhook: refused a SANDBOX-signed event on a live deployment. ' +
+        'Set ALLOW_SANDBOX_GRANTS=true on a test deployment, or remove ' +
+        'PADDLE_WEBHOOK_SECRET_SANDBOX from production.',
+    );
+    return res.status(200).json({ ok: true, skipped: 'sandbox event, live deployment' });
   }
 
   let event;

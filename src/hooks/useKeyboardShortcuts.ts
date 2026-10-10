@@ -23,6 +23,24 @@ export function useKeyboardShortcuts() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
 
+      // A modifier means the keystroke belongs to the OS or the browser, not
+      // to us. On desktop ⌘R, ⌘+, ⌥← and friends were landing here as bare
+      // keys: ⌘- quietly dropped the reference frequency by a hertz while
+      // the user thought they were zooming out, and nothing said so.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Anything focusable that acts on Enter or Space owns those keys. The
+      // browser turns them into a click, and e.preventDefault() below
+      // cancels that — which left every button in the app keyboard-dead,
+      // including the paywall's Unlock, where it is the only control on
+      // screen and there is nothing else to tab to.
+      const el = e.target instanceof Element ? e.target : null;
+      const interactive =
+        el?.closest(
+          'button, a[href], textarea, select, [role="button"], [contenteditable=""], [contenteditable="true"]',
+        ) ?? null;
+      if (interactive && (e.code === 'Space' || e.code === 'Enter')) return;
+
       const store = useTunerStore.getState();
 
       const toggleAudio = () => {

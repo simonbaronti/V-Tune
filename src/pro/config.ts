@@ -33,8 +33,10 @@ export const PRICE_DISPLAY = '£49.99';
  */
 export const STORE_URL = 'https://vtune-app.com/pricing.html';
 
-/** The same address, for telling someone to type it in themselves. */
-export const STORE_HOST = 'vtune-app.com/pricing';
+/** The same address, for telling someone to type it in themselves. Keep it
+ *  in step with STORE_URL, extension and all: /pricing without .html is a
+ *  404, and this string is only ever shown to someone already stranded. */
+export const STORE_HOST = 'vtune-app.com/pricing.html';
 
 // Real project values (safe to commit — the anon key is a public client key,
 // protected by Supabase Row Level Security, and designed to ship in apps).

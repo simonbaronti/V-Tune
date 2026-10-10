@@ -53,11 +53,11 @@ for (const m of ['log','warn','error']) {
   console[m] = (...a) => { logs.push(a.join(' ')); };
 }
 
-async function fire(event_type, data) {
+async function fire(event_type, data, secret = SECRET) {
   rcCalls = [];
   const body = JSON.stringify({ event_type, data });
   const ts = Math.floor(Date.now() / 1000);
-  const h1 = crypto.createHmac('sha256', SECRET).update(`${ts}:${body}`).digest('hex');
+  const h1 = crypto.createHmac('sha256', secret).update(`${ts}:${body}`).digest('hex');
   const req = { method: 'POST', headers: { 'paddle-signature': `ts=${ts};h1=${h1}` }, body };
   let out;
   const res = { status: () => ({ json: (j) => { out = j; } }), setHeader(){} };
@@ -92,6 +92,43 @@ for (const [name, type, data, expect] of cases) {
   const ok = action === expect;
   ok ? pass++ : fail++;
   rows.push(`  ${ok ? '✓' : '✗'} ${name.padEnd(42)} -> ${action.padEnd(6)} (expected ${expect})`);
+}
+
+/*
+ * The environment gate. pricing.html exposes the sandbox checkout behind
+ * ?checkout=test, and a sandbox purchase is made with a published test card
+ * — so a sandbox event granting against the one real RevenueCat key is a
+ * free lifetime unlock for anyone who types the URL. A live deployment must
+ * refuse it, and a deployment that has declared itself a test environment
+ * must still work.
+ */
+const SANDBOX_SECRET = 'pdl_ntfset_sandbox_secret_value';
+process.env.PADDLE_WEBHOOK_SECRET_SANDBOX = SANDBOX_SECRET;
+const sale = { id: TXN, custom_data: { app_user_id: APP_USER } };
+
+for (const [name, allow, expect] of [
+  ['SANDBOX sale on a live deployment', undefined, 'none'],
+  ['SANDBOX sale where sandbox is allowed', 'true', 'GRANT'],
+  ['SANDBOX refund on a live deployment', undefined, 'none'],
+]) {
+  if (allow) process.env.ALLOW_SANDBOX_GRANTS = allow;
+  else delete process.env.ALLOW_SANDBOX_GRANTS;
+  const isRefund = name.includes('refund');
+  const { action } = isRefund
+    ? await fire('adjustment.updated', adj({ status: 'approved' }), SANDBOX_SECRET)
+    : await fire('transaction.completed', sale, SANDBOX_SECRET);
+  const ok = action === expect;
+  ok ? pass++ : fail++;
+  rows.push(`  ${ok ? '✓' : '✗'} ${name.padEnd(42)} -> ${action.padEnd(6)} (expected ${expect})`);
+}
+delete process.env.ALLOW_SANDBOX_GRANTS;
+
+// And the live secret must keep working with a sandbox secret also present.
+{
+  const { action } = await fire('transaction.completed', sale);
+  const ok = action === 'GRANT';
+  ok ? pass++ : fail++;
+  rows.push(`  ${ok ? '✓' : '✗'} ${'LIVE sale, sandbox secret also set'.padEnd(42)} -> ${action.padEnd(6)} (expected GRANT)`);
 }
 for (const m of ['log','warn','error']) console[m] = (...a) => process.stdout.write(a.join(' ') + '\n');
 console.log(rows.join('\n'));

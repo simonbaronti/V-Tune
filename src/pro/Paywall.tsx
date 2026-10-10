@@ -104,10 +104,23 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
     setError(null);
     setBusy(true);
     const res = await verifyEmailCode(email.trim(), code);
+    if (res.error) {
+      setBusy(false);
+      setError('That code didn’t work — check it, or request a fresh email.');
+      return;
+    }
+    // Signing in and being entitled are different things, and the gap
+    // between them used to be silent: the code was accepted, the paywall
+    // stayed exactly as it was, and nothing said whether anything had
+    // happened. Settle the status, then say so if they are still locked.
+    await refreshProStatus();
     setBusy(false);
-    if (res.error) setError('That code didn’t work — check it, or request a fresh email.');
-    // Success needs no handling here: the auth listener refreshes Pro status
-    // and the paywall re-renders (or disappears) on its own.
+    if (useProStore.getState().status !== 'pro') {
+      setError(
+        `Signed in as ${email.trim()}, but this account hasn’t bought V-Tune yet. ` +
+          'Unlock below, or sign in with the address you bought with.',
+      );
+    }
   };
 
   return (

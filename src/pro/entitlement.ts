@@ -63,18 +63,27 @@ async function configureRc(appUserId: string | null): Promise<void> {
   if (isNative) {
     const apiKey =
       Capacitor.getPlatform() === 'ios' ? RC_API_KEY_APPLE : RC_API_KEY_GOOGLE;
-    if (!rcKeyLooksReal(apiKey)) return;
-    if (!nativeConfigured) {
-      await NativePurchases.configure({ apiKey, appUserID: appUserId });
-      nativeConfigured = true;
-    } else if (appUserId) {
-      await NativePurchases.logIn({ appUserID: appUserId });
-    } else {
-      await NativePurchases.logOut().catch(() => {});
+    // A placeholder key means this store's rail doesn't exist, so we fall
+    // through to the web SDK rather than returning. Returning left the whole
+    // of RevenueCat unconfigured, which made the entitlement *unreadable* —
+    // an Android buyer sent to the web storefront (Paywall routes them there
+    // for exactly this reason) paid, had the grant land on their account,
+    // and came back to an app that could not see it and locked them out.
+    // purchases-js talks HTTPS to RevenueCat and works fine in a WebView.
+    if (rcKeyLooksReal(apiKey)) {
+      if (!nativeConfigured) {
+        await NativePurchases.configure({ apiKey, appUserID: appUserId });
+        nativeConfigured = true;
+      } else if (appUserId) {
+        await NativePurchases.logIn({ appUserID: appUserId });
+      } else {
+        await NativePurchases.logOut().catch(() => {});
+      }
+      return;
     }
-    return;
   }
-  // Web + Tauri desktop. purchases-js requires an app user id; RC's
+  // Web, Tauri desktop, and any native shell without a real store key.
+  // purchases-js requires an app user id; RC's
   // anonymous-id helper covers the signed-out case. Persist the generated id
   // so signed-out sessions reuse ONE anonymous identity instead of minting a
   // new RC customer on every page load.
@@ -288,13 +297,14 @@ function cachedEntitlement(userId: string): boolean {
 async function entitlementActive(userId: string): Promise<boolean> {
   try {
     let active: boolean;
-    if (isNative) {
-      // Not configured means configure() didn't complete, which offline is
-      // a real possibility — treat it as "couldn't check", not "not paid".
-      if (!nativeConfigured) return cachedEntitlement(userId);
+    // Read through whichever SDK configureRc actually brought up — which on
+    // a native shell with a placeholder store key is the web one.
+    if (isNative && nativeConfigured) {
       const { customerInfo } = await NativePurchases.getCustomerInfo();
       active = ENTITLEMENT_ID in customerInfo.entitlements.active;
     } else {
+      // Neither configured means configure() didn't complete, which offline
+      // is a real possibility — treat it as "couldn't check", not "not paid".
       if (!WebPurchases.isConfigured()) return cachedEntitlement(userId);
       const info = await WebPurchases.getSharedInstance().getCustomerInfo();
       active = ENTITLEMENT_ID in info.entitlements.active;

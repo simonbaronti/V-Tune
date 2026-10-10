@@ -153,6 +153,12 @@
 
         /* ── Account strip ─────────────────────────────────────────── */
         function renderSignedOut(prompted) {
+          // Carry across anything already typed. This re-renders on every
+          // Buy click, and throwing away a half-typed address as a reward
+          // for pressing the buy button is its own small insult.
+          var existing = document.getElementById('acct-email');
+          var typed = existing ? existing.value : '';
+
           strip.hidden = false;
           strip.className = prompted ? 'account attention' : 'account';
           stripBody.innerHTML =
@@ -160,19 +166,38 @@
             '<input type="email" id="acct-email" placeholder="you@example.com" autocomplete="email" />' +
             '<button id="acct-send">Sign in</button>' +
             '</div>' +
-            '<div class="hint">' +
+            '<div class="hint" id="acct-hint">' +
             (prompted ? '<strong>Sign in first</strong> — y' : 'Y') +
             'our purchase attaches to your V-Tune account, so it unlocks the app on every device. We’ll email you a sign-in link — no password needed.' +
             '</div>';
-          document.getElementById('acct-send').addEventListener('click', function () {
-            var email = document.getElementById('acct-email').value.trim();
-            if (email.indexOf('@') === -1) return;
+
+          var field = document.getElementById('acct-email');
+          field.value = typed;
+
+          function send() {
+            var email = field.value.trim();
+            // Was a silent return. Pressing Sign in with an empty or
+            // malformed address did nothing whatsoever — the same failure
+            // the Buy button had, one box further down the page.
+            if (email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) === -1) {
+              var hint = document.getElementById('acct-hint');
+              hint.innerHTML = 'That doesn’t look like an email address — check it and try again.';
+              hint.style.color = '#fbbf24';
+              field.focus();
+              return;
+            }
             window.VTuneStore.signInWithEmail(email).then(function (r) {
               stripBody.innerHTML = r.error
                 ? '<div class="hint">Couldn’t send the link: ' + r.error + '</div>'
                 : '<div class="who">Check your inbox — we emailed a sign-in link to <strong>' +
-                  email + '</strong>. It brings you straight back here.</div>';
+                  email + '</strong>. Open it, come back to this tab, and press Buy.</div>';
             });
+          }
+
+          document.getElementById('acct-send').addEventListener('click', send);
+          // Enter in an email field means submit, everywhere else on the web.
+          field.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); send(); }
           });
         }
 
@@ -188,11 +213,34 @@
           });
         }
 
-        window.VTuneStore.getUser().then(function (u) {
-          user = u;
-          if (u) renderSignedIn();
-          else renderSignedOut(false);
+        var stripRendered = false;
+
+        function syncUser() {
+          return window.VTuneStore.getUser().then(function (u) {
+            var changed = (u && u.id) !== (user && user.id);
+            user = u;
+            // Re-render on a real change, and once at the start. NOT on every
+            // sync: a focus event must not wipe "check your inbox", or the
+            // prompt the Buy button just put there.
+            if (changed || !stripRendered) {
+              stripRendered = true;
+              if (u) renderSignedIn();
+              else renderSignedOut(false);
+            }
+            return u;
+          });
+        }
+
+        syncUser();
+
+        // The magic link opens in a NEW tab, so this one never hears about
+        // it: the buyer signs in, comes back, presses Buy, and is told to
+        // sign in — forever. Re-read the session whenever the tab regains
+        // focus, which is exactly when they have come back from their mail.
+        document.addEventListener('visibilitychange', function () {
+          if (!document.hidden) syncUser();
         });
+        window.addEventListener('focus', function () { syncUser(); });
 
         /* ── Checkout ──────────────────────────────────────────────── */
         function ready(fn) {
@@ -201,6 +249,8 @@
             if (window.Paddle) { clearInterval(t); fn(); }
           }, 50);
         }
+
+        var paddleReady = false;
 
         ready(function () {
           if (cfg.env === 'sandbox') Paddle.Environment.set('sandbox');
@@ -215,9 +265,29 @@
               }
             },
           });
-          btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            if (!user) {
+          paddleReady = true;
+        });
+
+        // Attached unconditionally, NOT inside ready(). It used to live in
+        // there, so if the Paddle CDN was slow, blocked by an extension, or
+        // simply down, the big green button stayed an <a href="#"> with no
+        // handler at all — a click did nothing and scrolled the page to the
+        // top. The one page on the site whose entire job is taking money
+        // must never be a button that goes nowhere.
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          if (!paddleReady || !window.Paddle) {
+            note.innerHTML =
+              'The checkout hasn’t finished loading. Give it a moment and try ' +
+              'again — if it keeps failing, reload the page or email ' +
+              '<a href="mailto:support@vtune-app.com">support@vtune-app.com</a>.';
+            note.style.color = '#fbbf24';
+            return;
+          }
+          // Re-read the session rather than trusting the captured copy: they
+          // may have signed in via the magic link seconds ago in another tab.
+          syncUser().then(function (u) {
+            if (!u) {
               // The sign-in strip is already on screen at this point, so
               // re-rendering it and scrolling to it changes nothing the eye
               // can catch: the buyer clicks the big green button and the page
@@ -237,8 +307,8 @@
             note.style.color = '';
             Paddle.Checkout.open({
               items: [{ priceId: cfg.priceId, quantity: 1 }],
-              customer: { email: user.email },
-              customData: { app_user_id: user.id },
+              customer: { email: u.email },
+              customData: { app_user_id: u.id },
             });
           });
         });
