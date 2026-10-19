@@ -864,7 +864,7 @@ def build(out_path: Path):
         'On desktop the tuning and scale controls sit directly in the menu, '
         'below the teal bar. On phones and portrait tablets they split: the '
         'scale picker, note grid and <font color="#00e878">Let’s Go</font> '
-        'live in the slide-up quick-pick panel (section 7), while Reference '
+        'live in the slide-up quick-pick panel (section 7), while '
         'A4 and Tolerance move into Settings <font name="V-Sym">→</font> Tuning. Either way the picker '
         'has two modes:',
         s['body'],
@@ -1035,7 +1035,7 @@ def build(out_path: Path):
         'of no interaction so the strobe gets full width, and it has its own '
         '<b>pin</b> (in the teal bar) to keep it open. When it re-collapses '
         'it just shows the selected note, centred, ready to tap again. '
-        'Reference A4 and Tolerance live in Settings <font name="V-Sym">→</font> Tuning on mobile.',
+        'A4 and Tolerance live in Settings <font name="V-Sym">→</font> Tuning on mobile.',
         s['body_secondary'],
     ))
 
@@ -1296,13 +1296,13 @@ def build(out_path: Path):
 
     story.append(Paragraph('Tuning (mobile only)', s['h2']))
     story.append(Paragraph(
-        'On phones and portrait tablets, Reference A4 and Tolerance live '
+        'On phones and portrait tablets, A4 and Tolerance live '
         'here. On desktop these controls sit directly in the menu instead, '
         'so this section only appears on mobile.',
         s['body_secondary'],
     ))
     story.append(settings_table([
-        ('Reference A4',
+        ('A4 = Hz',
          'Concert pitch. Default 440 Hz. Set to 442 for some orchestral work, 432 if you’re into that.'),
         ('Tolerance (±cents)',
          'How close you have to be before V-Tune calls you in tune. Default is ±5 cents.'),
@@ -1499,7 +1499,7 @@ def build(out_path: Path):
 
     story.append(Paragraph('“It’s telling me I’m in tune but I’m clearly not.”', s['h3']))
     story.append(Paragraph(
-        'Check Reference A4. If it’s set to something exotic (442, 432) '
+        'Check A4. If it’s set to something exotic (442, 432) '
         'you’ll be tuning against a different concert pitch — it’s in the '
         'menu on desktop, or Settings <font name="V-Sym">→</font> Tuning on mobile. Also check you’re '
         'on the right note: handpans have rich overtones, and it’s easy to '
