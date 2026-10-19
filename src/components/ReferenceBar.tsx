@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTunerStore } from '../store/tunerStore';
 import { updateWorkletTargets } from '../audio/AudioEngine';
 
@@ -13,15 +14,59 @@ import { updateWorkletTargets } from '../audio/AudioEngine';
  *   │   [- v +]     │   [- v +]     │
  *   └───────────────┴───────────────┘
  */
+/** Sane bounds for a concert-pitch reference. Wide enough for every
+ *  historical pitch a maker might work to, narrow enough that a typo can't
+ *  silently put the whole instrument an octave out. */
+const MIN_REF_HZ = 300;
+const MAX_REF_HZ = 600;
+
 export function ReferenceBar() {
   const referenceFreq = useTunerStore((s) => s.referenceFreq);
   const tolerance = useTunerStore((s) => s.tolerance);
   const autoDetect = useTunerStore((s) => s.autoDetect);
   const harmonicMode = useTunerStore((s) => s.harmonicMode);
 
+  // Typed entry as well as the steppers. Eight presses of − to reach 432 was
+  // its own argument for typing the number, and the number you type here is
+  // now the *only* thing that sets the reference: the old CUSTOM "type the
+  // target Hz" box quietly stored a second, invisible cents offset on top of
+  // this one, so A4 could read 432.0 while every target sat at 440. It is
+  // gone, and this field is what replaces it.
+  // null while the field simply mirrors the store; a string while the user
+  // is mid-type, so their keystrokes aren't fought by a re-render.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  /**
+   * Commit whatever is actually in the field.
+   *
+   * Read from the DOM rather than from React state: the keystroke that ends
+   * an edit (Enter, or a tap elsewhere) can arrive in the same batch as the
+   * change that produced the value, and a commit that reads a stale `draft`
+   * silently does nothing. On this control, "silently does nothing" is the
+   * entire bug we are here to fix.
+   *
+   * Escape is handled by putting the stored value back in the field before
+   * blurring, so the commit that follows is simply a no-op. An earlier
+   * version set an "abandon" flag instead — and if the blur never arrived,
+   * the flag sat there and swallowed the NEXT edit the user made. One
+   * invisible piece of sticky state is what caused this release.
+   */
+  const commit = (raw: string) => {
+    setDraft(null);
+    const parsed = Number.parseFloat(raw.replace(',', '.'));
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.min(MAX_REF_HZ, Math.max(MIN_REF_HZ, parsed));
+    const store = useTunerStore.getState();
+    if (clamped === store.referenceFreq) return;
+    store.setReferenceFreq(clamped);
+    updateWorkletTargets();
+  };
+
   const handleRefChange = (delta: number) => {
     const store = useTunerStore.getState();
-    store.setReferenceFreq(store.referenceFreq + delta);
+    const next = Math.min(MAX_REF_HZ, Math.max(MIN_REF_HZ, store.referenceFreq + delta));
+    setDraft(null);
+    store.setReferenceFreq(next);
     updateWorkletTargets();
   };
 
@@ -112,16 +157,37 @@ export function ReferenceBar() {
             className="text-xs text-center tracking-wide"
             style={{ color: 'var(--text-dim)' }}
           >
-            A4
+            A4 = Hz
           </span>
           <div className="flex items-center justify-between gap-1">
             {stepperBtn('−', () => handleRefChange(-1))}
-            <span
-              className="flex-1 text-center text-sm font-medium tabular-nums min-w-0"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {referenceFreq.toFixed(1)}
-            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              aria-label="Reference pitch, A4 in hertz"
+              value={draft ?? referenceFreq.toFixed(1)}
+              onChange={(e) => setDraft(e.target.value)}
+              onFocus={(e) => {
+                setDraft(referenceFreq.toFixed(1));
+                e.target.select();
+              }}
+              onBlur={(e) => commit(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                else if (e.key === 'Escape') {
+                  e.currentTarget.value = referenceFreq.toFixed(1);
+                  e.currentTarget.blur();
+                }
+              }}
+              // 16px, or iOS zooms the page on focus and leaves it there.
+              className="flex-1 text-center text-base font-medium tabular-nums min-w-0 rounded"
+              style={{
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                padding: '4px 2px',
+              }}
+            />
             {stepperBtn('+', () => handleRefChange(1))}
           </div>
         </div>
@@ -146,6 +212,12 @@ export function ReferenceBar() {
           </div>
         </div>
       </div>
+
+      {/* Said out loud, because the thing that caused a handpan to be tuned
+          to the wrong pitch was a second reference the user could not see. */}
+      <span className="text-[10px] text-center leading-tight" style={{ color: 'var(--text-dim)' }}>
+        Every target is built from this number — nothing else changes it.
+      </span>
     </div>
   );
 }

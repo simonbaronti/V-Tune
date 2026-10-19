@@ -120,19 +120,10 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Arrow left/right: cents offset
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        store.setCentsOffset(store.centsOffset - (e.shiftKey ? 10 : 1));
-        updateWorkletTargets();
-        return;
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        store.setCentsOffset(store.centsOffset + (e.shiftKey ? 10 : 1));
-        updateWorkletTargets();
-        return;
-      }
+      // Arrow left/right used to nudge a global cents offset. They don't
+      // any more: that offset was a second reference nothing on screen
+      // showed, and a stray keypress could re-pitch an entire instrument.
+      // The reference is the A4 field, and only the A4 field.
 
       // Q: toggle auto detect
       if (e.key === 'q') {
@@ -148,13 +139,6 @@ export function useKeyboardShortcuts() {
       }
       if (e.key === '-') {
         store.setReferenceFreq(store.referenceFreq - 1);
-        updateWorkletTargets();
-        return;
-      }
-
-      // 0: reset cents offset
-      if (e.key === '0') {
-        store.setCentsOffset(0);
         updateWorkletTargets();
         return;
       }

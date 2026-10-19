@@ -219,7 +219,6 @@ export interface TunerState {
   setRunning: (running: boolean) => void;
   setReferenceFreq: (freq: number) => void;
   setCurrentNote: (note: NoteInfo) => void;
-  setCentsOffset: (cents: number) => void;
   updateBands: (bandData: { targetFreq: number; magnitude: number; phase: number; phaseDelta: number; centsDelta: number }[]) => void;
   setRmsLevel: (level: number) => void;
   setPeaks: (peaks: PeakData[]) => void;
@@ -533,20 +532,6 @@ export const useTunerStore = create<TunerState>()(
     });
   },
 
-  setCentsOffset: (cents) => {
-    const state = get();
-    const clamped = Math.max(-MAX_CENTS_OFFSET, Math.min(MAX_CENTS_OFFSET, cents));
-    const ref = tunedRef(state.referenceFreq, clamped);
-    const updated = rebuildFrequencies(state.bandConfigs, ref, state.harmonicMode);
-    set({
-      centsOffset: clamped,
-      baseFrequency: state.currentNote
-        ? noteToFrequency(state.currentNote.name, state.currentNote.octave, ref)
-        : ref,
-      bandConfigs: updated,
-      bands: configsToBands(updated),
-    });
-  },
 
   updateBands: (bandData) => {
     set((state) => {
@@ -803,7 +788,7 @@ export const useTunerStore = create<TunerState>()(
       // every "wait, why did this reset?" setting is sticky.
       // ─────────────────────────────────────────────────────────────────
       name: 'v-tune-store',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
 
       // → v3: new default experience — Spectrum Analyser on with two
@@ -833,6 +818,24 @@ export const useTunerStore = create<TunerState>()(
           if (typeof s.strobeSpeed === 'number') {
             s.strobeSpeed = migrateStrobeSpeed(s.strobeSpeed);
           }
+        }
+        // → v5: clear any stored cents offset.
+        //
+        // This was a second reference multiplier — the targets were built
+        // from referenceFreq × 2^(cents/1200) — and nothing on screen showed
+        // it. Typing a 440-based note frequency into the old CUSTOM Hz box
+        // stored +31.8¢, which is exactly 432 → 440: the A4 field kept
+        // reading 432.0 while every target, on every note, through every
+        // restart, sat at 440. A handpan was tuned to the wrong pitch that
+        // way and sent back.
+        //
+        // The control is gone, so a saved offset can no longer be seen or
+        // undone from inside the app — it has to be cleared here or it would
+        // go on silently re-pitching instruments forever. Anyone who had set
+        // a deliberate fractional trim loses a fraction of a cent; that is
+        // not a close call against the alternative.
+        if (version < 5) {
+          s.centsOffset = 0;
         }
         return s;
       },

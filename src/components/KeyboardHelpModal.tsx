@@ -23,8 +23,6 @@ const BLACK = [
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['↑', '↓'], label: 'Octave up / down' },
-  { keys: ['←', '→'], label: 'Nudge cents (Shift = ±10)' },
-  { keys: ['0'], label: 'Reset cents to 0' },
   { keys: ['Q'], label: 'Toggle auto-detect' },
   { keys: ['+', '−'], label: 'Reference pitch (A4)' },
   { keys: ['Space'], label: 'Show / hide main menu' },

@@ -4,6 +4,41 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.6] — 2026-10-19
+
+### Fixed
+- **A4 could read 432 while every target was actually at 440. This is the
+  important one — please read it.**
+
+  V-Tune had a second adjustment that multiplied the A4 reference, and the
+  A4 box never showed it. If you ever typed a frequency into the old CUSTOM
+  "type to set the target Hz" field — a number off a chart, a spec sheet or
+  a previous job — V-Tune worked out how far that was from your A4 and
+  stored the difference as a permanent offset. A standard 440-based note
+  frequency is **exactly 31.8 cents** away from the same note at 432, so
+  typing one while set to 432 silently moved every target to 440. The A4
+  field carried on reading 432.0, through every note change and every
+  restart.
+
+  **This caused at least one handpan to be tuned to the wrong pitch.**
+
+  Any offset your copy had stored is cleared when you update. If you have
+  tuned an instrument to a non-standard reference recently, it is worth
+  checking it against this release.
+
+### Changed
+- **One reference, and you can type it.** A4 is now a field you type
+  straight into — 432, 442, anything from 300 to 600 Hz — as well as
+  stepping with − and +. It says underneath what it governs: *every target
+  is built from this number, nothing else changes it.* Whatever it reads is
+  what the tuner is using.
+- **The CUSTOM "type to set the target Hz" box is gone**, along with the
+  cent-nudge arrow keys that fed the same hidden offset. Setting a target by
+  typing a frequency turned out to re-base the whole instrument rather than
+  the one note, which is not what anybody expected it to do. If you relied
+  on it to tune to an exact measured frequency, set the reference instead —
+  it reaches the same place and shows you where you are.
+
 ## [1.3.5] — 2026-10-10
 
 ### Fixed

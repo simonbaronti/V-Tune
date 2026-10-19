@@ -9,7 +9,6 @@ import {
   type ScaleNote,
 } from '../data/scales';
 import { GuPortChip } from './GuPortChip';
-import { TargetFrequency } from './TargetFrequency';
 
 const NAMING_LABELS: { value: NoteNaming; label: string }[] = [
   { value: 'sharp', label: '♯' },
@@ -334,11 +333,6 @@ export function PitchDial() {
         </button>
       </div>
 
-      {/* CUSTOM — a typed target overrides whatever the grid above says, so
-          it gets its own band rather than passing for one more field. Bleeds
-          through the container's px-3 to the panel edges. Works in either
-          mode: a frequency doesn't care which notes are on screen. */}
-      <TargetFrequency bleedLeft="0.75rem" bleedRight="0.75rem" />
     </div>
   );
 }

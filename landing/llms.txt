@@ -33,7 +33,7 @@ against its own target instead.
   Windows 10/11, Linux (AppImage/.deb), and browsers including Safari 16.4+.
 - Built-in scales: Kurd, Amara (also known as Celtic in the handpan
   community), Pygmy, Low Pygmy, Aegean, Ashakiran, Aavartan, Equinox,
-  Nordlys — plus chromatic and a typed target in hertz. More are added
+  Nordlys — plus chromatic, with the reference pitch settable anywhere from 300 to 600 Hz. More are added
   over time.
 
 ## Pages

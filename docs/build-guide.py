@@ -125,7 +125,7 @@ def Paragraph(text, style, **kw):  # noqa: F811 — deliberate shadow, see above
 # page of its own.
 SECTION_GAP = 24
 
-GUIDE_VERSION = '1.3.5'
+GUIDE_VERSION = '1.3.6'
 SITE = 'vtune-app.com'
 
 # Inline glyph wrappers — use these inside Paragraph markup whenever a
@@ -973,48 +973,24 @@ def build(out_path: Path):
         s['body_secondary'],
     ))
 
-    story.append(Paragraph('CUSTOM — the target in hertz, to as many decimals as you like', s['h2']))
+    story.append(Paragraph('A4 — the reference every target is built from', s['h2']))
     story.append(Paragraph(
-        'Below the note grid, in its own tinted band, is <b>CUSTOM</b>: the '
-        'pitch you are actually tuning to, in hertz. Picking a note fills it '
-        'in, but you can also set it yourself — and because a target set here '
-        'overrides whatever the grid above says, it gets a band of its own '
-        'rather than passing for one more field. There are two ways to set '
-        'it, depending on whether you know the number you are after.',
+        '<b>A4 = Hz</b> sets concert pitch, and it is the <i>only</i> thing '
+        'that does. Type the number straight into the field — 432, 440, 442, '
+        'or anything from 300 to 600 — or step it a hertz at a time with '
+        '<b>−</b> and <b>+</b>. Press Enter, or tap elsewhere, and every '
+        'band target, every note on the grid and every reading in the app '
+        'rebuilds around it immediately. Escape abandons an edit.',
         s['body'],
     ))
     story.append(Paragraph(
-        '<b>Type it</b> when you do — 659.34, or 123.456 — from a maker’s '
-        'spec sheet or an instrument you have measured before. Decimals are '
-        'kept as typed rather than rounded away. Press Enter, or tap '
-        '<b>SET</b>; on a phone, simply tapping elsewhere commits it.',
-        s['body'],
+        'Whatever this field says is what the tuner is actually using. '
+        'Nothing else shifts it: there is no second offset hiding behind it, '
+        'no per-note override, nothing carried over from a previous session. '
+        'If it reads 432.0, your targets are at 432.',
+        s['body_secondary'],
     ))
     story.append(Paragraph(
-        '<b>Nudge it</b> when you don’t — the <b>−</b> and <b>+</b> buttons '
-        'either side move the target half a cent per press, up to a semitone '
-        'either way. That is the one to reach for when an instrument sits '
-        'between the notes and you are creeping up on it with the strobe '
-        'running, rather than working from a number.',
-        s['body'],
-    ))
-    story.append(Paragraph(
-        'Either way it moves the fundamental, the octave and the compound '
-        'fifth <i>together</i>, so the relationship between the partials is '
-        'preserved — in PURE and in EQUAL alike. The field turns '
-        '<font color="#a855f7">purple</font> whenever the target is off the '
-        'note, so an offset cannot be left on by accident, and the caption '
-        'underneath names the nearest note and the offset in cents with a '
-        '<b>reset</b> beside it. The strobe bands show the same purple chip '
-        'while an offset is in play. On a keyboard, '
-        f'{LEFT} and {RIGHT} nudge a cent at a time, Shift takes ten, and '
-        '<b>0</b> resets it (section 9).',
-        s['body'],
-    ))
-
-    story.append(Paragraph('Reference A4, Tolerance & Let’s Go', s['h2']))
-    story.append(Paragraph(
-        '<b>Reference A4</b> sets concert pitch (default 440 Hz) and '
         '<b>Tolerance</b> sets how close counts as in tune (default ±5 '
         'cents). On desktop these sit in the menu alongside the picker; on '
         'mobile they move into Settings <font name="V-Sym">→</font> Tuning. <font color="#00e878">Let’s '
@@ -1260,8 +1236,6 @@ def build(out_path: Path):
     story.append(Paragraph('Everything else', s['h2']))
     story.append(settings_table([
         (f'{UP} / {DOWN}', 'Octave up / down.'),
-        (f'{LEFT} / {RIGHT}', 'Nudge the target by a cent. Hold Shift for ±10.'),
-        ('0', 'Reset that nudge back to zero.'),
         ('Q', 'Toggle AUTO note detection.'),
         ('+ / −', 'Reference pitch (A4) up / down.'),
         ('Space', 'Slides the main menu in and out on a wide window. On a '
