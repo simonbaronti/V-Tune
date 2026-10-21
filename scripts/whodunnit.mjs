@@ -53,6 +53,8 @@ async function paddle(path) {
 }
 
 const verdicts = [];
+/** Any lookup that errored. If true, absence of evidence is not evidence. */
+let failed = false;
 
 // ── RevenueCat: does the unlock exist, and on whom? ───────────────────────
 head('RevenueCat');
@@ -65,7 +67,9 @@ if (!rcKey) {
 } else {
   const sub = await rc(`/subscribers/${encodeURIComponent(appUserId)}`);
   if (sub.__error) {
-    line(`lookup failed: ${sub.__error}`);
+    line(`lookup FAILED: ${sub.__error}`);
+    verdicts.push(`RevenueCat could not be reached or the key was rejected — this run says nothing about whether the unlock exists.`);
+    failed = true;
   } else {
     const s = sub.subscriber ?? {};
     const ents = s.entitlements ?? {};
@@ -103,9 +107,16 @@ if (!paddleKey) {
   const cust = await paddle(
     `/customers?email=${encodeURIComponent(email)}&status=active,archived`,
   );
+  if (cust.__error) {
+    // A failed lookup is NOT an answer. Saying "never paid" here because the
+    // request errored is how you end up telling someone who did pay that
+    // they didn't.
+    line(`customer lookup FAILED: ${cust.__error}`);
+    verdicts.push(`Paddle could not be reached or the key was rejected — this run proves NOTHING about whether they paid. Fix the key and run again.`);
+    failed = true;
+  }
   const found = cust.__error ? [] : (cust.data ?? []);
-  if (cust.__error) line(`customer lookup failed: ${cust.__error}`);
-  if (!found.length) {
+  if (!cust.__error && !found.length) {
     line(`No Paddle customer with ${email}.`);
     verdicts.push(`Paddle has never seen ${email}. Either they paid with a DIFFERENT address, or they bought through the App Store / Play rather than the website, or no payment was taken at all.`);
   }
@@ -114,8 +125,13 @@ if (!paddleKey) {
     // 30 is the documented maximum for this endpoint.
     const txns = await paddle(`/transactions?customer_id=${encodeURIComponent(c.id)}&per_page=30`);
     const list = txns.__error ? [] : (txns.data ?? []);
-    if (txns.__error) line(`  transaction lookup failed: ${txns.__error}`);
-    if (!list.length) line('  no transactions');
+    if (txns.__error) {
+      line(`  transaction lookup FAILED: ${txns.__error}`);
+      verdicts.push(`Found the Paddle customer but could not list their transactions — nothing here rules a payment in or out.`);
+      failed = true;
+    } else if (!list.length) {
+      line('  no transactions');
+    }
     for (const t of list) {
       const total = t.details?.totals?.total;
       const cur = t.currency_code;
@@ -138,6 +154,11 @@ if (!paddleKey) {
 head('What this means');
 if (!verdicts.length) line('Nothing conclusive — check the arguments and the keys.');
 verdicts.forEach((v, i) => line(`${i + 1}. ${v}`));
+if (failed) {
+  line();
+  line('⚠  At least one lookup failed, so this report is INCOMPLETE.');
+  line('   Do not conclude anything about this customer from it.');
+}
 line();
 line('To put it right once you know: grant the entitlement to the id they');
 line('actually sign in as, from RevenueCat → Customer → Grant entitlement');
