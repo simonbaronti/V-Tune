@@ -86,7 +86,21 @@ async function buy(setBusy: (b: boolean) => void, setError: (e: string | null) =
  * absent until those providers are configured in Supabase — dead social
  * buttons are an App Review rejection.
  */
-function SignInPanel({ onDone }: { onDone: () => void }) {
+function SignInPanel({
+  onDone,
+  recover,
+  notProMessage,
+}: {
+  onDone: () => void;
+  /**
+   * Last resort when the code was accepted but the unlock didn't follow the
+   * account across. Only the attach flow has one, and only because it is
+   * the one flow that can leave somebody worse off than it found them.
+   */
+  recover?: () => Promise<void>;
+  /** What to say when they are signed in and still not entitled. */
+  notProMessage?: (email: string) => string;
+}) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState('');
@@ -114,13 +128,21 @@ function SignInPanel({ onDone }: { onDone: () => void }) {
     // stayed exactly as it was, and nothing said whether anything had
     // happened. Settle the status, then say so if they are still locked.
     await refreshProStatus();
+    // Moving a purchase onto an account can, in principle, fail to bring the
+    // purchase with it — which would take an unlock away from somebody who
+    // had one a second ago. Re-reading the store receipt against the account
+    // they just signed into is the way back.
+    if (recover && useProStore.getState().status !== 'pro') await recover();
     setBusy(false);
     if (useProStore.getState().status !== 'pro') {
       setError(
-        `Signed in as ${email.trim()}, but this account hasn’t bought V-Tune yet. ` +
-          'Unlock below, or sign in with the address you bought with.',
+        notProMessage?.(email.trim()) ??
+          `Signed in as ${email.trim()}, but this account hasn’t bought V-Tune yet. ` +
+            'Unlock below, or sign in with the address you bought with.',
       );
+      return;
     }
+    onDone();
   };
 
   return (
@@ -343,6 +365,126 @@ export function TrialBanner() {
           ? 'Last day of your free trial.'
           : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left of your free trial.`}{' '}
         Unlock V-Tune Pro for {PRICE_DISPLAY} — yours forever.
+      </span>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+        className="text-base leading-none px-1"
+        style={{ color: 'var(--text-dim)' }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/**
+ * "You've paid, but only this device knows it."
+ *
+ * Shown to someone who is entitled through an anonymous store customer —
+ * they bought without signing in, which nothing in the app ever asked them
+ * to do. The purchase is real and this device works; the problem is that no
+ * other device can ever find it, and they will not discover that until they
+ * are standing in front of one, assuming we have taken their money and
+ * given them nothing.
+ *
+ * A banner rather than a modal. They have paid, the app works, and blocking
+ * a working tuner to ask for an email address would be charging them twice
+ * for our omission. It returns next launch until the purchase is attached,
+ * which is pressure enough for something they only need to do once.
+ */
+export function AttachAccountBanner() {
+  const unattached = useProStore((s) => s.unattached);
+  // Returning null does NOT unmount a component — React keeps the instance
+  // and its state alive, it just renders nothing. So the prompt's own state
+  // lives one level down, where going attached really does unmount it. Put
+  // `open` up here and a dialog closed by signing in elsewhere (tapping the
+  // emailed link rather than typing the code) would stay open behind the
+  // scenes, ready to reappear.
+  if (!unattached) return null;
+  return <AttachAccountPrompt />;
+}
+
+function AttachAccountPrompt() {
+  const [dismissed, setDismissed] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  if (open) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Save your unlock to an account"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom))',
+          background: 'rgba(0, 0, 0, 0.72)',
+          backdropFilter: 'blur(6px)',
+        }}
+      >
+        <div
+          className="flex flex-col gap-4 px-6 py-7 text-center"
+          style={{
+            width: '100%',
+            maxWidth: 420,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <div className="flex flex-col gap-1">
+            <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              Save your unlock to an account
+            </span>
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Your purchase is on this device only. Add an email address and
+              V-Tune unlocks on every device you own — phone, tablet, laptop.
+              No password, just a code.
+            </span>
+          </div>
+          <SignInPanel
+            onDone={() => setOpen(false)}
+            // If the account came up without the purchase, re-read the store
+            // receipt against it. Signing in must never be the thing that
+            // locks a paying customer out.
+            recover={restorePurchases}
+            notProMessage={(email) =>
+              `Signed in as ${email}, but we couldn’t move your purchase across. ` +
+              'Nothing is lost — email hello@vtune-app.com with your receipt and we’ll fix it.'
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (dismissed) return null;
+
+  return (
+    <div
+      className="flex items-center justify-center gap-3 px-3 py-1.5 text-sm shrink-0"
+      style={{
+        background: 'rgba(168, 85, 247, 0.12)',
+        borderBottom: '1px solid rgba(168, 85, 247, 0.35)',
+        color: 'var(--text-primary)',
+      }}
+    >
+      <span>
+        Your unlock only works on this device.{' '}
+        <button
+          onClick={() => setOpen(true)}
+          className="underline font-semibold"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          Save it to your account
+        </button>{' '}
+        to use V-Tune everywhere.
       </span>
       <button
         onClick={() => setDismissed(true)}

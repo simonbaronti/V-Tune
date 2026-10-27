@@ -4,6 +4,25 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.7] — 2026-10-27
+
+### Fixed
+- **Buying without signing in locked your purchase to one device.** Nothing
+  in the app asked you to sign in first, so an App Store purchase made while
+  signed out attached to the device rather than to an account. On that
+  device it worked perfectly — which is why nobody spotted it. Pick up a
+  second device, sign in, and V-Tune told you this account hadn't bought
+  V-Tune yet, which was both wrong and alarming.
+
+  V-Tune now notices when your unlock is stuck on one device and offers to
+  move it to an account, in a bar you can dismiss rather than a wall you
+  can't. Adding an email address once unlocks every device you own, and if
+  the purchase doesn't come across on its own, V-Tune re-reads your store
+  receipt rather than leaving you locked out.
+
+  Already affected? Open V-Tune **on the device you bought on**, sign in,
+  and tap Restore purchase. Your unlock then follows you everywhere.
+
 ## [1.3.6] — 2026-10-19
 
 ### Fixed

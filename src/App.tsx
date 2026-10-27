@@ -25,6 +25,9 @@ import { PRO_ENABLED } from './pro/config';
 // only when PRO_ENABLED — with the flag off the free build pays zero bytes.
 const ProGate = lazy(() => import('./pro/Paywall').then((m) => ({ default: m.ProGate })));
 const TrialBanner = lazy(() => import('./pro/Paywall').then((m) => ({ default: m.TrialBanner })));
+const AttachAccountBanner = lazy(() =>
+  import('./pro/Paywall').then((m) => ({ default: m.AttachAccountBanner })),
+);
 
 /** Width of the desktop / landscape-tablet slide-out menu. */
 const MENU_WIDTH = 380;
@@ -134,6 +137,7 @@ function App() {
         <Suspense fallback={null}>
           <ProGate />
           <TrialBanner />
+          <AttachAccountBanner />
         </Suspense>
       )}
 

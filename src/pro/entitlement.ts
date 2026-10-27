@@ -361,7 +361,21 @@ export async function refreshProStatus(): Promise<void> {
 
   const paid = await entitlementActive(user?.id ?? 'anonymous');
   if (paid) {
-    settle({ status: 'pro', accountEmail: user?.email ?? null });
+    // Entitled with nobody signed in, on a shell where the store SDK is the
+    // one answering: the receipt is sitting on an anonymous RevenueCat
+    // customer. This device is fine; their next one won't be. Flag it so the
+    // UI can offer to move the purchase onto an account while they still
+    // have the device that owns it.
+    //
+    // Scoped to the native SDK deliberately. logIn() aliases an anonymous
+    // customer onto the account and brings its purchases with it, which is
+    // what makes the offer true. purchases-js has no equivalent, so making
+    // the same promise on web would be a lie.
+    settle({
+      status: 'pro',
+      accountEmail: user?.email ?? null,
+      unattached: !user && isNative && nativeConfigured,
+    });
     return;
   }
 
@@ -377,7 +391,9 @@ export async function refreshProStatus(): Promise<void> {
   if (!user) {
     const last = lastKnownUser();
     if (last && cachedEntitlement(last.id)) {
-      settle({ status: 'pro', accountEmail: last.email });
+      // A known account whose token couldn't be refreshed — the purchase is
+      // already attached, so there is nothing to offer them.
+      settle({ status: 'pro', accountEmail: last.email, unattached: false });
       return;
     }
   }
@@ -386,10 +402,11 @@ export async function refreshProStatus(): Promise<void> {
       status: 'trial',
       trialDaysLeft: trialDaysLeft(),
       accountEmail: user?.email ?? null,
+      unattached: false,
     });
     return;
   }
-  settle({ status: 'locked', accountEmail: user?.email ?? null });
+  settle({ status: 'locked', accountEmail: user?.email ?? null, unattached: false });
 }
 
 /** Call once on app start: initial check + re-check whenever auth changes. */
