@@ -27,7 +27,8 @@
     "guide": "python3 docs/build-guide.py && python3 docs/build-guide.py --lang es",
     "guide:strings": "python3 docs/build-guide.py --collect",
     "whodunnit": "node scripts/whodunnit.mjs",
-    "orphans": "node scripts/orphaned-purchases.mjs"
+    "orphans": "node scripts/orphaned-purchases.mjs",
+    "buyers": "node scripts/paddle-buyers.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
