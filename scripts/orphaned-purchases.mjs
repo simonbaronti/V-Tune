@@ -93,11 +93,14 @@ while (next) {
         ? `${RC_V2}/projects/${projectId}/customers?limit=${PAGE_LIMIT}&starting_after=${encodeURIComponent(last.id)}`
         : null);
 }
-line(`Scanned ${customers.length} customers.`);
-
 const accountless = customers.filter((c) => isAccountless(c.id));
-line(`${customers.length - accountless.length} are attached to an account (Supabase user id).`);
-line(`${accountless.length} are anonymous — checking which of those have paid.`);
+// A tally of zero reads like a finding. Say nothing rather than report a
+// breakdown of a list we never managed to fetch.
+if (customers.length > 0) {
+  line(`Scanned ${customers.length} customers.`);
+  line(`${customers.length - accountless.length} are attached to an account (Supabase user id).`);
+  line(`${accountless.length} are anonymous — checking which of those have paid.`);
+}
 
 // ── Which of the accountless ones actually own the entitlement? ──────────
 async function inspect(id) {
@@ -134,8 +137,18 @@ for (let i = 0; i < accountless.length; i += CONCURRENCY) {
 }
 
 head('Paid, but not attached to an account');
-if (orphans.length === 0) {
-  line('None. Every unlock we can see belongs to an account.');
+// "None" has to mean none, not "the lookup fell over before it counted any".
+// A reassuring sentence printed over a failed scan is worse than no scan:
+// it is the one line somebody quotes back a fortnight later.
+if (failed && customers.length === 0) {
+  line('NOTHING WAS CHECKED — the customer list could not be read (see above).');
+  line('This is not a result. Fix the error and run it again.');
+} else if (orphans.length === 0) {
+  line(
+    failed
+      ? 'None among the customers that could be read — but the scan was incomplete.'
+      : 'None. Every unlock we can see belongs to an account.',
+  );
 } else {
   line(`${orphans.length} ${orphans.length === 1 ? 'person has' : 'people have'} an active "${ENTITLEMENT}" unlock on an anonymous customer.`);
   line('They can tune on the device they bought on. On any OTHER device,');
