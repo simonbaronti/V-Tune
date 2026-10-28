@@ -192,6 +192,39 @@ if (!expandWorked && !keyV1) {
   }
 }
 
+// ── The other half of the picture ────────────────────────────────────────
+// An anonymous row is only a stranded customer if the same purchase is not
+// ALSO sitting on their account. The Paddle webhook grants against the
+// Supabase id from custom_data, while RevenueCat separately ingests the raw
+// Paddle transaction — which can leave one buyer holding two records, one
+// working and one a ghost. Counting the anonymous side alone cannot tell
+// those apart, and reporting a ghost as a stranded customer would send you
+// chasing people who are perfectly fine.
+const attached = customers.filter((c) => !isAccountless(c.id));
+const attachedEntitled = [];
+for (let i = 0; i < attached.length; i += CONCURRENCY) {
+  const batch = await Promise.all(
+    attached.slice(i, i + CONCURRENCY).map(async (c) => {
+      const d = await detail(c.id);
+      const entitled = expandWorked ? expandedEntitlement(c) === true : d.entitled === true;
+      return entitled ? { id: c.id, ...d } : null;
+    }),
+  );
+  attachedEntitled.push(...batch.filter(Boolean));
+}
+
+head('Unlocked AND attached to an account (these people are fine)');
+if (attachedEntitled.length === 0) {
+  line('None.');
+} else {
+  line(`${attachedEntitled.length} working unlock${attachedEntitled.length === 1 ? '' : 's'}.`);
+  for (const a of attachedEntitled) {
+    line(`  ${a.id}`);
+    if (a.store) line(`    ${a.store}  ${a.product}  bought ${a.boughtAt}`);
+    if (a.email) line(`    ${a.email}`);
+  }
+}
+
 head('Paid, but not attached to an account');
 if (failed && customers.length === 0) {
   line('NOTHING WAS CHECKED — the customer list could not be read (see below).');
@@ -213,6 +246,14 @@ if (failed && customers.length === 0) {
     if (o.email) line(`    email on file: ${o.email}`);
   }
   line();
+  const ghostly = orphans.filter((o) => o.store === 'paddle').length;
+  if (ghostly) {
+    line(`${ghostly} of these came through Paddle, and our webhook grants the`);
+    line('SAME purchase against the buyer\'s Supabase id. Check the list above');
+    line('before contacting anyone: if a Paddle buyer appears there too, the');
+    line('anonymous row is a duplicate record and they are already unlocked.');
+    line();
+  }
   line('Fix, in order of preference:');
   line('  1. Ask them to open V-Tune ON THE DEVICE THEY BOUGHT ON and use');
   line('     Settings → V-Tune Pro → Save it (1.3.7 and later). Signing in');
