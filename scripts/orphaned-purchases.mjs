@@ -225,6 +225,47 @@ if (attachedEntitled.length === 0) {
   }
 }
 
+/**
+ * Find the account-side grant that this anonymous row is a shadow of.
+ *
+ * Matched on the day, because that is the only field the two sides share:
+ * the anonymous row carries Paddle's transaction date and the account row
+ * carries the moment our webhook granted, and those are the same purchase
+ * seconds apart. A day either side absorbs a purchase near midnight.
+ *
+ * Deliberately a hint, never a filter. A wrong match here would hide
+ * somebody who really is locked out, so an unmatched row is called out and
+ * a matched one is only ever described as likely.
+ */
+const twinPool = [...attachedEntitled];
+function takeAccountTwin(orphan) {
+  if (orphan.store !== 'paddle' || orphan.boughtAt === '—') return null;
+  const when = new Date(orphan.boughtAt).getTime();
+  // Closest day wins, and each account is claimable once. Taking the first
+  // within range instead let one account stand in for two anonymous rows —
+  // which quietly reclassified somebody genuinely locked out as a duplicate
+  // of a purchase that was not theirs.
+  let best = -1;
+  let bestDelta = Infinity;
+  twinPool.forEach((a, i) => {
+    if (a.boughtAt === '—') return;
+    const delta = Math.abs(new Date(a.boughtAt).getTime() - when);
+    if (delta <= 86_400_000 && delta < bestDelta) {
+      best = i;
+      bestDelta = delta;
+    }
+  });
+  return best < 0 ? null : twinPool.splice(best, 1)[0];
+}
+const twinned = [];
+const lonely = [];
+// Oldest first, so the pairing is stable run to run rather than dependent on
+// whatever order RevenueCat happened to page the customers out in.
+for (const o of [...orphans].sort((a, b) => a.boughtAt.localeCompare(b.boughtAt))) {
+  const twin = takeAccountTwin(o);
+  (twin ? twinned : lonely).push({ ...o, twin });
+}
+
 head('Paid, but not attached to an account');
 if (failed && customers.length === 0) {
   line('NOTHING WAS CHECKED — the customer list could not be read (see below).');
@@ -240,20 +281,25 @@ if (failed && customers.length === 0) {
   line('They can tune on the device they bought on. On any OTHER device,');
   line('signing in tells them this account has not bought V-Tune.');
   line();
-  for (const o of orphans) {
+  for (const o of [...lonely, ...twinned]) {
     line(`  ${o.id}`);
     if (o.store) line(`    ${o.store}  ${o.product}  bought ${o.boughtAt}  last seen ${o.lastSeen}`);
     if (o.email) line(`    email on file: ${o.email}`);
+    if (o.twin) {
+      line(`    ↳ likely a duplicate of ${o.twin.email ?? o.twin.id} — already unlocked`);
+    } else {
+      line('    ↳ NO ACCOUNT TWIN — treat as genuinely locked out');
+    }
   }
   line();
-  const ghostly = orphans.filter((o) => o.store === 'paddle').length;
-  if (ghostly) {
-    line(`${ghostly} of these came through Paddle, and our webhook grants the`);
-    line('SAME purchase against the buyer\'s Supabase id. Check the list above');
-    line('before contacting anyone: if a Paddle buyer appears there too, the');
-    line('anonymous row is a duplicate record and they are already unlocked.');
-    line();
+  line(`${lonely.length} of ${orphans.length} have no working account-side unlock.`);
+  line();
+  if (twinned.length) {
+    line(`${twinned.length} of these are almost certainly duplicates: a Paddle purchase`);
+    line('RevenueCat ingested on its own, beside the grant our webhook already');
+    line('put on the buyer\'s account the same day. Those people are unlocked.');
   }
+  line();
   line('Fix, in order of preference:');
   line('  1. Ask them to open V-Tune ON THE DEVICE THEY BOUGHT ON and use');
   line('     Settings → V-Tune Pro → Save it (1.3.7 and later). Signing in');
