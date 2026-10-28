@@ -28,15 +28,21 @@ process.env.REVENUECAT_SECRET_KEY = 'sk_test';
 process.env.PADDLE_API_KEY = 'pdl_live_test';
 
 const TXN = 'txn_test123';
-const APP_USER = 'user-uuid-1';
+// A real Supabase-shaped id. The webhook refuses to grant against anything
+// that isn't one, so a placeholder here would fail every grant case — which
+// is exactly how this fixture earned its uuid.
+const APP_USER = '81ea0185-143f-4122-8fae-06e806445b69';
 const TXN_TOTAL = '4999';           // £49.99 in minor units
 
+/** The app_user_id the stubbed Paddle transaction carries. Mutable so the
+ *  asymmetry between granting and revoking can be exercised. */
+let txnAppUser = APP_USER;
 let rcCalls = [];
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
   if (u.includes('api.paddle.com/transactions/')) {
     return { ok: true, json: async () => ({ data: {
-      custom_data: { app_user_id: APP_USER },
+      custom_data: { app_user_id: txnAppUser },
       details: { totals: { total: TXN_TOTAL } },
     }})};
   }
@@ -83,6 +89,16 @@ const cases = [
   ['chargeback REVERSED (we won)',                 'adjustment.updated', adj({action:'chargeback', status:'reversed'}), 'GRANT'],
   ['chargeback_reverse adjustment raised',         'adjustment.created', adj({action:'chargeback_reverse', status:'approved'}), 'GRANT'],
   ['a normal sale',                                'transaction.completed', { id:TXN, custom_data:{ app_user_id:APP_USER } }, 'GRANT'],
+  // The uuid gate. Every one of these granted a lifetime unlock against a
+  // record nobody can sign in to before it existed, and two real buyers paid
+  // £50 for one. A refusal here is the correct, loud outcome — the sale is
+  // still lost, but it is lost in the log rather than in silence.
+  ['sale with a RevenueCat ANONYMOUS id',          'transaction.completed', { id:TXN, custom_data:{ app_user_id:'$RCAnonymousID:db9bc6f766f44af988cb19396ab1e144' } }, 'none'],
+  ['sale with no app_user_id at all',              'transaction.completed', { id:TXN, custom_data:{} },                        'none'],
+  ['sale with an empty app_user_id',               'transaction.completed', { id:TXN, custom_data:{ app_user_id:'   ' } },     'none'],
+  ['sale with an email instead of an id',          'transaction.completed', { id:TXN, custom_data:{ app_user_id:'buyer@example.com' } }, 'none'],
+  ['sale with a non-string app_user_id',           'transaction.completed', { id:TXN, custom_data:{ app_user_id:12345 } },     'none'],
+  ['sale with a uuid wearing whitespace',          'transaction.completed', { id:TXN, custom_data:{ app_user_id:` ${APP_USER} ` } }, 'GRANT'],
 ];
 
 let pass = 0, fail = 0;
@@ -122,6 +138,29 @@ for (const [name, allow, expect] of [
   rows.push(`  ${ok ? '✓' : '✗'} ${name.padEnd(42)} -> ${action.padEnd(6)} (expected ${expect})`);
 }
 delete process.env.ALLOW_SANDBOX_GRANTS;
+
+/*
+ * The asymmetry. The uuid gate guards every path that hands access OUT, and
+ * deliberately guards none that takes it back.
+ *
+ * A handful of historical unlocks really did land on anonymous customers
+ * before the gate existed. Refusing to revoke from an id we would no longer
+ * grant to would leave those refunded purchases unlocked for good — so the
+ * rule is strict about granting, permissive about revoking.
+ */
+for (const [name, who, type, data, expect] of [
+  ['refund of an ANONYMOUS-id purchase still revokes', '$RCAnonymousID:db9bc6f766f44af988cb19396ab1e144',
+    'adjustment.updated', adj({ status: 'approved' }), 'REVOKE'],
+  ['reversal of an ANONYMOUS-id purchase is refused',  '$RCAnonymousID:db9bc6f766f44af988cb19396ab1e144',
+    'adjustment.updated', adj({ action: 'chargeback', status: 'reversed' }), 'none'],
+]) {
+  txnAppUser = who;
+  const { action } = await fire(type, data);
+  const ok = action === expect;
+  ok ? pass++ : fail++;
+  rows.push(`  ${ok ? '✓' : '✗'} ${name.padEnd(42)} -> ${action.padEnd(6)} (expected ${expect})`);
+}
+txnAppUser = APP_USER;
 
 // And the live secret must keep working with a sandbox secret also present.
 {

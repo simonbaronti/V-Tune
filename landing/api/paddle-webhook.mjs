@@ -237,6 +237,39 @@ async function revenueCat(method, path, body, key) {
  * 'lifetime' because V-Tune is a one-time purchase. Re-granting is harmless,
  * which is what makes it safe for Paddle to retry this endpoint.
  */
+/**
+ * A Supabase user id, or null when what arrived isn't one.
+ *
+ * The checkout only ever sends one, so this should never reject anything.
+ * It has, twice. One transaction carried a RevenueCat anonymous id, which we
+ * dutifully granted a lifetime unlock to — a customer record nobody can ever
+ * sign in to, so the buyer paid and stayed locked. Another carried nothing
+ * usable and was skipped in silence.
+ *
+ * Granting against an unverified string is the failure that cost those two
+ * people £50 each, and it fails invisibly: RevenueCat accepts any id and
+ * creates the customer, so a grant to a typo looks exactly like a grant to a
+ * person right up until they try to sign in.
+ */
+const SUPABASE_USER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function supabaseUserId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return SUPABASE_USER_ID.test(trimmed) ? trimmed : null;
+}
+
+/** What arrived, short enough to log and clear about why it was refused. */
+function describeId(value) {
+  if (value === undefined) return 'absent';
+  if (value === null) return 'null';
+  if (typeof value !== 'string') return `a ${typeof value}`;
+  const t = value.trim();
+  if (!t) return 'empty';
+  return `"${t.slice(0, 48)}${t.length > 48 ? '…' : ''}"`;
+}
+
 async function grant(appUserId, entitlement, key) {
   const id = encodeURIComponent(appUserId);
   await revenueCat('GET', `/subscribers/${id}`, null, key);
@@ -336,11 +369,23 @@ async function handleAdjustment(data, entitlement, rcKey, paddleKey) {
   }
 
   if (restoring) {
-    await grant(facts.appUserId, entitlement, rcKey);
+    // Same gate as a fresh purchase: a reversal that restores an unlock is
+    // still a grant, and a grant against an unverified id is still a record
+    // nobody can sign in to.
+    const restoreTo = supabaseUserId(facts.appUserId);
+    if (!restoreTo) {
+      console.error(
+        `paddle-webhook: REFUSED RESTORE — ${action} on txn ${txnId} carried no ` +
+          `usable app_user_id (received=${describeId(facts.appUserId)}). ` +
+          'Restore this one by hand.',
+      );
+      return { ok: true, skipped: 'no usable app_user_id to restore' };
+    }
+    await grant(restoreTo, entitlement, rcKey);
     console.log(
-      `paddle-webhook: restored ${entitlement} to ${facts.appUserId} (${action}, txn ${txnId})`,
+      `paddle-webhook: restored ${entitlement} to ${restoreTo} (${action}, txn ${txnId})`,
     );
-    return { ok: true, restored: facts.appUserId };
+    return { ok: true, restored: restoreTo };
   }
 
   const refunded = Number(data?.totals?.total);
@@ -354,6 +399,12 @@ async function handleAdjustment(data, entitlement, rcKey, paddleKey) {
     return { ok: true, skipped: 'partial refund' };
   }
 
+  // Deliberately ungated, unlike every grant above. Refusing to revoke from
+  // an id we wouldn't grant to would strand the handful of historical unlocks
+  // that did land on anonymous customers, leaving a refunded purchase still
+  // unlocked. Revoking from a record nobody can sign in to costs nothing; the
+  // asymmetry is the point — be strict about handing access out, permissive
+  // about taking it back.
   await revoke(facts.appUserId, entitlement, rcKey);
   console.log(
     `paddle-webhook: revoked ${entitlement} from ${facts.appUserId} (${action}, txn ${txnId})`,
@@ -429,12 +480,24 @@ export default async function handler(req, res) {
 
   try {
     if (type === 'transaction.completed') {
-      const appUserId = data?.custom_data?.app_user_id;
+      const appUserId = supabaseUserId(data?.custom_data?.app_user_id);
       if (!appUserId) {
         // Worth shouting about: a sale completed that can't be attached to
-        // anyone, which means somebody has paid for nothing.
-        console.error('paddle-webhook: transaction.completed with no app_user_id', data?.id);
-        return res.status(200).json({ ok: true, skipped: 'no app_user_id' });
+        // anyone, which means somebody has paid for nothing. Everything
+        // needed to put it right by hand goes in the line, because by the
+        // time anyone reads it the event itself is long gone.
+        //
+        // Still 200. The payload cannot improve on a retry, so a 500 would
+        // only have Paddle redeliver the same unusable event until it gives
+        // up — noise in place of the one message that matters.
+        console.error(
+          'paddle-webhook: REFUSED GRANT — transaction.completed carried no usable ' +
+            `app_user_id. txn=${data?.id} customer=${data?.customer_id} ` +
+            `received=${describeId(data?.custom_data?.app_user_id)}. ` +
+            'Nobody was granted anything. Find this buyer in Paddle and grant ' +
+            'the entitlement against their Supabase user id by hand.',
+        );
+        return res.status(200).json({ ok: true, skipped: 'no usable app_user_id' });
       }
       await grant(appUserId, entitlement, rcKey);
       console.log(`paddle-webhook: granted ${entitlement} to ${appUserId} (txn ${data?.id})`);
