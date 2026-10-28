@@ -82,6 +82,7 @@ function ProSection() {
   const status = useProStore((s) => s.status);
   const trialDaysLeft = useProStore((s) => s.trialDaysLeft);
   const accountEmail = useProStore((s) => s.accountEmail);
+  const unattached = useProStore((s) => s.unattached);
   if (status === 'disabled' || status === 'loading') return null;
 
   const statusLabel =
@@ -104,6 +105,23 @@ function ProSection() {
           {statusLabel}
         </span>
       </Row>
+      {unattached && (
+        <Row
+          title="Save your unlock to an account"
+          description="Your purchase is on this device only — add an email to use V-Tune everywhere"
+        >
+          <button
+            onClick={() => {
+              useTunerStore.getState().setSettingsOpen(false);
+              useProStore.getState().set({ attachOpen: true });
+            }}
+            className="text-sm px-3 py-1.5 rounded font-semibold transition-colors"
+            style={{ background: '#a855f7', color: '#fff', border: '1px solid #a855f7' }}
+          >
+            Save it
+          </button>
+        </Row>
+      )}
       {status === 'trial' && (
         <Row
           title="Unlock forever"

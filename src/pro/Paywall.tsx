@@ -407,7 +407,11 @@ export function AttachAccountBanner() {
 
 function AttachAccountPrompt() {
   const [dismissed, setDismissed] = useState(false);
-  const [open, setOpen] = useState(false);
+  // In the store, not local state: Settings → V-Tune Pro opens this too, and
+  // the banner is dismissible — somebody who swipes it away every launch
+  // still needs a way back to it.
+  const open = useProStore((s) => s.attachOpen);
+  const setOpen = (v: boolean) => useProStore.getState().set({ attachOpen: v });
 
   if (open) {
     return (

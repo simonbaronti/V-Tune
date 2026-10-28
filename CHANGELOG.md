@@ -20,8 +20,16 @@ All notable changes to V-Tune are documented here. The format is based on
   the purchase doesn't come across on its own, V-Tune re-reads your store
   receipt rather than leaving you locked out.
 
-  Already affected? Open V-Tune **on the device you bought on**, sign in,
-  and tap Restore purchase. Your unlock then follows you everywhere.
+  Already affected? Open V-Tune **on the device you bought on** and use
+  either the bar at the top or Settings → V-Tune Pro → Save it. Your unlock
+  then follows you everywhere.
+
+- **Settings → V-Tune Pro offers no way back once you're unlocked.** If the
+  app was already unlocked on a device there was no Sign in and no Restore
+  anywhere in it — the only place those live is the paywall, which an
+  unlocked app never shows. So the one device that could prove the purchase
+  was the one device that couldn't be asked to. Settings now carries the
+  route, and it isn't dismissible.
 
 ## [1.3.6] — 2026-10-19
 

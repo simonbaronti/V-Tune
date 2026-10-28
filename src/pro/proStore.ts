@@ -38,6 +38,9 @@ interface ProState {
    *  lets trial users (and App Review) reach the purchase before the trial
    *  ends. When 'locked', the gate shows regardless of this flag. */
   paywallOpen: boolean;
+  /** The "save your unlock to an account" dialog. Only ever read while
+   *  `unattached` is true, so a stale `true` can't surface on its own. */
+  attachOpen: boolean;
   set: (patch: Partial<Omit<ProState, 'set'>>) => void;
 }
 
@@ -47,5 +50,6 @@ export const useProStore = create<ProState>()((set) => ({
   accountEmail: null,
   unattached: false,
   paywallOpen: false,
+  attachOpen: false,
   set: (patch) => set(patch),
 }));
