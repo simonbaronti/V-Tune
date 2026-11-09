@@ -32,7 +32,20 @@
 const PADDLE_API = 'https://api.paddle.com';
 const PER_PAGE = 30; // Paddle's maximum.
 
-const key = process.env.PADDLE_API_KEY;
+/**
+ * The API key, cleaned up before it is ever put in a header.
+ *
+ * Paddle answers a key with a stray space or a pasted "Bearer " prefix with
+ * `authentication_malformed`, which reads like the script is broken rather
+ * than like the key needs retyping. Both happen constantly when a key is
+ * pasted into a prompt, so handle them here and fail locally with a sentence
+ * that says what to do.
+ */
+const key = (process.env.PADDLE_API_KEY ?? '')
+  .trim()
+  .replace(/^Bearer\s+/i, '')
+  .replace(/^["']|["']$/g, '')
+  .trim();
 const [from, to] = process.argv.slice(2);
 
 const line = (s = '') => console.log(s);
@@ -43,6 +56,13 @@ if (!key) {
   line();
   line('  from, to   optional YYYY-MM-DD bounds, inclusive. Omit for every sale.');
   line('  PADDLE_API_KEY   Paddle → Developer tools → Authentication');
+  process.exit(1);
+}
+
+if (!key.startsWith('pdl_')) {
+  line(`That doesn't look like a Paddle API key — it should start with "pdl_".`);
+  line(`Got ${key.length} character${key.length === 1 ? '' : 's'} starting "${key.slice(0, 4)}".`);
+  line('Paddle → Developer tools → Authentication. The key is shown once, at creation.');
   process.exit(1);
 }
 
@@ -92,7 +112,13 @@ const inWindow = (t) => {
 };
 const rows = txns.filter(inWindow).sort((a, b) => when(a).localeCompare(when(b)));
 
-line(`${txns.length} completed sales${from || to ? `, ${rows.length} in the window` : ''}.`);
+if (failed && txns.length === 0) {
+  // "0 completed sales" over a failed request is the same false reassurance
+  // the orphan scan used to print: an empty result dressed as a finding.
+  line('NOTHING WAS READ — the request failed above. This is not a result.');
+} else {
+  line(`${txns.length} completed sales${from || to ? `, ${rows.length} in the window` : ''}.`);
+}
 
 const money = (t) => {
   const total = t.details?.totals?.grand_total;
@@ -111,7 +137,7 @@ for (const t of rows) {
   line(`    app_user_id: ${ok ? raw.trim() : `${JSON.stringify(raw) ?? 'absent'}  ← UNUSABLE`}`);
   if (!ok) broken.push({ ...t, email });
 }
-if (rows.length === 0) line('  None.');
+if (rows.length === 0) line(failed ? '  Nothing readable — see the error above.' : '  None.');
 
 head('Sales that could never have unlocked anything');
 if (broken.length === 0) {
