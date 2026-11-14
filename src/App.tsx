@@ -17,6 +17,7 @@ import { AudioErrorToast } from './components/AudioErrorToast';
 import { UpdateBanner } from './components/UpdateBanner';
 import { DesktopUpdater } from './components/DesktopUpdater';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useWakeLock } from './hooks/useWakeLock';
 import { useTunerStore } from './store/tunerStore';
 import { PRO_ENABLED } from './pro/config';
 
@@ -34,6 +35,10 @@ const MENU_WIDTH = 380;
 
 function App() {
   useKeyboardShortcuts();
+  // Hold the screen awake only while the mic is live. Tuning a pan is both
+  // hands on the instrument for minutes at a time, and the display sleeping
+  // mid-strobe is the one moment it must not.
+  useWakeLock(useTunerStore((s) => s.isRunning));
   // Pro layer (trial / unlock). Inert until PRO_ENABLED is flipped on.
   useEffect(() => {
     if (PRO_ENABLED) void import('./pro/entitlement').then((m) => m.initPro());

@@ -76,6 +76,42 @@ function Row({
   );
 }
 
+/**
+ * Whether the screen is being held awake, said out loud.
+ *
+ * There is nothing to configure — it follows the microphone — so this is a
+ * readout, not a control. It exists because the failure is invisible: a
+ * wake lock that was refused looks exactly like a device that just sleeps,
+ * and neither the user nor we could tell them apart from a support email.
+ * Now the answer is on screen next to the mic settings.
+ */
+function WakeLockRow() {
+  const wakeLock = useTunerStore((s) => s.wakeLock);
+  const isRunning = useTunerStore((s) => s.isRunning);
+
+  const [label, colour] =
+    wakeLock === 'held'
+      ? ['Screen staying awake', '#22c55e']
+      : wakeLock === 'unsupported'
+        ? ['Not available on this device', 'var(--text-dim)']
+        : wakeLock === 'denied'
+          ? ['Blocked by this device', '#fbbf24']
+          : isRunning
+            ? ['Not held', 'var(--text-dim)']
+            : ['Starts with the microphone', 'var(--text-dim)'];
+
+  return (
+    <Row
+      title="Keep screen awake"
+      description="While the tuner is listening, so the display won't sleep mid-strobe"
+    >
+      <span className="text-sm font-semibold" style={{ color: colour }}>
+        {label}
+      </span>
+    </Row>
+  );
+}
+
 /** V-Tune Pro status + a way to buy before the trial runs out. Also the
  *  purchase path App Review can always reach. Hidden while Pro is off. */
 function ProSection() {
@@ -314,6 +350,7 @@ export function SettingsModal() {
                 </button>
               ))}
             </Row>
+            <WakeLockRow />
           </Section>
 
           {/* ── Sound — the pitch pipe is the only thing V-Tune plays

@@ -90,8 +90,28 @@ export const ISO_COLORS = [
   { rgb: '168, 85, 247', hex: '#a855f7' },  // purple — 2nd window
 ] as const;
 
+/**
+ * Whether the screen is being held awake, and if not, why not.
+ *
+ * Lives in the store rather than in the hook so Settings can show it. A
+ * wake lock that silently does nothing is indistinguishable from a device
+ * that simply sleeps, and "the screen still went dark" cannot be diagnosed
+ * from a support email — so the app has to be able to say which it is.
+ */
+export type WakeLockState =
+  /** No Screen Wake Lock API here — nothing was attempted. */
+  | 'unsupported'
+  /** Supported, not currently wanted (or let go while hidden). */
+  | 'idle'
+  /** The screen is being kept awake right now. */
+  | 'held'
+  /** Asked, and the platform refused. */
+  | 'denied';
+
 export interface TunerState {
   isRunning: boolean;
+  /** Transient; never persisted. Owned by useWakeLock. */
+  wakeLock: WakeLockState;
   referenceFreq: number;
   currentNote: NoteInfo | null;
   centsOffset: number;
@@ -217,6 +237,7 @@ export interface TunerState {
   largeText: boolean;
 
   setRunning: (running: boolean) => void;
+  setWakeLock: (state: WakeLockState) => void;
   setReferenceFreq: (freq: number) => void;
   setCurrentNote: (note: NoteInfo) => void;
   updateBands: (bandData: { targetFreq: number; magnitude: number; phase: number; phaseDelta: number; centsDelta: number }[]) => void;
@@ -439,6 +460,10 @@ export const useTunerStore = create<TunerState>()(
   persist(
     (set, get) => ({
   isRunning: false,
+  // Detected up front so Settings can say "not supported here" rather than
+  // sitting on a hopeful 'idle' that will never change.
+  wakeLock:
+    typeof navigator !== 'undefined' && 'wakeLock' in navigator ? 'idle' : 'unsupported',
   referenceFreq: 440,
   currentNote: null,
   centsOffset: 0,
@@ -504,6 +529,7 @@ export const useTunerStore = create<TunerState>()(
   largeText: (typeof localStorage !== 'undefined' && localStorage.getItem('v-tune-large-text') === '1'),
 
   setRunning: (running) => set({ isRunning: running }),
+  setWakeLock: (state) => set({ wakeLock: state }),
 
   setReferenceFreq: (freq) => {
     const state = get();
