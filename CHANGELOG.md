@@ -4,6 +4,20 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.8] — 2026-11-15
+
+### Added
+- **The screen stays on while the tuner is listening.** Tuning a handpan
+  means both hands on the instrument, and the display used to dim and lock
+  mid-strobe, usually just as a note was nearly there. V-Tune now keeps the
+  screen awake whenever the microphone is on, and lets the device sleep
+  normally again the moment you stop. Nothing to switch on.
+
+  Settings → Input shows whether it's working on your device. If it says
+  *Blocked by this device*, the device refused the request (a battery-saver
+  or low-power mode is the usual cause), and the screen will sleep on its
+  usual timer.
+
 ## [1.3.7] — 2026-10-27
 
 ### Fixed
