@@ -4,6 +4,17 @@ All notable changes to V-Tune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and V-Tune follows
 [semantic versioning](https://semver.org/).
 
+## [1.3.9] — 2026-11-17
+
+### Fixed
+- **V-Tune 1.3.8 wouldn't open on iPhones and iPads running iOS 27.** It
+  closed straight away, every time. Nothing in V-Tune itself had changed:
+  1.3.8 was the first version built with Apple's iOS 27 tools, and those
+  require a way of starting up that V-Tune didn't use yet, so iOS 27 refused
+  to launch it. V-Tune now starts up the way iOS 27 expects. Your settings,
+  instruments and unlock were never affected; update and everything is
+  where you left it.
+
 ## [1.3.8] — 2026-11-15
 
 ### Added

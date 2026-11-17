@@ -173,3 +173,64 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 }
+
+/// Scene lifecycle — required from the iOS 27 SDK on.
+///
+/// Built with the iOS 27 SDK, an app that still runs on the old app-delegate
+/// lifecycle is killed at launch on iOS 27, before any of our code runs
+/// (`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`). 1.3.8
+/// shipped that way: nothing in V-Tune changed, Xcode moved from 26.5 to 27.2
+/// between 1.3.7 and 1.3.8, and the app stopped opening on every iOS 27 device.
+///
+/// Capacitor 8 doesn't provide a scene delegate, so this one does the minimum:
+/// UIKit builds the window from Main.storyboard (Info.plist's scene manifest),
+/// and every lifecycle event is handed to AppDelegate, which still owns the
+/// audio session. Once scenes are adopted, UIKit stops calling the
+/// app-delegate lifecycle methods itself — without the forwarding below,
+/// the speaker/Bluetooth reactivation after backgrounding would silently stop.
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+    var window: UIWindow?
+
+    private var app: AppDelegate? { UIApplication.shared.delegate as? AppDelegate }
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        // Cold launch from a link: UIKit delivers it here, not to openURLContexts.
+        if !connectionOptions.urlContexts.isEmpty {
+            self.scene(scene, openURLContexts: connectionOptions.urlContexts)
+        }
+        for activity in connectionOptions.userActivities {
+            self.scene(scene, continue: activity)
+        }
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        app?.applicationDidBecomeActive(UIApplication.shared)
+    }
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        app?.applicationWillResignActive(UIApplication.shared)
+    }
+
+    func sceneWillEnterForeground(_ scene: UIScene) {
+        app?.applicationWillEnterForeground(UIApplication.shared)
+    }
+
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        app?.applicationDidEnterBackground(UIApplication.shared)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            var options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+            if let source = context.options.sourceApplication {
+                options[.sourceApplication] = source
+            }
+            options[.openInPlace] = context.options.openInPlace
+            _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, open: context.url, options: options)
+        }
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+    }
+}
